@@ -207,6 +207,7 @@ function initializeCalendar() {
         // Double RAF: let FC finish its setOption re-render before scrolling
         requestAnimationFrame(() => {
             calendar.scrollToTime(_calSettings.cal_scroll_time || '08:00:00');
+            _updateSlotLabel();
         });
     });
     window.addEventListener('resize', fitCalHeight);
@@ -400,13 +401,53 @@ function setupEventListeners() {
     );
 }
 
+const _SLOT_CYCLE = ['00:15:00', '00:30:00', '01:00:00'];
+const _SLOT_LABEL = { '00:15:00': '15m', '00:30:00': '30m', '01:00:00': '60m' };
+
+function _currentSlot() {
+    return calendar.getOption('slotDuration') || _calSettings.cal_slot_duration || '00:15:00';
+}
+
+function _cycleSlot() {
+    const cur = _currentSlot();
+    // Normalise FC's returned value (may be an object or string like "00:15:00")
+    const curStr = typeof cur === 'string' ? cur : `${String(cur.hours || 0).padStart(2,'0')}:${String(cur.minutes || 0).padStart(2,'0')}:00`;
+    const idx = _SLOT_CYCLE.indexOf(curStr);
+    return _SLOT_CYCLE[(idx + 1) % _SLOT_CYCLE.length];
+}
+
+function _updateSlotLabel() {
+    const cur = _currentSlot();
+    const curStr = typeof cur === 'string' ? cur : `${String(cur.hours || 0).padStart(2,'0')}:${String(cur.minutes || 0).padStart(2,'0')}:00`;
+    const label = _SLOT_LABEL[curStr] || '';
+    ['day', 'week'].forEach(v => {
+        const btn = document.querySelector(`.view-btn[data-view="${v}"]`);
+        if (!btn) return;
+        const base = v.charAt(0).toUpperCase() + v.slice(1);
+        const active = document.getElementById('calendar')?.dataset.view === v;
+        btn.textContent = active ? `${base} ${label}` : base;
+    });
+}
+
 function changeView(view) {
-    const fcViews = { week: 'timeGridWeek', day: 'timeGridDay', month: 'dayGridMonth' };
-    if (fcViews[view]) calendar.changeView(fcViews[view]);
+    const fcViews   = { week: 'timeGridWeek', day: 'timeGridDay', month: 'dayGridMonth' };
+    const currentFC = calendar.view.type;
+    const isTimegrid = view === 'week' || view === 'day';
+
+    // Repeated click on active timegrid view → cycle slot duration
+    if (isTimegrid && currentFC === fcViews[view]) {
+        const next = _cycleSlot();
+        calendar.setOption('slotDuration', next);
+        requestAnimationFrame(() => calendar.scrollToTime(_calSettings.cal_scroll_time || '08:00:00'));
+    } else {
+        if (fcViews[view]) calendar.changeView(fcViews[view]);
+    }
+
     document.getElementById('calendar').dataset.view = view;
     document.querySelectorAll('.view-btn[data-view]').forEach(btn =>
         btn.classList.toggle('active', btn.dataset.view === view)
     );
+    _updateSlotLabel();
     updateCalendarTitle();
 }
 
