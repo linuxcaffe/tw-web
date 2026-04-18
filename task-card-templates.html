@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Card Templates</title>
+</head>
+<body>
+    <!-- Template pour la version minimaliste -->
+    <template id="task-card-minimal">
+        <div class="task-card">
+            <div class="task-card-header">
+                <span class="task-priority"><slot name="priority"></slot></span>
+            </div>
+            <div class="task-description"><slot name="description"></slot></div>
+            <div class="task-meta">
+                <span class="task-meta-item">⏱️ <slot name="duration"></slot></span>
+                <span class="task-meta-item">📂 <slot name="pool"></slot></span>
+            </div>
+        </div>
+    </template>
+
+    <!-- Template pour la version complète -->
+    <template id="task-card-full">
+        <div class="task-card">
+            <div class="task-card-header">
+                <span class="task-priority"><slot name="priority"></slot></span>
+                <button class="toggle-mode-btn" onclick="taskCardManager.toggleMode(this.closest('.task-card'))">
+                    <span class="icon">🔄</span>
+                </button>
+            </div>
+            <div class="task-description"><slot name="description"></slot></div>
+            <div class="task-meta">
+                <span class="task-meta-item">⏱️ <slot name="duration"></slot></span>
+                <span class="task-meta-item">📅 <slot name="due"></slot></span>
+                <span class="task-meta-item">📂 <slot name="pool"></slot></span>
+            </div>
+            <div class="task-tags">
+                <slot name="tags"></slot>
+            </div>
+            <div class="task-actions">
+                <button class="btn btn-warning btn-small task-stop" style="display: none;" data-task-action="stop">
+                    <span class="icon">⏸️</span> Stop
+                </button>
+                <button class="btn btn-success btn-small task-start" data-task-action="start">
+                    <span class="icon">▶️</span> Start
+                </button>
+                <button class="btn btn-primary btn-small task-edit" data-task-action="edit">
+                    <span class="icon">✏️</span> Edit
+                </button>
+                <button class="btn btn-success btn-small task-done" data-task-action="done">
+                    <span class="icon">✅</span> Done
+                </button>
+                <button class="btn btn-danger btn-small task-delete" data-task-action="delete">
+                    <span class="icon">🗑️</span> Delete
+                </button>
+            </div>
+        </div>
+    </template>
+</body>
+</html>

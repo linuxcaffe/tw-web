@@ -1,0 +1,64 @@
+# Environnements virtuels
+venv/
+venv/*
+ENV/
+
+# Fichiers de configuration locaux
+*.code-workspace
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Dossiers de dépendances
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+
+#Documentation
+relevant_documentation/
+docs/tui-calendar/
+
+# Fichiers de cache et logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Dossiers de build et distribution
+build/
+dist/
+*.egg-info/
+
+# Fichiers de test et couverture
+coverage/
+.nyc_output/
+.coveragerc
+
+# Fichiers Playwright
+playwright-report/
+test-results/
+
+# Fichiers temporaires
+*~
+*.swp
+*.swo
+*~
+.DS_Store
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Fichiers de débogage
+command.debug
+_*
+
+# User settings — machine-local preferences written by the Settings UI
+settings.json
+

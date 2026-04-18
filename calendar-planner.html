@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1a1a1a">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/logo-192.png">
+    <title>Calendar Planner</title>
+
+    <!-- FullCalendar v5 (local — avoids PWA sandbox CDN issues) -->
+    <link rel="stylesheet" href="/fullcalendar.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="calendar-planner.css">
+    <script src="/nav.js"></script>
+    <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");</script>
+</head>
+<body class="cal-page">
+    <!-- DEBUG banner — remove once calendar is working -->
+    <div id="cal-debug-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#c0392b;color:#fff;padding:8px 12px;font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:30vh;overflow-y:auto;pointer-events:none;"></div>
+
+    <div class="app-container">
+        <div class="cal-topbar">
+            <button id="prev-btn" class="nav-btn">◀</button>
+            <span id="calendar-title" class="cal-title-text"></span>
+            <div class="cal-topbar-right">
+                <button id="today-btn" class="view-btn active">Today</button>
+                <button class="view-btn" data-view="day">Day</button>
+                <button class="view-btn active" data-view="week">Week</button>
+                <button class="view-btn" data-view="month">Month</button>
+                <button id="next-btn" class="nav-btn">▶</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Left column: calendar (70%) -->
+            <div class="calendar-column">
+                <div id="calendar" class="calendar-container"></div>
+            </div>
+
+            <!-- Right column: unscheduled tasks (30%) -->
+            <div class="tasks-column">
+                <div class="tasks-controls">
+                    <div class="sort-wrap">
+                        <button id="cal-sort-btn" class="view-btn" title="Sort">⇅</button>
+                        <div id="cal-sort-popup" class="sort-popup" style="display:none">
+                            <div class="sort-fields" id="cal-sort-fields"></div>
+                            <label class="sort-reverse-label">
+                                <input type="checkbox" id="cal-sort-reverse"> Reverse
+                            </label>
+                        </div>
+                    </div>
+                    <button id="cal-view-card" class="view-btn active" title="Card view">⊞</button>
+                    <button id="cal-view-list" class="view-btn" title="List view">≡</button>
+                </div>
+                <div class="tasks-container" id="unplanned-tasks">
+                    <div class="loading-message">
+                        <span class="icon">⏳</span>
+                        Loading tasks...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task detail modal -->
+    <div id="task-detail-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-task-title">Task Details</h3>
+                <button class="modal-close" id="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-task-body"></div>
+            <div class="modal-footer modal-crud-footer">
+                <button id="modal-start-btn"       class="ca-btn ca-start"  title="Start">▶</button>
+                <button id="modal-stop-btn"        class="ca-btn ca-stop"   title="Stop">⏸</button>
+                <button id="modal-edit-btn"        class="ca-btn ca-edit"   title="Edit">✏</button>
+                <button id="modal-unschedule-btn"  class="ca-btn ca-unsched" title="Unschedule">📅</button>
+                <button id="modal-done-btn"        class="ca-btn ca-done"   title="Done">✓</button>
+                <button id="modal-delete-btn"      class="ca-btn ca-delete" title="Delete">✕</button>
+            </div>
+        </div>
+    </div>
+
+<!-- Notification -->
+    <div id="notification" class="notification">
+        <span id="notif-text"></span>
+        <button class="notif-close" id="notif-close">&times;</button>
+    </div>
+
+    <!-- FullCalendar v5: core + view plugins (local — avoids PWA sandbox CDN issues) -->
+    <script src="/fullcalendar.min.js"></script>
+    <script src="/fullcalendar-daygrid.min.js"></script>
+    <script src="/fullcalendar-timegrid.min.js"></script>
+    <script src="/fullcalendar-interaction.min.js"></script>
+    <!-- Custom JS -->
+    <script src="task-card.js"></script>
+    <script src="/codemirror-bundle.js"></script>
+    <script src="task-editor.js"></script>
+    <script src="calendar-planner.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+# [Created by task 3.3.0 1/19/2025 16:53:49]
+#data.location=/data/data/com.termux/files/home/.task
+news.version=3.3.0
+
+# To use the default location of the XDG directories,
+# move this configuration file from ~/.taskrc to ~/.config/task/taskrc and update location config as follows:
+
+#data.location=~/.local/share/task
+hooks.location=~/.config/task/hooks
+#data.location=/storage/emulated/0/Documents/Syncthing-Oneplus/taskWarrior/.task
+data.location=~/.task
+
+#gestion des dependance
+urgency.inherit=on
+urgency.blocked.coefficient=0
+urgency.blocking.coefficient=1
+
+#Custom urgency
+urgency.user.tag.committed=2
+urgency.user.tag.commit=2
+urgency.user.tag.rapide=2
+
+#Definition des UDA
+uda.estTime.type=duration
+uda.estTime.label=estimateTime
+uda.proposed_scheduled.type=date
+uda.proposed_scheduled.label=propScheduled
+uda.pool.type=string
+uda.pool.label=pool
+uda.assignee.type=string
+uda.assignee.label=Assignee
+
+context.pro.read=+pro
+context.pro.write=+pro
+context.perso.read=+perso
+context.perso.write=+perso
+
+

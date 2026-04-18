@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head><title>Task Editor Templates</title></head>
+<body>
+<template id="task-editor-modal">
+    <div class="modal-content te-panel">
+        <div class="te-header">
+            <span id="task-editor-title">Add Task</span>
+            <span class="close task-editor-close">&times;</span>
+        </div>
+        <!-- Status banner — shown for completed/deleted tasks only -->
+        <div id="te-status-banner" class="te-status-banner" style="display:none">
+            <span id="te-status-text"></span>
+            <button type="button" id="te-revert-btn" class="te-revert-btn">Revert to pending</button>
+        </div>
+
+        <form id="task-editor-form" autocomplete="off">
+
+            <!-- Row 1: Description full width -->
+            <input type="text" id="task-editor-description" placeholder="Description" required>
+
+            <!-- Row 2: Project full width -->
+            <input type="text" id="task-editor-project" placeholder="Project"
+                   list="task-editor-project-options">
+            <datalist id="task-editor-project-options"></datalist>
+
+            <!-- Row 3: Priority 25% | Tags 75% -->
+            <div class="te-row te-row-1-3">
+                <input type="text" id="task-editor-priority" placeholder="Pri (1-6,H,M,L)" maxlength="2" autocomplete="off">
+                <input type="text" id="task-editor-tags" placeholder="Tags (comma-sep)">
+            </div>
+
+            <!-- Row 4: Due 70% | due_duration 30% -->
+            <div class="te-row te-row-7-3">
+                <div class="te-date-field">
+                    <small>Due</small>
+                    <div class="te-date-row">
+                        <input type="datetime-local" id="task-editor-due">
+                        <button type="button" class="te-clr" data-clears="task-editor-due" title="Clear">×</button>
+                    </div>
+                </div>
+                <input type="text" id="task-editor-due-duration" placeholder="Due dur">
+            </div>
+
+            <!-- Row 5: Scheduled 70% | sched_duration 30% -->
+            <div class="te-row te-row-7-3">
+                <div class="te-date-field">
+                    <small>Scheduled</small>
+                    <div class="te-date-row">
+                        <input type="datetime-local" id="task-editor-scheduled">
+                        <button type="button" class="te-clr" data-clears="task-editor-scheduled" title="Clear">×</button>
+                    </div>
+                </div>
+                <input type="text" id="task-editor-sched-duration" placeholder="Sched dur">
+            </div>
+
+            <!-- Annotations (edit mode only — hidden for new tasks until after save) -->
+            <div id="te-annotations-section" class="te-annotations-section">
+                <div id="te-existing-annotations" class="te-existing-annotations"></div>
+                <!-- CM editor for add / edit -->
+                <div id="te-ann-editor-wrap" class="te-ann-editor-wrap" style="display:none">
+                    <div id="te-ann-cm-host" class="te-ann-cm-host"></div>
+                    <div class="te-ann-editor-btns">
+                        <button type="button" class="btn btn-primary btn-sm" id="te-ann-save-btn">Save</button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="te-ann-cancel-btn">Cancel</button>
+                    </div>
+                </div>
+                <button type="button" class="te-ann-add-btn" id="te-ann-add-btn">+ Add annotation</button>
+            </div>
+
+            <div class="te-actions">
+                <button type="submit"  class="btn btn-primary   btn-sm" id="task-editor-save">Save</button>
+                <button type="button"  class="btn btn-secondary btn-sm" id="task-editor-cancel">Cancel</button>
+            </div>
+
+        </form>
+    </div>
+</template>
+</body>
+</html>
