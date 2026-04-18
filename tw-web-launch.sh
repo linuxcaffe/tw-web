@@ -6,7 +6,7 @@
 #   tw-web-launch.sh --clean   wipe stale SW cache first, then launch
 #   tw-web-launch.sh --stop    stop the Flask server
 
-FLASK_DIR="$HOME/dev/WebTaskManager"
+FLASK_DIR="$HOME/dev/tw-web"
 FLASK_LOG="/tmp/tw-web.log"
 FLASK_PID_FILE="/tmp/tw-web.pid"
 FLASK_URL="http://localhost:5000/"
