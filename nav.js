@@ -484,11 +484,13 @@
             else { closeMenu(); document.dispatchEvent(new CustomEvent('tw-menu-action', { detail: { action } })); }
         });
 
-        // Brand text → refresh with blink
+        // Brand text → force refresh (bypass cache) with blink
         document.getElementById('tw-brand-refresh').addEventListener('click', () => {
             const btn = document.getElementById('tw-brand-refresh');
             btn.classList.add('blinking');
             btn.addEventListener('animationend', () => btn.classList.remove('blinking'), { once: true });
+            // Invalidate cache so loadTasks() always hits the server
+            try { sessionStorage.setItem('tw-tasks-dirty', '1'); } catch {}
             document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
             document.dispatchEvent(new CustomEvent('tw-show-notification',
                 { detail: { message: 'Refreshed', type: 'success' } }));
