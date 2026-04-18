@@ -9,6 +9,7 @@ let allTasks         = [];
 let dueTasks         = [];
 let _calEventSource  = null;  // managed FC event source — remove before re-adding
 let _loadId          = 0;     // increment each loadTasks() call; cancelled calls are ignored
+let _calSettings     = {};    // loaded from /api/config before calendar init
 
 // ── Task cache ────────────────────────────────────────────────────────────────
 // Two-layer cache:
@@ -83,8 +84,14 @@ window.onunhandledrejection = (e) => {
 };
 
 // ── DOMContentLoaded ──────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const _step = (name, fn) => { try { fn(); } catch(e) { _dbg(`CRASH in ${name}: ${e.message}\n${e.stack}`); throw e; } };
+
+    // Load calendar settings before initialising the calendar
+    try {
+        const r = await fetch('/api/config');
+        _calSettings = await r.json();
+    } catch (_) { /* use defaults */ }
 
     _step('TaskCardManager', () => {
         taskCardManager = new TaskCardManager(new CalendarTaskActionHandler());
@@ -134,10 +141,10 @@ function initializeCalendar() {
     const el = document.getElementById('calendar');
 
     calendar = new FullCalendar.Calendar(el, {
-        initialView:          'timeGridWeek',
+        initialView:          _calSettings.cal_default_view  || 'timeGridWeek',
         headerToolbar:        false,     // we render our own toolbar
-        slotMinTime:          '06:00:00',
-        slotMaxTime:          '23:00:00',
+        slotMinTime:          _calSettings.cal_day_start     || '06:00:00',
+        slotMaxTime:          _calSettings.cal_day_end       || '23:00:00',
         firstDay:             1,         // Monday
         nowIndicator:         true,
         allDaySlot:           false,     // due events are timed; no allday strip needed
@@ -150,7 +157,7 @@ function initializeCalendar() {
         weekNumbers:             true,      // ISO week numbers in gutter (TW users love these)
         weekNumberFormat:        { week: 'narrow' },  // "W16" compact style
         slotDuration:            '00:15:00', // 15-min grid for finer drag precision
-        scrollTime:              '08:00:00', // open scrolled to 8am, not 6am
+        scrollTime:              _calSettings.cal_scroll_time || '08:00:00',
         scrollTimeReset:         false,      // don't jump back on week/day navigation
         selectable:              true,       // drag to select a time range
         selectMirror:            true,       // ghost event preview while selecting

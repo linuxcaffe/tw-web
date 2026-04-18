@@ -309,6 +309,10 @@
 }
 .tw-settings-label { font-size: 13px; color: rgba(255,255,255,0.75); }
 .tw-settings-note  { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+.tw-settings-section-label {
+    padding: 10px 16px 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: rgba(255,255,255,0.3);
+}
 .tw-settings-input {
     background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
     border-radius: 4px; color: #ecf0f1; font-size: 12px; padding: 4px 6px;
@@ -804,6 +808,36 @@
                 `<input id="tws-kanban" type="text" value="${esc((cfg.kanban_columns || []).join(', '))}" ` +
                     `class="tw-settings-input" style="width:140px">` +
             `</div>` +
+            `<div class="tw-settings-section-label">Calendar</div>` +
+            `<div class="tw-settings-row">` +
+                `<div>` +
+                    `<div class="tw-settings-label">Day start / end</div>` +
+                    `<div class="tw-settings-note">Visible hour range (HH:MM)</div>` +
+                `</div>` +
+                `<div style="display:flex;gap:6px;align-items:center">` +
+                    `<input id="tws-cal-start" type="time" value="${esc((cfg.cal_day_start  || '06:00').slice(0,5))}" class="tw-settings-input" style="width:80px">` +
+                    `<span style="color:rgba(255,255,255,0.3)">–</span>` +
+                    `<input id="tws-cal-end"   type="time" value="${esc((cfg.cal_day_end    || '23:00').slice(0,5))}" class="tw-settings-input" style="width:80px">` +
+                `</div>` +
+            `</div>` +
+            `<div class="tw-settings-row">` +
+                `<div>` +
+                    `<div class="tw-settings-label">Scroll to (on open)</div>` +
+                    `<div class="tw-settings-note">Time shown at top of calendar</div>` +
+                `</div>` +
+                `<input id="tws-cal-scroll" type="time" value="${esc((cfg.cal_scroll_time || '08:00').slice(0,5))}" class="tw-settings-input" style="width:80px">` +
+            `</div>` +
+            `<div class="tw-settings-row">` +
+                `<div>` +
+                    `<div class="tw-settings-label">Default view</div>` +
+                    `<div class="tw-settings-note">Opening view for Calendar page</div>` +
+                `</div>` +
+                `<select id="tws-cal-view" class="tw-settings-input" style="width:130px">` +
+                    `<option value="timeGridWeek"${cfg.cal_default_view === 'timeGridWeek'  ? ' selected' : ''}>Week</option>` +
+                    `<option value="timeGridDay"${cfg.cal_default_view  === 'timeGridDay'   ? ' selected' : ''}>Day</option>` +
+                    `<option value="dayGridMonth"${cfg.cal_default_view === 'dayGridMonth'  ? ' selected' : ''}>Month</option>` +
+                `</select>` +
+            `</div>` +
             `<div class="tw-settings-row" style="border:none;justify-content:flex-end;gap:8px">` +
                 `<span id="tws-status" style="font-size:12px;color:rgba(255,255,255,0.45)"></span>` +
                 `<button type="submit" class="tw-pick-item" style="width:auto;padding:6px 16px;border:1px solid rgba(255,255,255,0.2);border-radius:4px">Save</button>` +
@@ -816,16 +850,27 @@
 
         body.querySelector('#tw-settings-form').addEventListener('submit', async e => {
             e.preventDefault();
-            const status  = body.querySelector('#tws-status');
-            const notifVal = parseInt(body.querySelector('#tws-notif').value, 10);
+            const status    = body.querySelector('#tws-status');
+            const notifVal  = parseInt(body.querySelector('#tws-notif').value, 10);
             const kanbanVal = body.querySelector('#tws-kanban').value;
+            const calStart  = body.querySelector('#tws-cal-start').value;
+            const calEnd    = body.querySelector('#tws-cal-end').value;
+            const calScroll = body.querySelector('#tws-cal-scroll').value;
+            const calView   = body.querySelector('#tws-cal-view').value;
             if (isNaN(notifVal) || notifVal < 0) { status.textContent = 'Invalid timeout'; return; }
             status.textContent = 'Saving…';
             try {
                 const r = await fetch('/api/config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ notification_timeout: notifVal, kanban_columns: kanbanVal }),
+                    body: JSON.stringify({
+                        notification_timeout: notifVal,
+                        kanban_columns:       kanbanVal,
+                        cal_day_start:        calStart,
+                        cal_day_end:          calEnd,
+                        cal_scroll_time:      calScroll,
+                        cal_default_view:     calView,
+                    }),
                 });
                 const d = await r.json();
                 if (d.success) {

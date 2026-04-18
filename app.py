@@ -30,12 +30,31 @@ def _valid_task_id(task_id):
 # ── Settings (settings.json > config.py > hardcoded defaults) ─────────────────
 _SETTINGS_PATH = Path(__file__).parent / 'settings.json'
 
+def _valid_hour(v):
+    """Accept 'HH:MM' or plain int/float hours, return 'HH:MM:00'."""
+    s = str(v).strip()
+    if ':' in s:
+        parts = s.split(':')
+        h, m = int(parts[0]), int(parts[1])
+    else:
+        h = int(float(s)); m = 0
+    if not (0 <= h <= 24 and 0 <= m < 60):
+        raise ValueError(f'Invalid hour value: {v}')
+    return f'{h:02d}:{m:02d}:00'
+
+_CAL_VIEWS = {'timeGridWeek', 'timeGridDay', 'dayGridMonth'}
+
 _SETTINGS_SCHEMA = {
     'notification_timeout': {'type': int,  'default': 3000,
                               'validate': lambda v: v >= 0},
     'kanban_columns':       {'type': None, 'default': ['backlog','todo','doing','review','done'],
                               'coerce': lambda v: [c.strip() for c in
                                   (v if isinstance(v, list) else str(v).split(',')) if c.strip()]},
+    'cal_day_start':        {'type': None, 'default': '06:00:00', 'coerce': _valid_hour},
+    'cal_day_end':          {'type': None, 'default': '23:00:00', 'coerce': _valid_hour},
+    'cal_scroll_time':      {'type': None, 'default': '08:00:00', 'coerce': _valid_hour},
+    'cal_default_view':     {'type': str,  'default': 'timeGridWeek',
+                              'validate': lambda v: v in _CAL_VIEWS},
 }
 
 def _load_settings():
