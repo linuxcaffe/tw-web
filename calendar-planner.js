@@ -199,8 +199,13 @@ function initializeCalendar() {
     // Observe the COLUMN (parent), not #calendar itself — observing the mount point
     // creates a feedback loop: FC renders → #calendar size changes → observer fires
     // → setOption('height') → FC re-renders → interrupts event rendering.
+    // After fitCalHeight triggers a re-render via setOption, scrollToTime ensures
+    // the scroll position lands on the configured time (re-render can reset it).
     const col = document.querySelector('.calendar-column');
-    requestAnimationFrame(fitCalHeight);
+    requestAnimationFrame(() => {
+        fitCalHeight();
+        calendar.scrollToTime(_calSettings.cal_scroll_time || '08:00:00');
+    });
     window.addEventListener('resize', fitCalHeight);
     if (col) new ResizeObserver(fitCalHeight).observe(col);
 }
