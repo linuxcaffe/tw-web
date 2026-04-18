@@ -319,19 +319,20 @@ function renderEventContent(arg) {
 }
 
 // ── Optimistic event drop/resize ──────────────────────────────────────────────
+function _isDueEvent(fcEvent) { return fcEvent.id.endsWith('_due'); }
+
 async function handleEventDrop(info) {
     const task = info.event.extendedProps?.raw;
     if (!task?.uuid) return;
 
-    const modData = { scheduled: toLocalISOString(info.event.start) };
-    if (info.event.end) {
-        const mins = Math.round((info.event.end - info.event.start) / 60000);
-        modData.sched_duration = minsToISO(mins);
-    }
+    const isDue   = _isDueEvent(info.event);
+    const mins    = info.event.end ? Math.round((info.event.end - info.event.start) / 60000) : null;
+    const modData = isDue
+        ? { due: toLocalISOString(info.event.start), ...(mins ? { due_duration: minsToISO(mins) } : {}) }
+        : { scheduled: toLocalISOString(info.event.start), ...(mins ? { sched_duration: minsToISO(mins) } : {}) };
+
     const result = await modifyTaskInBackend(task.uuid, modData);
     if (result.success) {
-        // Optimistic update — patch in-place, no full reload needed.
-        // Mark dirty so other pages refetch when they next open.
         const updated = { ...task, ...modData };
         info.event.setExtendedProp('raw', updated);
         const idx = allTasks.findIndex(t => t.uuid === task.uuid);
@@ -348,11 +349,12 @@ async function handleEventResize(info) {
     const task = info.event.extendedProps?.raw;
     if (!task?.uuid) return;
 
+    const isDue   = _isDueEvent(info.event);
     const mins    = Math.round((info.event.end - info.event.start) / 60000);
-    const modData = {
-        scheduled:      toLocalISOString(info.event.start),
-        sched_duration: minsToISO(mins)
-    };
+    const modData = isDue
+        ? { due: toLocalISOString(info.event.start), due_duration: minsToISO(mins) }
+        : { scheduled: toLocalISOString(info.event.start), sched_duration: minsToISO(mins) };
+
     const result = await modifyTaskInBackend(task.uuid, modData);
     if (result.success) {
         const updated = { ...task, ...modData };
@@ -416,18 +418,7 @@ function _cycleSlot() {
     return _SLOT_CYCLE[(idx + 1) % _SLOT_CYCLE.length];
 }
 
-function _updateSlotLabel() {
-    const cur = _currentSlot();
-    const curStr = typeof cur === 'string' ? cur : `${String(cur.hours || 0).padStart(2,'0')}:${String(cur.minutes || 0).padStart(2,'0')}:00`;
-    const label = _SLOT_LABEL[curStr] || '';
-    ['day', 'week'].forEach(v => {
-        const btn = document.querySelector(`.view-btn[data-view="${v}"]`);
-        if (!btn) return;
-        const base = v.charAt(0).toUpperCase() + v.slice(1);
-        const active = document.getElementById('calendar')?.dataset.view === v;
-        btn.textContent = active ? `${base} ${label}` : base;
-    });
-}
+function _updateSlotLabel() { /* labels removed — cycle is silent */ }
 
 function changeView(view) {
     const fcViews   = { week: 'timeGridWeek', day: 'timeGridDay', month: 'dayGridMonth' };
@@ -582,11 +573,11 @@ function createDueEvent(task) {
         backgroundColor: '#e74c3c',
         borderColor:     '#c0392b',
         textColor:       '#fff',
-        editable:        false,   // due date events are read-only on the calendar
+        editable:        true,
         extendedProps:   { raw: task },
     };
-    if (task.status === 'completed') { ev.backgroundColor = '#78909c'; ev.borderColor = '#546e7a'; }
-    if (task.status === 'deleted')   { ev.backgroundColor = '#ab47bc'; ev.borderColor = '#8e24aa'; }
+    if (task.status === 'completed') { ev.backgroundColor = '#78909c'; ev.borderColor = '#546e7a'; ev.editable = false; }
+    if (task.status === 'deleted')   { ev.backgroundColor = '#ab47bc'; ev.borderColor = '#8e24aa'; ev.editable = false; }
     return ev;
 }
 
