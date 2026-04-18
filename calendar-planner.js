@@ -156,7 +156,7 @@ function initializeCalendar() {
         dayMaxEvents:            true,      // month view: "+N more" instead of overflowing
         weekNumbers:             true,      // ISO week numbers in gutter (TW users love these)
         weekNumberFormat:        { week: 'narrow' },  // "W16" compact style
-        slotDuration:            '00:15:00', // 15-min grid for finer drag precision
+        slotDuration:            _calSettings.cal_slot_duration || '00:15:00',
         scrollTime:              _calSettings.cal_scroll_time || '08:00:00',
         scrollTimeReset:         false,      // don't jump back on week/day navigation
         selectable:              true,       // drag to select a time range
@@ -204,7 +204,10 @@ function initializeCalendar() {
     const col = document.querySelector('.calendar-column');
     requestAnimationFrame(() => {
         fitCalHeight();
-        calendar.scrollToTime(_calSettings.cal_scroll_time || '08:00:00');
+        // Double RAF: let FC finish its setOption re-render before scrolling
+        requestAnimationFrame(() => {
+            calendar.scrollToTime(_calSettings.cal_scroll_time || '08:00:00');
+        });
     });
     window.addEventListener('resize', fitCalHeight);
     if (col) new ResizeObserver(fitCalHeight).observe(col);

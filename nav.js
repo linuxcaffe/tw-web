@@ -838,6 +838,17 @@
                     `<option value="dayGridMonth"${cfg.cal_default_view === 'dayGridMonth'  ? ' selected' : ''}>Month</option>` +
                 `</select>` +
             `</div>` +
+            `<div class="tw-settings-row">` +
+                `<div>` +
+                    `<div class="tw-settings-label">Time grid slot</div>` +
+                    `<div class="tw-settings-note">Row height / snap interval</div>` +
+                `</div>` +
+                `<select id="tws-cal-slot" class="tw-settings-input" style="width:130px">` +
+                    `<option value="00:15:00"${(cfg.cal_slot_duration || '00:15:00') === '00:15:00' ? ' selected' : ''}>15 min</option>` +
+                    `<option value="00:30:00"${cfg.cal_slot_duration === '00:30:00' ? ' selected' : ''}>30 min</option>` +
+                    `<option value="01:00:00"${cfg.cal_slot_duration === '01:00:00' ? ' selected' : ''}>60 min</option>` +
+                `</select>` +
+            `</div>` +
             `<div class="tw-settings-row" style="border:none;justify-content:flex-end;gap:8px">` +
                 `<span id="tws-status" style="font-size:12px;color:rgba(255,255,255,0.45)"></span>` +
                 `<button type="submit" class="tw-pick-item" style="width:auto;padding:6px 16px;border:1px solid rgba(255,255,255,0.2);border-radius:4px">Save</button>` +
@@ -857,6 +868,7 @@
             const calEnd    = body.querySelector('#tws-cal-end').value;
             const calScroll = body.querySelector('#tws-cal-scroll').value;
             const calView   = body.querySelector('#tws-cal-view').value;
+            const calSlot   = body.querySelector('#tws-cal-slot').value;
             if (isNaN(notifVal) || notifVal < 0) { status.textContent = 'Invalid timeout'; return; }
             status.textContent = 'Saving…';
             try {
@@ -870,6 +882,7 @@
                         cal_day_end:          calEnd,
                         cal_scroll_time:      calScroll,
                         cal_default_view:     calView,
+                        cal_slot_duration:    calSlot,
                     }),
                 });
                 const d = await r.json();

@@ -42,7 +42,8 @@ def _valid_hour(v):
         raise ValueError(f'Invalid hour value: {v}')
     return f'{h:02d}:{m:02d}:00'
 
-_CAL_VIEWS = {'timeGridWeek', 'timeGridDay', 'dayGridMonth'}
+_CAL_VIEWS     = {'timeGridWeek', 'timeGridDay', 'dayGridMonth'}
+_CAL_SLOT_DURS = {'00:15:00', '00:30:00', '01:00:00'}
 
 _SETTINGS_SCHEMA = {
     'notification_timeout': {'type': int,  'default': 3000,
@@ -55,6 +56,8 @@ _SETTINGS_SCHEMA = {
     'cal_scroll_time':      {'type': None, 'default': '08:00:00', 'coerce': _valid_hour},
     'cal_default_view':     {'type': str,  'default': 'timeGridWeek',
                               'validate': lambda v: v in _CAL_VIEWS},
+    'cal_slot_duration':    {'type': str,  'default': '00:15:00',
+                              'validate': lambda v: v in _CAL_SLOT_DURS},
 }
 
 def _load_settings():
