@@ -506,27 +506,25 @@ class TaskEditor {
     }
 
     formatDateForInput(dateString) {
-        // Convert TaskWarrior date format to HTML datetime-local format
+        // Convert TaskWarrior date format to HTML datetime-local format (local time).
+        // MUST use local-time methods — toISOString() returns UTC and would show the
+        // wrong time for users not in UTC (e.g. UTC-4 sees a 4-hour offset).
         if (!dateString) return '';
-        
-        // Handle TaskWarrior format: 20250131T055530Z
+
+        let date;
         if (/^\d{8}T\d{6}Z$/.test(dateString)) {
-            const year = dateString.substring(0, 4);
-            const month = dateString.substring(4, 6);
-            const day = dateString.substring(6, 8);
-            const hour = dateString.substring(9, 11);
-            const minute = dateString.substring(11, 13);
-            const second = dateString.substring(13, 15);
-            
-            // Create ISO format string: YYYY-MM-DDTHH:MM:SSZ
-            const isoString = `${year}-${month}-${day}T${hour}:${minute}:${second}Z`;
-            const date = new Date(isoString);
-            return date.toISOString().slice(0, 16);
+            // Compact TW UTC format: 20250131T055530Z → parse as UTC
+            const y = dateString.slice(0,4), mo = dateString.slice(4,6), d = dateString.slice(6,8);
+            const h = dateString.slice(9,11), mi = dateString.slice(11,13);
+            date = new Date(`${y}-${mo}-${d}T${h}:${mi}:00Z`);
+        } else {
+            date = new Date(dateString);
         }
-        
-        // Fallback for other date formats
-        const date = new Date(dateString);
-        return date.toISOString().slice(0, 16);
+        if (isNaN(date.getTime())) return '';
+
+        const pad = n => String(n).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}` +
+               `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
     }
 
     formatDurationString(durationString) {
