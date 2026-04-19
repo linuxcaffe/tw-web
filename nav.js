@@ -282,10 +282,26 @@
 .tw-panel-title { color: #fff; font-size: 15px; font-weight: 600; }
 .tw-panel-body  { flex: 1; overflow-y: auto; padding: 6px 0; }
 .tw-pick-item {
-    display: block; width: 100%; text-align: left; padding: 9px 16px;
+    display: flex; align-items: center; width: 100%; text-align: left; padding: 5px 16px;
     background: none; border: none; border-left: 3px solid transparent;
     color: rgba(255,255,255,0.7); font-size: 14px; cursor: pointer; box-sizing: border-box;
 }
+.tw-proj-arrow {
+    width: 14px; font-size: 9px; flex-shrink: 0;
+    color: rgba(255,255,255,0.3); line-height: 1; padding-right: 2px; pointer-events: none;
+}
+.tw-proj-label { flex: 1; }
+.tw-proj-count { font-size: 11px; color: rgba(255,255,255,0.3); margin-left: 6px; flex-shrink: 0; pointer-events: none; }
+.tw-proj-total { font-size: 11px; color: rgba(255,255,255,0.3); margin-left: auto; align-self: center; }
+.tw-toggle-bar {
+    display: flex; gap: 5px; padding: 6px 16px 4px;
+}
+.tw-toggle-btn {
+    padding: 2px 10px; font-size: 11px; border-radius: 10px; cursor: pointer;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.5);
+}
+.tw-toggle-btn.active { background: #3498db; border-color: #3498db; color: #fff; }
 .tw-pick-item:hover  { background: rgba(255,255,255,0.07); color: #fff; border-left-color: #3498db; }
 .tw-pick-item.active { color: #fff; border-left-color: #3498db; background: rgba(52,152,219,0.15); }
 .tw-pick-section-label {
@@ -309,6 +325,9 @@
 }
 .tw-settings-label { font-size: 13px; color: rgba(255,255,255,0.75); }
 .tw-settings-note  { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+.tw-settings-row.stack { flex-direction: column; align-items: stretch; gap: 4px; }
+.tw-settings-row.stack .tw-settings-note { margin-top: 0; }
+.tw-settings-row.stack .tw-settings-input { width: 100% !important; box-sizing: border-box; }
 .tw-settings-section-label {
     padding: 10px 16px 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
     text-transform: uppercase; color: rgba(255,255,255,0.3);
@@ -698,65 +717,141 @@
     }
 
     // ── Projects panel ────────────────────────────────────────────────────────
-    async function openProjectsPanel() {
+    async function openProjectsPanel(mode) {
+        if (!mode || mode === 'count') mode = localStorage.getItem('tw-proj-mode') || 'active';
+        localStorage.setItem('tw-proj-mode', mode);
         openPanel('Projects');
         const body = panelBody();
-        try {
-            const r = await fetch('/api/projects');
-            const d = await r.json();
-            const projects = (d.projects || []).filter(Boolean).sort();
-            const state    = getState();
 
-            let html = `<button class="tw-pick-item${!state.project ? ' active' : ''}" data-pick="">All projects</button>`;
-            if (projects.length) {
+        let collapsed;
+        try { collapsed = new Set(JSON.parse(localStorage.getItem('tw-proj-collapsed') || '[]')); }
+        catch { collapsed = new Set(); }
+        function saveCollapsed() {
+            localStorage.setItem('tw-proj-collapsed', JSON.stringify([...collapsed]));
+        }
+
+        function render(allProjects) {
+            const names = allProjects.map(p => p.name);
+            const state = getState();
+
+            let html =
+                `<div class="tw-toggle-bar">` +
+                    `<button class="tw-toggle-btn${mode === 'active' ? ' active' : ''}" data-mode="active">active</button>` +
+                    `<button class="tw-toggle-btn${mode === 'all'    ? ' active' : ''}" data-mode="all">all</button>` +
+                    `<span class="tw-proj-total">${allProjects.length}</span>` +
+                `</div>` +
+                `<button class="tw-pick-item${!state.project ? ' active' : ''}" data-pick="">` +
+                    `<span class="tw-proj-label">All projects</span></button>` +
+                `<button class="tw-pick-item${state.project === '.none:' ? ' active' : ''}" data-pick=".none:">` +
+                    `<span class="tw-proj-label">No project</span></button>`;
+
+            if (allProjects.length) {
                 html += `<div class="tw-pick-section-label">Projects</div>`;
-                projects.forEach(p => {
-                    const depth = (p.match(/\./g) || []).length;
-                    const label = p.split('.').pop();
-                    const pad   = 16 + depth * 14;
-                    html += `<button class="tw-pick-item${state.project === p ? ' active' : ''}" ` +
-                            `data-pick="${esc(p)}" style="padding-left:${pad}px" title="${esc(p)}">${esc(label)}</button>`;
+                allProjects.forEach(({ name, count }) => {
+                    const parts    = name.split('.');
+                    const depth    = parts.length - 1;
+                    const label    = parts[parts.length - 1];
+                    const pad      = 16 + depth * 12;
+                    const isParent = names.some(n => n.startsWith(name + '.'));
+                    const isColl   = collapsed.has(name);
+                    const hidden   = parts.some((_, i) => i > 0 && collapsed.has(parts.slice(0, i).join('.')));
+                    if (hidden) return;
+                    const arrow = isParent
+                        ? `<span class="tw-proj-arrow">${isColl ? '▶' : '▼'}</span>`
+                        : `<span class="tw-proj-arrow"></span>`;
+                    const badge = count ? `<span class="tw-proj-count">${count}</span>` : '';
+                    // Parent: data-fold on button, data-pick on label only (so left area folds, text picks)
+                    // Non-parent: data-pick on button as usual
+                    if (isParent) {
+                        html += `<button class="tw-pick-item${state.project === name ? ' active' : ''}" ` +
+                                `data-fold="${esc(name)}" style="padding-left:${pad}px" title="${esc(name)}">` +
+                                `${arrow}<span class="tw-proj-label" data-pick="${esc(name)}">${esc(label)}</span>${badge}</button>`;
+                    } else {
+                        html += `<button class="tw-pick-item${state.project === name ? ' active' : ''}" ` +
+                                `data-pick="${esc(name)}" style="padding-left:${pad}px" title="${esc(name)}">` +
+                                `${arrow}<span class="tw-proj-label">${esc(label)}</span>${badge}</button>`;
+                    }
                 });
             } else {
                 html += `<div class="tw-panel-loading">No projects found</div>`;
             }
             body.innerHTML = html;
-            body.addEventListener('click', e => {
+        }
+
+        try {
+            const r = await fetch('/api/projects' + (mode === 'all' ? '' : '?active=1'));
+            const d = await r.json();
+            const projects = (d.projects || []).filter(p => p && p.name);
+            render(projects);
+
+            body.onclick = e => {
+                const tog = e.target.closest('[data-mode]');
+                if (tog) { openProjectsPanel(tog.dataset.mode); return; }
+                // Label click on a parent row → pick, not fold
+                const lbl = e.target.closest('.tw-proj-label[data-pick]');
+                if (lbl) {
+                    setState({ project: lbl.dataset.pick }, { clientOnly: true });
+                    closeMenu();
+                    return;
+                }
+                // Click anywhere else on a foldable row → fold
+                const foldBtn = e.target.closest('[data-fold]');
+                if (foldBtn) {
+                    const name = foldBtn.dataset.fold;
+                    if (collapsed.has(name)) collapsed.delete(name); else collapsed.add(name);
+                    saveCollapsed();
+                    render(projects);
+                    return;
+                }
+                // Non-parent button → pick
                 const btn = e.target.closest('[data-pick]');
                 if (!btn) return;
                 setState({ project: btn.dataset.pick }, { clientOnly: true });
                 closeMenu();
-            });
-        } catch { panelBody().innerHTML = '<div class="tw-panel-error">Failed to load projects</div>'; }
+            };
+        } catch { body.innerHTML = '<div class="tw-panel-error">Failed to load projects</div>'; }
     }
 
     // ── Tags panel ────────────────────────────────────────────────────────────
-    async function openTagsPanel() {
+    async function openTagsPanel(mode) {
+        if (mode === undefined) mode = localStorage.getItem('tw-tags-mode') || 'active';
+        localStorage.setItem('tw-tags-mode', mode);
         openPanel('Tags');
         const body = panelBody();
         try {
-            const r = await fetch('/api/tags');
+            const r = await fetch('/api/tags' + (mode === 'all' ? '' : '?active=1'));
             const d = await r.json();
-            const tags  = (d.tags || []).filter(Boolean).sort();
-            const state = getState();
-            const active = (state.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+            const allTags = (d.tags || []).filter(Boolean).sort();
+            const state   = getState();
+            const sel     = (state.tags || '').split(',').map(t => t.trim()).filter(Boolean);
 
-            let html = `<button class="tw-pick-item${!active.length ? ' active' : ''}" data-pick="">All tags</button>`;
-            if (tags.length) {
+            let html =
+                `<div class="tw-toggle-bar">` +
+                    `<button class="tw-toggle-btn${mode === 'active' ? ' active' : ''}" data-mode="active">active</button>` +
+                    `<button class="tw-toggle-btn${mode === 'all'    ? ' active' : ''}" data-mode="all">all</button>` +
+                    `<span class="tw-proj-total">${allTags.length}</span>` +
+                `</div>` +
+                `<button class="tw-pick-item${!sel.length ? ' active' : ''}" data-pick="">` +
+                    `<span class="tw-proj-label">All tags</span></button>` +
+                `<button class="tw-pick-item${state.tags === '.none:' ? ' active' : ''}" data-pick=".none:">` +
+                    `<span class="tw-proj-label">No tags</span></button>`;
+            if (allTags.length) {
                 html += `<div class="tw-pick-section-label">Tags</div>`;
-                tags.forEach(t => {
-                    const on = active.includes(t);
-                    html += `<button class="tw-pick-item${on ? ' active' : ''}" data-pick="${esc(t)}">+${esc(t)}</button>`;
+                allTags.forEach(t => {
+                    html += `<button class="tw-pick-item${sel.includes(t) ? ' active' : ''}" data-pick="${esc(t)}">` +
+                            `<span class="tw-proj-label">+${esc(t)}</span></button>`;
                 });
             }
             body.innerHTML = html;
-            body.addEventListener('click', e => {
+            body.onclick = e => {
+                const tog = e.target.closest('[data-mode]');
+                if (tog) { openTagsPanel(tog.dataset.mode); return; }
                 const btn = e.target.closest('[data-pick]');
                 if (!btn) return;
                 setState({ tags: btn.dataset.pick }, { clientOnly: true });
                 closeMenu();
-            });
-        } catch { panelBody().innerHTML = '<div class="tw-panel-error">Failed to load tags</div>'; }
+            };
+        } catch { body.innerHTML = '<div class="tw-panel-error">Failed to load tags</div>'; }
     }
 
     // ── Stats panel ───────────────────────────────────────────────────────────
@@ -794,62 +889,50 @@
 
         body.innerHTML =
             `<form id="tw-settings-form" autocomplete="off">` +
-            `<div class="tw-settings-row">` +
-                `<div>` +
-                    `<div class="tw-settings-label">Notification timeout</div>` +
-                    `<div class="tw-settings-note">ms — 0 = manual dismiss only</div>` +
-                `</div>` +
+            `<div class="tw-settings-row stack">` +
+                `<div class="tw-settings-label">Notification timeout</div>` +
                 `<input id="tws-notif" type="number" min="0" step="500" value="${cfg.notification_timeout ?? 3000}" ` +
-                    `class="tw-settings-input" style="width:72px">` +
+                    `class="tw-settings-input" style="width:90px">` +
+                `<div class="tw-settings-note">ms — 0 = manual dismiss only</div>` +
             `</div>` +
-            `<div class="tw-settings-row">` +
-                `<div>` +
-                    `<div class="tw-settings-label">Kanban columns</div>` +
-                    `<div class="tw-settings-note">Comma-separated, in order</div>` +
-                `</div>` +
+            `<div class="tw-settings-row stack">` +
+                `<div class="tw-settings-label">Kanban columns</div>` +
                 `<input id="tws-kanban" type="text" value="${esc((cfg.kanban_columns || []).join(', '))}" ` +
-                    `class="tw-settings-input" style="width:140px">` +
+                    `class="tw-settings-input">` +
+                `<div class="tw-settings-note">Comma-separated, in order</div>` +
             `</div>` +
             `<div class="tw-settings-section-label">Calendar</div>` +
-            `<div class="tw-settings-row">` +
-                `<div>` +
-                    `<div class="tw-settings-label">Day start / end</div>` +
-                    `<div class="tw-settings-note">Visible hour range (HH:MM)</div>` +
-                `</div>` +
+            `<div class="tw-settings-row stack">` +
+                `<div class="tw-settings-label">Day start / end</div>` +
                 `<div style="display:flex;gap:6px;align-items:center">` +
-                    `<input id="tws-cal-start" type="time" value="${esc((cfg.cal_day_start  || '06:00').slice(0,5))}" class="tw-settings-input" style="width:80px">` +
+                    `<input id="tws-cal-start" type="time" value="${esc((cfg.cal_day_start  || '06:00').slice(0,5))}" class="tw-settings-input" style="width:90px">` +
                     `<span style="color:rgba(255,255,255,0.3)">–</span>` +
-                    `<input id="tws-cal-end"   type="time" value="${esc((cfg.cal_day_end    || '23:00').slice(0,5))}" class="tw-settings-input" style="width:80px">` +
+                    `<input id="tws-cal-end"   type="time" value="${esc((cfg.cal_day_end    || '23:00').slice(0,5))}" class="tw-settings-input" style="width:90px">` +
                 `</div>` +
+                `<div class="tw-settings-note">Visible hour range (HH:MM)</div>` +
             `</div>` +
-            `<div class="tw-settings-row">` +
-                `<div>` +
-                    `<div class="tw-settings-label">Scroll to (on open)</div>` +
-                    `<div class="tw-settings-note">Time shown at top of calendar</div>` +
-                `</div>` +
-                `<input id="tws-cal-scroll" type="time" value="${esc((cfg.cal_scroll_time || '08:00').slice(0,5))}" class="tw-settings-input" style="width:80px">` +
+            `<div class="tw-settings-row stack">` +
+                `<div class="tw-settings-label">Scroll to (on open)</div>` +
+                `<input id="tws-cal-scroll" type="time" value="${esc((cfg.cal_scroll_time || '08:00').slice(0,5))}" class="tw-settings-input" style="width:90px">` +
+                `<div class="tw-settings-note">Time shown at top of calendar</div>` +
             `</div>` +
-            `<div class="tw-settings-row">` +
-                `<div>` +
-                    `<div class="tw-settings-label">Default view</div>` +
-                    `<div class="tw-settings-note">Opening view for Calendar page</div>` +
-                `</div>` +
-                `<select id="tws-cal-view" class="tw-settings-input" style="width:130px">` +
+            `<div class="tw-settings-row stack">` +
+                `<div class="tw-settings-label">Default view</div>` +
+                `<select id="tws-cal-view" class="tw-settings-input">` +
                     `<option value="timeGridWeek"${cfg.cal_default_view === 'timeGridWeek'  ? ' selected' : ''}>Week</option>` +
                     `<option value="timeGridDay"${cfg.cal_default_view  === 'timeGridDay'   ? ' selected' : ''}>Day</option>` +
                     `<option value="dayGridMonth"${cfg.cal_default_view === 'dayGridMonth'  ? ' selected' : ''}>Month</option>` +
                 `</select>` +
+                `<div class="tw-settings-note">Opening view for Calendar page</div>` +
             `</div>` +
-            `<div class="tw-settings-row">` +
-                `<div>` +
-                    `<div class="tw-settings-label">Time grid slot</div>` +
-                    `<div class="tw-settings-note">Row height / snap interval</div>` +
-                `</div>` +
-                `<select id="tws-cal-slot" class="tw-settings-input" style="width:130px">` +
+            `<div class="tw-settings-row stack">` +
+                `<div class="tw-settings-label">Time grid slot</div>` +
+                `<select id="tws-cal-slot" class="tw-settings-input">` +
                     `<option value="00:15:00"${(cfg.cal_slot_duration || '00:15:00') === '00:15:00' ? ' selected' : ''}>15 min</option>` +
                     `<option value="00:30:00"${cfg.cal_slot_duration === '00:30:00' ? ' selected' : ''}>30 min</option>` +
                     `<option value="01:00:00"${cfg.cal_slot_duration === '01:00:00' ? ' selected' : ''}>60 min</option>` +
                 `</select>` +
+                `<div class="tw-settings-note">Row height / snap interval</div>` +
             `</div>` +
             `<div class="tw-settings-row" style="border:none;justify-content:flex-end;gap:8px">` +
                 `<span id="tws-status" style="font-size:12px;color:rgba(255,255,255,0.45)"></span>` +

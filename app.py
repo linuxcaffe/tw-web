@@ -402,27 +402,68 @@ def get_tasks():
             'stderr': result['stderr']
         }), 500
 
+def _parse_task_projects(output):
+    """Parse `task projects` report into {full_name: count} dict.
+    Reconstructs dotted full names from indented short names.
+    """
+    result = {}
+    stack = []   # list of (indent, full_name)
+    for raw in output.split('\n'):
+        line = raw.rstrip()
+        if not line:
+            continue
+        # Skip header, separator, summary line
+        if re.match(r'^\s*-+', line) or re.match(r'^\s*Project\s+Tasks', line, re.I):
+            continue
+        if re.match(r'^\s*\d+\s+projects?', line, re.I):
+            continue
+        # Match: <indent><name><2+ spaces><count>
+        m = re.match(r'^( *)(.*?)\s{2,}(\d+)\s*$', line)
+        if not m:
+            continue
+        short = m.group(2).strip()
+        if not short or short == '(none)':
+            continue
+        indent = len(m.group(1))
+        count  = int(m.group(3))
+        # Pop stack to parent level
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        full = (stack[-1][1] + '.' + short) if stack else short
+        stack.append((indent, full))
+        result[full] = count
+    return result
+
+
 @app.route('/api/projects')
 def get_projects():
-    """Get all unique projects from TaskWarrior, including completed tasks"""
-    result = run_task_command(['task', '_projects'])
+    """Return projects with pending-task counts parsed from `task projects`.
+    ?active=1: only projects with pending tasks (alpha order).
+    Without:   all known names via _projects, counts from pending.
+    Returned list preserves alpha order; client sorts by count if needed.
+    """
+    active_only = request.args.get('active', '0') == '1'
 
-    if result['success']:
-        try:
-            projects = [p.strip() for p in result['stdout'].split('\n') if p.strip()]
-            return jsonify({'success': True, 'projects': projects})
-        except Exception as e:
-            return jsonify({
-                'success': False,
-                'error': f'Failed to parse projects: {str(e)}'
-            }), 500
+    r = run_task_command(['task', 'projects'])
+    counts = _parse_task_projects(r['stdout']) if r['success'] else {}
+
+    if active_only:
+        names = sorted(counts.keys())
     else:
-        return jsonify({'success': False, 'error': result['stderr']}), 500
+        r2 = run_task_command(['task', '_projects'])
+        all_names = sorted({p.strip() for p in r2['stdout'].split('\n') if p.strip()}) \
+                    if r2['success'] else sorted(counts.keys())
+        names = all_names
+
+    projects = [{'name': n, 'count': counts.get(n, 0)} for n in names]
+    return jsonify({'success': True, 'projects': projects})
 
 @app.route('/api/tags')
 def get_tags():
-    """Get all unique user-visible tags (excludes Taskwarrior virtual tags in ALL-CAPS)"""
-    result = run_task_command(['task', '_tags'])
+    """Get unique user-visible tags. ?active=1 restricts to pending tasks only."""
+    active_only = request.args.get('active', '0') == '1'
+    cmd = ['task', 'status:pending', '_tags'] if active_only else ['task', '_tags']
+    result = run_task_command(cmd)
     if result['success']:
         tags = [t.strip() for t in result['stdout'].split('\n')
                 if t.strip() and not t.strip().isupper()]
@@ -432,7 +473,7 @@ def get_tags():
 @app.route('/api/stats')
 def get_stats():
     """Return the output of `task stats` for display in the UI"""
-    result = run_task_command(['task', 'stats'])
+    result = run_task_command(['task', 'rc.context=none', 'stats'])
     return jsonify({'success': result['success'], 'output': result['stdout'], 'error': result['stderr']})
 
 @app.route('/api/contexts')
