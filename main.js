@@ -1,5 +1,89 @@
 // tw-web — frontend JavaScript
 
+// Attribute-modifier filter helpers
+// Recognised modifiers for text/ordered fields
+const _TEXT_MODS = new Set(['is','isnt','not','contains','startswith','endswith','any','none']);
+const _ORD_MODS  = new Set(['is','isnt','any','none']);
+// Explicit priority order for < / > comparisons
+const _PRI_ORDER = ['1','2','3','4','5','6','H','M','L'];
+
+// Parse a leading modifier prefix from input: ".mod:val" → {mod, val}
+// or "< val" / "> val" → {mod:'lt'/'gt', val}. Returns null if no prefix.
+function _parseModifier(input) {
+    const m = input.match(/^\.([a-z]+):(.*)/i);
+    if (m) return { mod: m[1].toLowerCase(), val: m[2] };
+    const c = input.match(/^([<>])\s+(.*)/);
+    if (c) return { mod: c[1] === '<' ? 'lt' : 'gt', val: c[2] };
+    return null;
+}
+
+// Compare a scalar field value against a filter string, with optional modifier.
+// type: 'text' (case-insensitive string ops) | 'ord' (priority order for </> )
+function _matchAttr(fieldVal, input, type) {
+    const p = _parseModifier(input);
+    const fv = String(fieldVal);
+
+    if (!p) {
+        // default: contains (text) or is (ord)
+        return type === 'ord'
+            ? fv.toLowerCase() === input.toLowerCase()
+            : fv.toLowerCase().includes(input.toLowerCase());
+    }
+
+    const { mod, val } = p;
+    const fvl = fv.toLowerCase();
+    const vl  = val.toLowerCase();
+
+    if (mod === 'lt' || mod === 'gt') {
+        const ai = _PRI_ORDER.indexOf(fv.toUpperCase());
+        const bi = _PRI_ORDER.indexOf(val.toUpperCase());
+        if (ai === -1 || bi === -1) {
+            // fall back to numeric if both parse as numbers
+            const an = parseFloat(fv), bn = parseFloat(val);
+            if (isNaN(an) || isNaN(bn)) return false;
+            return mod === 'lt' ? an < bn : an > bn;
+        }
+        return mod === 'lt' ? ai < bi : ai > bi;
+    }
+
+    const allowed = type === 'ord' ? _ORD_MODS : _TEXT_MODS;
+    if (!allowed.has(mod)) return false;  // unrecognised modifier → no match
+
+    switch (mod) {
+        case 'any':        return fv !== '';
+        case 'none':       return fv === '';
+        case 'is':         return fvl === vl;
+        case 'isnt':
+        case 'not':        return fvl !== vl;
+        case 'contains':   return fvl.includes(vl);
+        case 'startswith': return fvl.startsWith(vl);
+        case 'endswith':   return fvl.endsWith(vl);
+        default:           return false;
+    }
+}
+
+// Match a task's tags array against a tags filter string.
+// Supports modifier prefixes: .has: .hasnt: .any: .none:
+// Without prefix, comma-separated values must ALL be present (AND).
+function _matchTags(taskTags, input) {
+    const p = _parseModifier(input);
+
+    if (!p) {
+        // default: all comma-separated tags must be present
+        const wanted = input.split(',').map(t => t.trim()).filter(Boolean);
+        return wanted.length === 0 || wanted.every(t => taskTags.includes(t));
+    }
+
+    const { mod, val } = p;
+    switch (mod) {
+        case 'has':    return taskTags.includes(val);
+        case 'hasnt':  return !taskTags.includes(val);
+        case 'any':    return taskTags.length > 0;
+        case 'none':   return taskTags.length === 0;
+        default:       return false;
+    }
+}
+
 class TaskWarriorUI {
     constructor() {
         this.tasks = [];
@@ -305,16 +389,16 @@ class TaskWarriorUI {
     // Filter tasks client-side using project/tags from nav state
     getFilteredTasks() {
         const state = window.twNav ? window.twNav.getState() : {};
-        const filter   = (state.filter   || '').trim().toLowerCase();
-        const priority = (state.priority || '').trim().toLowerCase();
-        const project  = (state.project  || '').trim().toLowerCase();
-        const tags     = (state.tags     || '').split(',').map(t => t.trim()).filter(Boolean);
+        const filter   = (state.filter   || '').trim();
+        const priority = (state.priority || '').trim();
+        const project  = (state.project  || '').trim();
+        const tags     = (state.tags     || '').trim();
 
         return this.tasks.filter(task => {
-            if (filter   && !(task.description || '').toLowerCase().includes(filter)) return false;
-            if (priority && !String(task.priority || '').toLowerCase().includes(priority)) return false;
-            if (project  && !(task.project      || '').toLowerCase().includes(project)) return false;
-            if (tags.length > 0 && !tags.every(t => (task.tags || []).includes(t))) return false;
+            if (filter   && !_matchAttr(task.description || '', filter,  'text'))  return false;
+            if (priority && !_matchAttr(task.priority    || '', priority, 'ord'))   return false;
+            if (project  && !_matchAttr(task.project     || '', project,  'text'))  return false;
+            if (tags     && !_matchTags(task.tags        || [], tags))              return false;
             return true;
         });
     }
