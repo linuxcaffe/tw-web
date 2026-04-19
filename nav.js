@@ -1100,10 +1100,45 @@
         };
     }
 
+    // ── Keyboard shortcuts ────────────────────────────────────────────────────
+    const _PAGE_KEYS = {
+        'L': '/',
+        'K': '/kanban.html',
+        'A': '/agenda.html',
+        'C': '/calendar-planner.html',
+    };
+    const _CAL_KEYS = { 'D': 'day', 'W': 'week', 'M': 'month' };
+
+    function _initKeys() {
+        document.addEventListener('keydown', (e) => {
+            if (e.metaKey || e.ctrlKey || e.altKey) return;
+            const tag = (e.target.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+
+            const k = e.key;
+
+            if (_PAGE_KEYS[k]) {
+                e.preventDefault();
+                window.location.href = _PAGE_KEYS[k];
+            } else if (_CAL_KEYS[k] && typeof changeView === 'function') {
+                e.preventDefault();
+                changeView(_CAL_KEYS[k]);
+            } else if (k === 'a') {
+                e.preventDefault();
+                document.dispatchEvent(new CustomEvent('tw-open-add'));
+            } else if (k === 'f') {
+                e.preventDefault();
+                const fi = document.getElementById('tw-filter-input');
+                if (fi) { fi.focus(); fi.select(); }
+            }
+        });
+    }
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => { init(); _initSSE(); });
+        document.addEventListener('DOMContentLoaded', () => { init(); _initSSE(); _initKeys(); });
     } else {
         init();
         _initSSE();
+        _initKeys();
     }
 }());
