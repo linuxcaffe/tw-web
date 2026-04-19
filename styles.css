@@ -1005,3 +1005,103 @@ h2 {
     padding: 2rem;
     color: var(--text-muted, #888);
 }
+
+/* ── Kanban page ─────────────────────────────────────────────────────────── */
+
+/* full-height layout, mirrors calendar page */
+body.kanban-page { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+body.kanban-page .app-container { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+/* column navigation bar */
+.kb-col-nav {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 10px; flex-shrink: 0;
+    background: #0d1117; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.kb-nav-arrow {
+    background: none; border: none; color: rgba(255,255,255,0.4);
+    font-size: 15px; cursor: pointer; padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
+}
+.kb-nav-arrow:hover:not(:disabled) { color: #fff; background: rgba(255,255,255,0.08); }
+.kb-nav-arrow:disabled { opacity: 0.2; cursor: default; }
+.kb-nav-cols { display: flex; gap: 4px; flex: 1; overflow: hidden; flex-wrap: nowrap; }
+.kb-nav-pill {
+    padding: 2px 10px; font-size: 11px; border-radius: 10px; cursor: pointer; white-space: nowrap;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.35); text-transform: capitalize;
+}
+.kb-nav-pill.active { background: #3498db; border-color: #3498db; color: #fff; }
+
+/* board — horizontal scrolling flex container */
+.kb-board {
+    display: flex; gap: 10px; flex: 1; align-items: stretch;
+    overflow-x: auto; overflow-y: hidden;
+    padding: 10px 12px 14px;
+    scroll-snap-type: x proximity;
+}
+@media (max-width: 600px) { .kb-board { scroll-snap-type: x mandatory; } }
+
+/* column */
+.kb-col {
+    min-width: 240px; flex: 1 1 240px; max-width: 380px; flex-shrink: 0;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 8px; display: flex; flex-direction: column;
+    scroll-snap-align: start;
+}
+.kb-col-hdr {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 10px; border-radius: 8px 8px 0 0; flex-shrink: 0;
+    background: rgba(255,255,255,0.06);
+}
+.kb-col-hdr--unassigned {
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px dashed rgba(255,255,255,0.08);
+}
+.kb-col-count {
+    font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.1); border-radius: 10px; padding: 1px 7px; flex-shrink: 0;
+}
+.kb-col-name {
+    flex: 1; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.85);
+    text-transform: capitalize; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kb-col-ctrl { display: flex; gap: 2px; flex-shrink: 0; }
+.kb-btn {
+    background: none; border: 1px solid transparent; border-radius: 4px;
+    color: rgba(255,255,255,0.3); font-size: 12px; cursor: pointer; padding: 2px 5px; line-height: 1;
+}
+.kb-btn:hover { color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.07); }
+.kb-btn.active { color: #3498db; border-color: rgba(52,152,219,0.35); }
+
+/* per-column sort popup */
+.kb-sort-popup {
+    margin: 0 8px 4px; padding: 5px; border-radius: 6px; flex-shrink: 0;
+    background: #151c2a; border: 1px solid rgba(255,255,255,0.1);
+}
+.kb-sort-opt {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 6px; font-size: 12px; color: rgba(255,255,255,0.55);
+    cursor: pointer; border-radius: 4px;
+}
+.kb-sort-opt:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.kb-sort-opt input { accent-color: #3498db; cursor: pointer; }
+
+/* scrollable card body */
+.kb-col-body { flex: 1; overflow-y: auto; padding: 6px 8px; min-height: 60px; }
+.kb-col-body .task-card { margin-bottom: 6px; }
+.kb-col-body .task-card:last-child { margin-bottom: 0; }
+
+/* hide action buttons by default; reveal on hover */
+.kb-col-body .card-actions { display: none; }
+.kb-col-body .task-card:hover .card-actions,
+.kb-col-body .task-card.expanded .card-actions { display: flex; }
+
+/* empty column hint */
+.kb-empty {
+    text-align: center; color: rgba(255,255,255,0.18);
+    font-size: 12px; font-style: italic; padding: 20px 8px;
+}
+
+/* drag-and-drop states */
+.sortable-ghost  { opacity: 0.3; }
+.sortable-chosen { box-shadow: 0 6px 24px rgba(0,0,0,0.5) !important; }
