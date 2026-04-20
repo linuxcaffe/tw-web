@@ -260,11 +260,12 @@ function _kbMakeCol(col, label, tasks, isUnassigned, colorIdx) {
     div.appendChild(body);
 
     new Sortable(body, {
-        group:       'kanban',
-        animation:   150,
-        ghostClass:  'sortable-ghost',
-        chosenClass: 'sortable-chosen',
-        filter:      '.card-toggle',
+        group:         'kanban',
+        animation:     150,
+        forceFallback: true,   // use pointer tracking so pointermove fires during drag
+        ghostClass:    'sortable-ghost',
+        chosenClass:   'sortable-chosen',
+        filter:        '.card-toggle',
         onStart(evt) { _kbDragStart(evt.item.dataset.taskId); },
         onEnd(evt) {
             _kbDragEnd();  // cleanup move listeners, nav styling
@@ -455,8 +456,9 @@ function _kbUpdateNavPills() {
     if (_kbNavSortable) { _kbNavSortable.destroy(); _kbNavSortable = null; }
     const navEl = document.getElementById('kb-col-nav');
     _kbNavSortable = new Sortable(pills, {
-        group: { name: 'kanban', put: () => navEl.classList.contains('kb-dragging'), pull: false },
-        animation:  0,
+        group:         { name: 'kanban', put: () => navEl.classList.contains('kb-dragging'), pull: false },
+        animation:     0,
+        forceFallback: true,
         onAdd(evt) {
             const uuid = evt.item.dataset.taskId;
             let targetState = _kbNavDropTarget;
