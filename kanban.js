@@ -354,11 +354,6 @@ function _kbDragStart(_uuid) {
     const nav = document.getElementById('kb-col-nav');
     nav.classList.add('kb-dragging');
 
-    // Show which column the nav bar will drop into
-    const focusedPill = nav.querySelector(`.kb-nav-pill[data-kb-idx="${kbFocusedColIdx}"]`);
-    const hint = document.getElementById('kb-drag-hint');
-    if (hint) hint.textContent = focusedPill ? `→ ${focusedPill.textContent}` : '';
-
     let panTimer = null;
 
     const handler = e => {
@@ -375,16 +370,13 @@ function _kbDragStart(_uuid) {
             .forEach(p => p.classList.remove('drag-target'));
 
         if (onNav) {
-            // Find which pill the pointer is over by rect (not elementFromPoint)
+            // Find which pill the pointer is over by rect
             const hovered = [...nav.querySelectorAll('.kb-nav-pill')].find(p => {
                 const r = p.getBoundingClientRect();
                 return cx >= r.left && cx <= r.right;
             });
-            // Specific pill wins; otherwise fall back to focused column's pill
-            const target = hovered ?? nav.querySelector(`.kb-nav-pill[data-kb-idx="${kbFocusedColIdx}"]`);
-            target?.classList.add('drag-target');
-            // Track live — this is what _kbDragEnd will read
-            _kbNavDropTarget = target ? target.dataset.kbCol : _kbFocusedColValue();
+            hovered?.classList.add('drag-target');
+            _kbNavDropTarget = hovered ? hovered.dataset.kbCol : null;
         } else {
             _kbNavDropTarget = null;
         }
@@ -420,10 +412,7 @@ function _kbDragStart(_uuid) {
 function _kbDragEnd() {
     _kbNavDropTarget = null;
     if (_kbDragMoveOff) { _kbDragMoveOff(); _kbDragMoveOff = null; }
-    const nav = document.getElementById('kb-col-nav');
-    nav.classList.remove('kb-dragging');
-    const hint = document.getElementById('kb-drag-hint');
-    if (hint) hint.textContent = '';
+    document.getElementById('kb-col-nav').classList.remove('kb-dragging');
     document.querySelectorAll('.kb-nav-pill.drag-target')
         .forEach(p => p.classList.remove('drag-target'));
 }
@@ -464,10 +453,20 @@ function _kbUpdateNavPills() {
         group:      { name: 'kanban', put: true, pull: false },
         animation:  0,
         onAdd(evt) {
-            // Card was dropped on the nav bar — determine target from last tracked pill
-            const uuid        = evt.item.dataset.taskId;
-            const targetState = _kbNavDropTarget ?? _kbFocusedColValue();
-            evt.item.remove();          // remove card from nav DOM immediately
+            const uuid = evt.item.dataset.taskId;
+            let targetState = _kbNavDropTarget;
+            if (targetState === null) {
+                // Dropped in a gap — find nearest pill by card midpoint
+                const r  = evt.item.getBoundingClientRect();
+                const cx = r.left + r.width / 2;
+                const nearest = [...pills.querySelectorAll('.kb-nav-pill')].reduce((best, p) => {
+                    const pc = p.getBoundingClientRect().left + p.getBoundingClientRect().width / 2;
+                    return (!best || Math.abs(cx - pc) < Math.abs(cx - best.cx))
+                        ? { el: p, cx: pc } : best;
+                }, null);
+                targetState = nearest?.el?.dataset.kbCol ?? null;
+            }
+            evt.item.remove();
             _kbNavDropTarget = null;
             if (uuid && targetState !== null) {
                 _kbSetState(uuid, targetState).then(() => kbReload(true));

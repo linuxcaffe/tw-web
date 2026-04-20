@@ -1018,41 +1018,54 @@ body.kanban-page .app-container { flex: 1; min-height: 0; display: flex; flex-di
     padding: 5px 10px; flex-shrink: 0;
     background: #0d1117; border-bottom: 1px solid rgba(255,255,255,0.06);
     position: relative; z-index: 20;
-    transition: padding 0.15s;
+    transition: padding 0.15s, background 0.15s;
 }
-.kb-col-nav.kb-dragging { padding: 10px 10px; }
 .kb-nav-cols { display: flex; gap: 5px; flex: 1; overflow: hidden; flex-wrap: wrap; }
 .kb-nav-pill {
     padding: 3px 11px; font-size: 11px; border-radius: 10px; cursor: pointer; white-space: nowrap;
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);
     color: rgba(255,255,255,0.4); text-transform: capitalize;
-    transition: color 0.12s, transform 0.1s, box-shadow 0.1s;
+    transition: color 0.12s, transform 0.1s, box-shadow 0.1s, opacity 0.1s;
 }
 .kb-nav-pill.active  { color: rgba(255,255,255,0.85); }
 .kb-nav-pill.focused { color: #fff; outline: 2px solid rgba(255,255,255,0.65); outline-offset: 1px; }
-.kb-nav-pill.drag-target {
-    opacity: 1 !important; transform: scale(1.12); color: #fff;
-    box-shadow: 0 0 0 2px #fff, 0 4px 16px rgba(0,0,0,0.6);
-}
-/* During drag: whole nav bar is the drop zone */
+
+/* ── Drag overlay: nav bar transforms into a state-selector strip ── */
 .kb-col-nav.kb-dragging {
-    background: rgba(255,255,255,0.06);
-    border-bottom-color: rgba(255,255,255,0.2);
+    padding: 6px 8px 8px;
+    background: rgba(0,0,0,0.35);
+    border-bottom-color: rgba(255,255,255,0.12);
 }
-/* enlarge pill hit-targets during drag */
-.kb-dragging .kb-nav-pill { padding: 8px 18px; font-size: 12px; }
-/* focused pill pulses to show it's the default drop target */
-.kb-col-nav.kb-dragging .kb-nav-pill.focused {
-    box-shadow: 0 0 0 2px rgba(255,255,255,0.55), 0 0 14px rgba(255,255,255,0.2);
-    transform: scale(1.06);
+/* Pills become equal-width drop targets filling the nav width */
+.kb-col-nav.kb-dragging .kb-nav-cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+    gap: 5px;
+    overflow: visible;
 }
-/* hint label: "→ todo" */
-.kb-drag-hint {
-    display: none; flex-shrink: 0;
-    font-size: 11px; color: rgba(255,255,255,0.5);
-    padding: 0 8px; white-space: nowrap;
+.kb-col-nav.kb-dragging .kb-nav-pill {
+    height: 36px;
+    padding: 0 6px;
+    border-radius: 6px;
+    font-size: 12px; font-weight: 500;
+    opacity: 0.6;
+    outline: none;       /* suppress focused ring during drag */
+    box-shadow: none;
+    transform: none;
+    display: flex; align-items: center; justify-content: center;
 }
-.kb-col-nav.kb-dragging .kb-drag-hint { display: block; }
+/* hovered pill glows — this is the drop target */
+.kb-col-nav.kb-dragging .kb-nav-pill.drag-target {
+    opacity: 1;
+    transform: scale(1.05);
+    box-shadow: 0 0 0 2px #fff, 0 4px 18px rgba(0,0,0,0.55);
+    color: #fff;
+    z-index: 1;
+}
+/* Hide the Sortable ghost placeholder inside the nav strip */
+.kb-nav-cols .sortable-ghost { display: none !important; }
+/* Hint span is gone in the new design */
+.kb-drag-hint { display: none !important; }
 
 /* board — fills remaining height, no scroll (visibility managed by JS) */
 .kb-board {
