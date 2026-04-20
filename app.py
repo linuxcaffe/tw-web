@@ -698,8 +698,14 @@ def get_kanban_columns():
 @app.route('/api/kanban/order', methods=['GET'])
 def get_kanban_order():
     """Return saved manual sort order: { col: [uuid, ...] }"""
-    s = _load_settings()
-    return jsonify({'success': True, 'order': s.get('kanban_order', {})})
+    # Read raw file — _load_settings() only returns schema-defined keys
+    try:
+        if _SETTINGS_PATH.exists():
+            raw = json.loads(_SETTINGS_PATH.read_text())
+            return jsonify({'success': True, 'order': raw.get('kanban_order', {})})
+    except Exception:
+        pass
+    return jsonify({'success': True, 'order': {}})
 
 @app.route('/api/kanban/order', methods=['PUT'])
 def set_kanban_order():

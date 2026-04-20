@@ -24,9 +24,10 @@ let kbUnassignedSrc = [];   // unassigned tasks — status-filtered, no context
 let kbManualOrder   = {};   // { col: [uuid, ...] } loaded from server
 let kbColOffset     = 0;
 let kbFocusedColIdx = 0;
-let _kbResizeObs    = null;
-let _kbDragMoveOff  = null;
+let _kbResizeObs     = null;
+let _kbDragMoveOff   = null;
 let _kbNavDropTarget = null;  // state string when pointer is over nav bar, else null
+let _kbNavSortable   = null;  // Sortable instance on #kb-nav-cols (nav drop zone)
 let taskEditor;  // global — TaskCardManager's edit handler references this by name
 
 const kbCardManager = new TaskCardManager(new TaskActionHandler({
@@ -266,11 +267,10 @@ function _kbMakeCol(col, label, tasks, isUnassigned, colorIdx) {
         filter:      '.card-toggle',
         onStart(evt) { _kbDragStart(evt.item.dataset.taskId); },
         onEnd(evt) {
-            const target = _kbDragEnd(evt.originalEvent);
-            if (target !== null) {
-                // dropped on nav bar — write state then reload (nav target was focused column)
-                _kbSetState(evt.item.dataset.taskId, target).then(() => kbReload(true));
-            } else if (evt.from !== evt.to) {
+            _kbDragEnd();  // cleanup move listeners, nav styling
+            // Nav drops are handled by _kbNavSortable onAdd — skip here to avoid double-write
+            if (evt.to.id === 'kb-nav-cols') return;
+            if (evt.from !== evt.to) {
                 // dropped in a different column — write state then reload to sync local arrays
                 _kbSetState(evt.item.dataset.taskId, evt.to.dataset.col).then(() => kbReload(true));
             } else if (evt.oldIndex !== evt.newIndex) {
@@ -405,32 +405,27 @@ function _kbDragStart(_uuid) {
         }
     };
 
-    // Capture phase + touchmove for maximum device coverage
+    // pointermove covers mouse+touch on modern browsers; touchmove as fallback for older Safari
+    // mousemove is intentionally excluded — compat mousemove after touchend fires at wrong coords
     window.addEventListener('pointermove', handler, true);
-    window.addEventListener('mousemove',   handler, true);
     window.addEventListener('touchmove',   handler, { capture: true, passive: true });
     _kbDragMoveOff = () => {
         window.removeEventListener('pointermove', handler, true);
-        window.removeEventListener('mousemove',   handler, true);
         window.removeEventListener('touchmove',   handler, true);
         if (panTimer) clearTimeout(panTimer);
     };
 }
 
-// Returns target col string (including "" for Unassigned) or null if not a nav drop.
-// Uses _kbNavDropTarget tracked live by the move handler — more reliable than
-// re-checking coordinates from originalEvent (SortableJS may fire onEnd with stale coords).
-function _kbDragEnd(_originalEvent) {
-    const navTarget = _kbNavDropTarget;
+// Cleanup only — nav drops are handled by the #kb-nav-cols Sortable onAdd.
+function _kbDragEnd() {
     _kbNavDropTarget = null;
     if (_kbDragMoveOff) { _kbDragMoveOff(); _kbDragMoveOff = null; }
-    const nav  = document.getElementById('kb-col-nav');
+    const nav = document.getElementById('kb-col-nav');
     nav.classList.remove('kb-dragging');
     const hint = document.getElementById('kb-drag-hint');
     if (hint) hint.textContent = '';
     document.querySelectorAll('.kb-nav-pill.drag-target')
         .forEach(p => p.classList.remove('drag-target'));
-    return navTarget;   // null when pointer was not over nav at release
 }
 
 // ── Column nav pills ──────────────────────────────────────────────────────────
@@ -448,7 +443,7 @@ function _kbUpdateNavPills() {
     const board = document.getElementById('kb-board');
     const cols  = [...board.querySelectorAll('.kb-col')];
 
-    // i=0 → Unassigned (colorIdx -1, no tint), i=1+ → workflow cols (colorIdx = i-1)
+    // Rebuild pills HTML
     pills.innerHTML = cols.map((c, i) => {
         const label = c.dataset.col || 'Unassigned';
         const color = _kbColColor(i - 1);
@@ -460,8 +455,25 @@ function _kbUpdateNavPills() {
 
     pills.onclick = e => {
         const btn = e.target.closest('[data-kb-idx]');
-        if (btn) _kbSetFocus(+btn.dataset.kbIdx); // _kbSetFocus handles idx=0 → bring into view only
+        if (btn) _kbSetFocus(+btn.dataset.kbIdx);
     };
+
+    // Reinitialise the nav drop zone Sortable (pills HTML was replaced above)
+    if (_kbNavSortable) { _kbNavSortable.destroy(); _kbNavSortable = null; }
+    _kbNavSortable = new Sortable(pills, {
+        group:      { name: 'kanban', put: true, pull: false },
+        animation:  0,
+        onAdd(evt) {
+            // Card was dropped on the nav bar — determine target from last tracked pill
+            const uuid        = evt.item.dataset.taskId;
+            const targetState = _kbNavDropTarget ?? _kbFocusedColValue();
+            evt.item.remove();          // remove card from nav DOM immediately
+            _kbNavDropTarget = null;
+            if (uuid && targetState !== null) {
+                _kbSetState(uuid, targetState).then(() => kbReload(true));
+            }
+        },
+    });
 }
 
 // ── UI event delegation ───────────────────────────────────────────────────────
