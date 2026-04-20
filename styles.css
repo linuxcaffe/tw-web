@@ -1030,41 +1030,37 @@ body.kanban-page .app-container { flex: 1; min-height: 0; display: flex; flex-di
 .kb-nav-pill.active  { color: rgba(255,255,255,0.85); }
 .kb-nav-pill.focused { color: #fff; outline: 2px solid rgba(255,255,255,0.65); outline-offset: 1px; }
 
-/* ── Drag overlay: nav bar transforms into a state-selector strip ── */
+/* ── Drag overlay: horizontal pills stack into full-width vertical rows ── */
 .kb-col-nav.kb-dragging {
-    padding: 6px 8px 8px;
-    background: rgba(0,0,0,0.35);
-    border-bottom-color: rgba(255,255,255,0.12);
+    padding: 5px 8px 7px;
+    background: rgba(0,0,0,0.3);
+    border-bottom-color: rgba(255,255,255,0.1);
 }
-/* Pills become equal-width drop targets filling the nav width */
 .kb-col-nav.kb-dragging .kb-nav-cols {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
-    gap: 5px;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 4px;
     overflow: visible;
 }
 .kb-col-nav.kb-dragging .kb-nav-pill {
-    height: 36px;
-    padding: 0 6px;
-    border-radius: 6px;
+    width: 100%;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 4px;
     font-size: 12px; font-weight: 500;
     opacity: 0.6;
-    outline: none;       /* suppress focused ring during drag */
-    box-shadow: none;
-    transform: none;
-    display: flex; align-items: center; justify-content: center;
+    outline: none; box-shadow: none; transform: none;
+    display: flex; align-items: center;
 }
-/* hovered pill glows — this is the drop target */
+/* hovered row brightens with its own column color — no white flash */
 .kb-col-nav.kb-dragging .kb-nav-pill.drag-target {
     opacity: 1;
-    transform: scale(1.05);
-    box-shadow: 0 0 0 2px #fff, 0 4px 18px rgba(0,0,0,0.55);
-    color: #fff;
-    z-index: 1;
+    filter: brightness(1.5) saturate(1.2);
+    transform: translateX(3px);
 }
-/* Hide the Sortable ghost placeholder inside the nav strip */
+/* Hide Sortable ghost inside the nav strip */
 .kb-nav-cols .sortable-ghost { display: none !important; }
-/* Hint span is gone in the new design */
+/* Hint span unused in new design */
 .kb-drag-hint { display: none !important; }
 
 /* board — fills remaining height, no scroll (visibility managed by JS) */
