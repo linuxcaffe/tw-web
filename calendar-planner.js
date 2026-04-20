@@ -14,7 +14,7 @@ let _calSettings     = {};    // loaded from /api/config before calendar init
 // ── Task cache ────────────────────────────────────────────────────────────────
 // Two-layer cache:
 //   'tw-tasks-cache'  — shared with main.js: {params, tasks, ts}
-//   'tw-cal-extras'   — calendar-only:       {statusParam, planned, due, ts}
+//   'tw-cal-extras'   — calendar-only:       {cacheKey, planned, due, ts}
 // 'tw-tasks-dirty' is the shared invalidation flag written by all pages on any write.
 const _SHARED_KEY  = 'tw-tasks-cache';
 const _EXTRAS_KEY  = 'tw-cal-extras';
@@ -23,23 +23,23 @@ const _CACHE_TTL   = 30_000; // ms
 
 function _isDirty() { return sessionStorage.getItem(_DIRTY_KEY) === '1'; }
 
-function _readCache(params, statusParam) {
+function _readCache(params, cacheKey) {
     try {
         if (_isDirty()) return null;
         const now = Date.now();
         const s = JSON.parse(sessionStorage.getItem(_SHARED_KEY));
         const x = JSON.parse(sessionStorage.getItem(_EXTRAS_KEY));
-        if (!s || s.params !== params       || (now - s.ts) > _CACHE_TTL) return null;
-        if (!x || x.statusParam !== statusParam || (now - x.ts) > _CACHE_TTL) return null;
+        if (!s || s.params !== params         || (now - s.ts) > _CACHE_TTL) return null;
+        if (!x || x.cacheKey !== cacheKey     || (now - x.ts) > _CACHE_TTL) return null;
         return { allFetched: s.tasks, plannedTasks: x.planned, due: x.due };
     } catch { return null; }
 }
 
-function _writeCache(params, statusParam, allFetched, plannedTasks, due) {
+function _writeCache(params, cacheKey, allFetched, plannedTasks, due) {
     try {
         const now = Date.now();
         sessionStorage.setItem(_SHARED_KEY, JSON.stringify({ params, tasks: allFetched, ts: now }));
-        sessionStorage.setItem(_EXTRAS_KEY, JSON.stringify({ statusParam, planned: plannedTasks, due, ts: now }));
+        sessionStorage.setItem(_EXTRAS_KEY, JSON.stringify({ cacheKey, planned: plannedTasks, due, ts: now }));
         sessionStorage.removeItem(_DIRTY_KEY);
     } catch {}
 }
@@ -459,10 +459,11 @@ function loadTasks() {
     const myId        = ++_loadId;   // mark this wave; older in-flight calls become stale
     const params      = window.twNav ? window.twNav.stateToParams() : 'status=pending';
     const navState    = window.twNav ? window.twNav.getState() : {};
-    const statusParam = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(','));
+    // Calendar events: status-only (no context) — FS via matchesNavFilter in processTasksForCalendar
+    const calParams   = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(','));
 
     // Serve from cache when clean and fresh — skips all three fetches
-    const cached = _readCache(params, statusParam);
+    const cached = _readCache(params, calParams);
     if (cached) {
         _applyLoaded(myId, cached.allFetched, cached.plannedTasks, cached.due);
         return;
@@ -470,9 +471,9 @@ function loadTasks() {
 
     function _fetch(attempt) {
         Promise.all([
-            fetch('/api/tasks?'         + params      ).then(r => r.json()),
-            fetch('/api/tasks/planned?' + statusParam ).then(r => r.json()),
-            fetch('/api/tasks/due?'     + statusParam ).then(r => r.json()),
+            fetch('/api/tasks?'         + params    ).then(r => r.json()),
+            fetch('/api/tasks/planned?' + calParams ).then(r => r.json()),
+            fetch('/api/tasks/due?'     + calParams ).then(r => r.json()),
         ])
         .then(([data, plannedData, dueData]) => {
             if (myId !== _loadId) return;   // superseded by a newer loadTasks() call
@@ -482,7 +483,7 @@ function loadTasks() {
             const plannedTasks = plannedData.success ? (plannedData.data || []) : [];
             const due          = dueData.success      ? (dueData.data  || []) : [];
 
-            _writeCache(params, statusParam, allFetched, plannedTasks, due);
+            _writeCache(params, calParams, allFetched, plannedTasks, due);
             _applyLoaded(myId, allFetched, plannedTasks, due);
         })
         .catch(err => {

@@ -1012,66 +1012,88 @@ h2 {
 body.kanban-page { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 body.kanban-page .app-container { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 
-/* column navigation bar */
+/* column navigation bar — sits above dragged cards */
 .kb-col-nav {
-    display: flex; align-items: center; gap: 6px;
-    padding: 4px 10px; flex-shrink: 0;
+    display: flex; align-items: center;
+    padding: 5px 10px; flex-shrink: 0;
     background: #0d1117; border-bottom: 1px solid rgba(255,255,255,0.06);
+    position: relative; z-index: 20;
+    transition: padding 0.15s;
 }
-.kb-nav-arrow {
-    background: none; border: none; color: rgba(255,255,255,0.4);
-    font-size: 15px; cursor: pointer; padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
-}
-.kb-nav-arrow:hover:not(:disabled) { color: #fff; background: rgba(255,255,255,0.08); }
-.kb-nav-arrow:disabled { opacity: 0.2; cursor: default; }
-.kb-nav-cols { display: flex; gap: 4px; flex: 1; overflow: hidden; flex-wrap: nowrap; }
+.kb-col-nav.kb-dragging { padding: 10px 10px; }
+.kb-nav-cols { display: flex; gap: 5px; flex: 1; overflow: hidden; flex-wrap: wrap; }
 .kb-nav-pill {
-    padding: 2px 10px; font-size: 11px; border-radius: 10px; cursor: pointer; white-space: nowrap;
-    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-    color: rgba(255,255,255,0.35); text-transform: capitalize;
+    padding: 3px 11px; font-size: 11px; border-radius: 10px; cursor: pointer; white-space: nowrap;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.4); text-transform: capitalize;
+    transition: color 0.12s, transform 0.1s, box-shadow 0.1s;
 }
-.kb-nav-pill.active { background: #3498db; border-color: #3498db; color: #fff; }
+.kb-nav-pill.active  { color: rgba(255,255,255,0.85); }
+.kb-nav-pill.focused { color: #fff; outline: 2px solid rgba(255,255,255,0.65); outline-offset: 1px; }
+.kb-nav-pill.drag-target {
+    opacity: 1 !important; transform: scale(1.12); color: #fff;
+    box-shadow: 0 0 0 2px #fff, 0 4px 16px rgba(0,0,0,0.6);
+}
+/* During drag: whole nav bar is the drop zone */
+.kb-col-nav.kb-dragging {
+    background: rgba(255,255,255,0.06);
+    border-bottom-color: rgba(255,255,255,0.2);
+}
+/* enlarge pill hit-targets during drag */
+.kb-dragging .kb-nav-pill { padding: 8px 18px; font-size: 12px; }
+/* focused pill pulses to show it's the default drop target */
+.kb-col-nav.kb-dragging .kb-nav-pill.focused {
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.55), 0 0 14px rgba(255,255,255,0.2);
+    transform: scale(1.06);
+}
+/* hint label: "→ todo" */
+.kb-drag-hint {
+    display: none; flex-shrink: 0;
+    font-size: 11px; color: rgba(255,255,255,0.5);
+    padding: 0 8px; white-space: nowrap;
+}
+.kb-col-nav.kb-dragging .kb-drag-hint { display: block; }
 
-/* board — horizontal scrolling flex container */
+/* board — fills remaining height, no scroll (visibility managed by JS) */
 .kb-board {
     display: flex; gap: 10px; flex: 1; align-items: stretch;
-    overflow-x: auto; overflow-y: hidden;
+    overflow: hidden;
     padding: 10px 12px 14px;
-    scroll-snap-type: x proximity;
 }
-@media (max-width: 600px) { .kb-board { scroll-snap-type: x mandatory; } }
 
 /* column */
 .kb-col {
-    min-width: 240px; flex: 1 1 240px; max-width: 380px; flex-shrink: 0;
+    flex: 1; min-width: 0;
     background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
     border-radius: 8px; display: flex; flex-direction: column;
-    scroll-snap-align: start;
+    transition: box-shadow 0.15s;
 }
+.kb-col--hidden  { display: none; }
+.kb-col--focused { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.28), 0 0 0 1px rgba(255,255,255,0.1); }
 .kb-col-hdr {
     display: flex; align-items: center; gap: 6px;
     padding: 7px 10px; border-radius: 8px 8px 0 0; flex-shrink: 0;
     background: rgba(255,255,255,0.06);
 }
 .kb-col-hdr--unassigned {
-    background: rgba(255,255,255,0.03);
-    border-bottom: 1px dashed rgba(255,255,255,0.08);
+    background: #0a0d12;
+    border-bottom: 1px dashed rgba(255,255,255,0.12);
 }
 .kb-col-count {
-    font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.5);
-    background: rgba(255,255,255,0.1); border-radius: 10px; padding: 1px 7px; flex-shrink: 0;
+    font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6);
+    background: rgba(0,0,0,0.25); border-radius: 10px; padding: 1px 7px; flex-shrink: 0;
 }
 .kb-col-name {
-    flex: 1; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.85);
+    flex: 1; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9);
     text-transform: capitalize; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .kb-col-ctrl { display: flex; gap: 2px; flex-shrink: 0; }
 .kb-btn {
-    background: none; border: 1px solid transparent; border-radius: 4px;
-    color: rgba(255,255,255,0.3); font-size: 12px; cursor: pointer; padding: 2px 5px; line-height: 1;
+    background: transparent; border: 1px solid transparent; border-radius: 4px;
+    color: rgba(255,255,255,0.75); font-size: 13px; cursor: pointer; padding: 2px 6px; line-height: 1;
 }
-.kb-btn:hover { color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.07); }
-.kb-btn.active { color: #3498db; border-color: rgba(52,152,219,0.35); }
+.kb-btn:hover { color: #fff; background: rgba(0,0,0,0.3); }
+.kb-btn.active { color: #fff; border-color: rgba(255,255,255,0.55); background: rgba(0,0,0,0.25); }
 
 /* per-column sort popup */
 .kb-sort-popup {
@@ -1087,14 +1109,52 @@ body.kanban-page .app-container { flex: 1; min-height: 0; display: flex; flex-di
 .kb-sort-opt input { accent-color: #3498db; cursor: pointer; }
 
 /* scrollable card body */
-.kb-col-body { flex: 1; overflow-y: auto; padding: 6px 8px; min-height: 60px; }
-.kb-col-body .task-card { margin-bottom: 6px; }
+.kb-col-body {
+    flex: 1; overflow-y: auto; padding: 6px 8px; min-height: 60px;
+    background: rgba(255,255,255,0.018); border-radius: 0 0 7px 7px;
+}
+.kb-col-body .task-card { margin-bottom: 6px; position: relative; padding-left: 18px; }
 .kb-col-body .task-card:last-child { margin-bottom: 0; }
 
-/* hide action buttons by default; reveal on hover */
-.kb-col-body .card-actions { display: none; }
-.kb-col-body .task-card:hover .card-actions,
-.kb-col-body .task-card.expanded .card-actions { display: flex; }
+/* left-strip toggle — tap to expand/collapse individual card */
+.card-toggle {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 18px;
+    cursor: pointer; display: flex; align-items: flex-start;
+    justify-content: center; padding-top: 7px; user-select: none;
+}
+.card-toggle::before {
+    content: '›'; font-size: 11px; line-height: 1; display: block;
+    color: rgba(255,255,255,0.22); transition: transform 0.15s, color 0.15s;
+}
+/* card view (default expanded): chevron points down, dim */
+.kb-col-body:not(.list-view) .task-card:not(.card--collapsed) .card-toggle::before {
+    transform: rotate(90deg); color: rgba(255,255,255,0.15);
+}
+/* list view with per-card expand: chevron points down */
+.kb-col-body.list-view .task-card.card--expanded .card-toggle::before {
+    transform: rotate(90deg); color: rgba(255,255,255,0.45);
+}
+
+/* card view: CRUD always visible at bottom */
+.kb-col-body:not(.list-view) .card-actions { display: flex; }
+
+/* per-card collapse in card-view */
+.kb-col-body:not(.list-view) .task-card.card--collapsed .card-meta,
+.kb-col-body:not(.list-view) .task-card.card--collapsed .card-annotations,
+.kb-col-body:not(.list-view) .task-card.card--collapsed .card-actions { display: none; }
+.kb-col-body:not(.list-view) .task-card.card--collapsed .card-desc { margin-bottom: 0; }
+
+/* list view: priority dot + description only */
+.kb-col-body.list-view .card-meta,
+.kb-col-body.list-view .card-annotations,
+.kb-col-body.list-view .card-actions { display: none; }
+.kb-col-body.list-view .card-desc { margin-bottom: 0; }
+
+/* per-card expand in list-view */
+.kb-col-body.list-view .task-card.card--expanded .card-meta,
+.kb-col-body.list-view .task-card.card--expanded .card-annotations { display: block; }
+.kb-col-body.list-view .task-card.card--expanded .card-actions { display: flex; }
+.kb-col-body.list-view .task-card.card--expanded .card-desc { margin-bottom: 4px; }
 
 /* empty column hint */
 .kb-empty {
@@ -1103,5 +1163,5 @@ body.kanban-page .app-container { flex: 1; min-height: 0; display: flex; flex-di
 }
 
 /* drag-and-drop states */
-.sortable-ghost  { opacity: 0.3; }
-.sortable-chosen { box-shadow: 0 6px 24px rgba(0,0,0,0.5) !important; }
+.sortable-ghost  { opacity: 0.25; }
+.sortable-chosen { box-shadow: 0 8px 28px rgba(0,0,0,0.6) !important; }

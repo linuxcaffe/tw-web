@@ -57,18 +57,18 @@ const _EXTRAS_KEY = 'tw-cal-extras';
 const _DIRTY_KEY  = 'tw-tasks-dirty';
 const _CACHE_TTL  = 30_000;
 
-function _readExtras(statusParam) {
+function _readExtras(cacheKey) {
     try {
         if (sessionStorage.getItem(_DIRTY_KEY) === '1') return null;
         const x = JSON.parse(sessionStorage.getItem(_EXTRAS_KEY));
-        if (!x || x.statusParam !== statusParam || (Date.now() - x.ts) > _CACHE_TTL) return null;
+        if (!x || x.cacheKey !== cacheKey || (Date.now() - x.ts) > _CACHE_TTL) return null;
         return { planned: x.planned, due: x.due };
     } catch { return null; }
 }
 
-function _writeExtras(statusParam, planned, due) {
+function _writeExtras(cacheKey, planned, due) {
     try {
-        sessionStorage.setItem(_EXTRAS_KEY, JSON.stringify({ statusParam, planned, due, ts: Date.now() }));
+        sessionStorage.setItem(_EXTRAS_KEY, JSON.stringify({ cacheKey, planned, due, ts: Date.now() }));
         sessionStorage.removeItem(_DIRTY_KEY);
     } catch {}
 }
@@ -76,14 +76,13 @@ function _writeExtras(statusParam, planned, due) {
 // ── Data loading ──────────────────────────────────────────────────────────────
 
 function loadAgenda() {
-    const navState    = window.twNav ? window.twNav.getState() : {};
-    const statusParam = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(','));
+    const params = window.twNav ? window.twNav.stateToParams() : 'status=pending';
 
     document.getElementById('loading').style.display = '';
     document.getElementById('error-message').style.display = 'none';
     document.getElementById('tasks-container').innerHTML = '';
 
-    const cached = _readExtras(statusParam);
+    const cached = _readExtras(params);
     if (cached) {
         document.getElementById('loading').style.display = 'none';
         renderAgenda(cached.planned, cached.due);
@@ -91,14 +90,14 @@ function loadAgenda() {
     }
 
     Promise.all([
-        fetch('/api/tasks/planned?' + statusParam).then(r => r.json()),
-        fetch('/api/tasks/due?'     + statusParam).then(r => r.json()),
+        fetch('/api/tasks/planned?' + params).then(r => r.json()),
+        fetch('/api/tasks/due?'     + params).then(r => r.json()),
     ])
     .then(([plannedData, dueData]) => {
         document.getElementById('loading').style.display = 'none';
         const scheduled = plannedData.success ? (plannedData.data || []) : [];
         const due       = dueData.success      ? (dueData.data  || []) : [];
-        _writeExtras(statusParam, scheduled, due);
+        _writeExtras(params, scheduled, due);
         renderAgenda(scheduled, due);
     })
     .catch(err => {

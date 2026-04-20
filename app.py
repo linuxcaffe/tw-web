@@ -297,8 +297,14 @@ def static_files(filename):
 def get_due_tasks():
     """Get tasks that have a due date but no scheduled date (for calendar due-event display)."""
     statuses = [s.strip() for s in request.args.get('status', 'pending').split(',') if s.strip()]
-    status_args = _build_task_filter(statuses, None)
-    result = run_task_command(['task', 'due.any:', 'scheduled.none:'] + status_args + ['export'])
+    context  = request.args.get('context', '').strip()
+    args = ['task']
+    if context:
+        ctx_expr = _get_context_filters().get(context)
+        if ctx_expr:
+            args += ['(', ctx_expr, ')']
+    args += ['due.any:', 'scheduled.none:'] + _build_task_filter(statuses, None) + ['export']
+    result = run_task_command(args)
     if result['success']:
         try:
             tasks = json.loads(result['stdout'])
@@ -311,8 +317,14 @@ def get_due_tasks():
 def get_planned_tasks():
     """Get all planned tasks (with scheduled date) in JSON format"""
     statuses = [s.strip() for s in request.args.get('status', 'pending').split(',') if s.strip()]
-    status_args = _build_task_filter(statuses, None)
-    result = run_task_command(['task', 'scheduled.not:'] + status_args + ['export'])
+    context  = request.args.get('context', '').strip()
+    args = ['task']
+    if context:
+        ctx_expr = _get_context_filters().get(context)
+        if ctx_expr:
+            args += ['(', ctx_expr, ')']
+    args += ['scheduled.not:'] + _build_task_filter(statuses, None) + ['export']
+    result = run_task_command(args)
 
     if result['success']:
         try:
@@ -682,6 +694,26 @@ def set_config():
 def get_kanban_columns():
     """Return configured kanban column names (live from settings)"""
     return jsonify({'success': True, 'columns': _load_settings()['kanban_columns']})
+
+@app.route('/api/kanban/order', methods=['GET'])
+def get_kanban_order():
+    """Return saved manual sort order: { col: [uuid, ...] }"""
+    s = _load_settings()
+    return jsonify({'success': True, 'order': s.get('kanban_order', {})})
+
+@app.route('/api/kanban/order', methods=['PUT'])
+def set_kanban_order():
+    """Save manual sort order for one column."""
+    data  = request.get_json() or {}
+    col   = data.get('col')
+    order = data.get('order', [])
+    if col is None:
+        return jsonify({'success': False, 'error': 'col required'}), 400
+    s  = _load_settings()
+    ko = dict(s.get('kanban_order', {}))
+    ko[col] = [str(u) for u in order]
+    _save_settings({'kanban_order': ko})
+    return jsonify({'success': True})
 
 @app.route('/api/task/add', methods=['POST'])
 def add_task():
