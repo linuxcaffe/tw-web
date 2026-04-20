@@ -403,8 +403,8 @@
         ].join('');
     }
 
-    function buildBtnBar(state, contexts) {
-        const statusBtns = STATUS_BTNS.map(s =>
+    function buildBtnBar(state, contexts, active) {
+        const statusBtns = active === 'kanban' ? '' : STATUS_BTNS.map(s =>
             `<button class="tw-status-btn${state.statuses.includes(s.id) ? ' active' : ''}" data-status="${s.id}">${s.label}</button>`
         ).join('');
         return (
@@ -550,7 +550,7 @@
         // Button bar
         const btnBar = document.createElement('div');
         btnBar.id = 'tw-btn-bar';
-        btnBar.innerHTML = buildBtnBar(state, contexts);
+        btnBar.innerHTML = buildBtnBar(state, contexts, active);
 
         // Filter summary bar (hidden until a filter is active)
         const filterBar = document.createElement('div');

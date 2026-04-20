@@ -26,6 +26,7 @@ let kbColOffset     = 0;
 let kbFocusedColIdx = 0;
 let _kbResizeObs     = null;
 let _kbDragMoveOff   = null;
+let _kbIsDragging    = false; // true only between onStart and onEnd
 let _kbNavDropTarget = null;  // state string when pointer is over nav bar, else null
 let _kbNavSortable   = null;  // Sortable instance on #kb-nav-cols (nav drop zone)
 let taskEditor;  // global — TaskCardManager's edit handler references this by name
@@ -63,15 +64,14 @@ async function kbReload(preserveView = false) {
     const savedOffset = kbColOffset;
     const savedFocus  = kbFocusedColIdx;
     try {
-        const navState    = window.twNav ? window.twNav.getState() : {};
-        const context     = (navState.context || '').trim();
-        const statusParam = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(','));
-        // Swimlanes: pending + context only (C); Unassigned: nav status + no context (FS via kbNavFilter)
-        const swimParams  = 'status=pending' + (context ? '&context=' + encodeURIComponent(context) : '');
+        const navState   = window.twNav ? window.twNav.getState() : {};
+        const context    = (navState.context || '').trim();
+        // Kanban is always pending-only; status filter is suppressed on this page
+        const swimParams = 'status=pending' + (context ? '&context=' + encodeURIComponent(context) : '');
         const [colsData, swimData, unassignData, orderData] = await Promise.all([
             fetch('/api/kanban/columns').then(r => r.json()),
             fetch('/api/tasks?' + swimParams).then(r => r.json()),
-            fetch('/api/tasks?' + statusParam).then(r => r.json()),
+            fetch('/api/tasks?status=pending').then(r => r.json()),
             fetch('/api/kanban/order').then(r => r.json()),
         ]);
         kbColumns       = colsData.columns    || [];
@@ -351,6 +351,7 @@ function _kbApplyVisibility() {
 
 // ── Drag to nav pill ──────────────────────────────────────────────────────────
 function _kbDragStart(_uuid) {
+    _kbIsDragging    = true;
     _kbNavDropTarget = null;
     // kb-dragging is NOT set here — the move handler adds/removes it as the
     // pointer enters/leaves the nav so the stack only appears on demand.
@@ -359,6 +360,7 @@ function _kbDragStart(_uuid) {
     let panTimer = null;
 
     const handler = e => {
+        if (!_kbIsDragging) return;
         const cx = e.clientX ?? e.touches?.[0]?.clientX;
         const cy = e.clientY ?? e.touches?.[0]?.clientY;
         if (cx == null) return;
@@ -415,6 +417,7 @@ function _kbDragStart(_uuid) {
 
 // Cleanup only — nav drops are handled by the #kb-nav-cols Sortable onAdd.
 function _kbDragEnd() {
+    _kbIsDragging    = false;
     _kbNavDropTarget = null;
     if (_kbDragMoveOff) { _kbDragMoveOff(); _kbDragMoveOff = null; }
     document.getElementById('kb-col-nav').classList.remove('kb-dragging');
