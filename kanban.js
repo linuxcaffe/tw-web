@@ -26,6 +26,7 @@ let kbColOffset     = 0;
 let kbFocusedColIdx = 0;
 let _kbResizeObs    = null;
 let _kbDragMoveOff  = null;
+let _kbNavDropTarget = null;  // state string when pointer is over nav bar, else null
 let taskEditor;  // global — TaskCardManager's edit handler references this by name
 
 const kbCardManager = new TaskCardManager(new TaskActionHandler({
@@ -267,12 +268,11 @@ function _kbMakeCol(col, label, tasks, isUnassigned, colorIdx) {
         onEnd(evt) {
             const target = _kbDragEnd(evt.originalEvent);
             if (target !== null) {
-                // dropped on a nav pill — only writes state, nothing else
-                _kbSetState(evt.item.dataset.taskId, target);
-                setTimeout(() => kbReload(true), 400);  // preserve view for rapid multi-drag
+                // dropped on nav bar — write state then reload (nav target was focused column)
+                _kbSetState(evt.item.dataset.taskId, target).then(() => kbReload(true));
             } else if (evt.from !== evt.to) {
-                // dropped in a different column — only writes state, nothing else
-                _kbSetState(evt.item.dataset.taskId, evt.to.dataset.col);
+                // dropped in a different column — write state then reload to sync local arrays
+                _kbSetState(evt.item.dataset.taskId, evt.to.dataset.col).then(() => kbReload(true));
             } else if (evt.oldIndex !== evt.newIndex) {
                 // within-column reorder — save manual order, no task mutation
                 const c     = evt.to.dataset.col;
@@ -350,6 +350,7 @@ function _kbApplyVisibility() {
 
 // ── Drag to nav pill ──────────────────────────────────────────────────────────
 function _kbDragStart(_uuid) {
+    _kbNavDropTarget = null;
     const nav = document.getElementById('kb-col-nav');
     nav.classList.add('kb-dragging');
 
@@ -379,9 +380,13 @@ function _kbDragStart(_uuid) {
                 const r = p.getBoundingClientRect();
                 return cx >= r.left && cx <= r.right;
             });
-            // Specific pill wins; otherwise highlight the focused column's pill
+            // Specific pill wins; otherwise fall back to focused column's pill
             const target = hovered ?? nav.querySelector(`.kb-nav-pill[data-kb-idx="${kbFocusedColIdx}"]`);
             target?.classList.add('drag-target');
+            // Track live — this is what _kbDragEnd will read
+            _kbNavDropTarget = target ? target.dataset.kbCol : _kbFocusedColValue();
+        } else {
+            _kbNavDropTarget = null;
         }
 
         // Edge auto-pan — only fires when not over the nav bar
@@ -413,8 +418,11 @@ function _kbDragStart(_uuid) {
 }
 
 // Returns target col string (including "" for Unassigned) or null if not a nav drop.
-// Uses originalEvent for a final bounding-rect check — reliable on mobile.
-function _kbDragEnd(originalEvent) {
+// Uses _kbNavDropTarget tracked live by the move handler — more reliable than
+// re-checking coordinates from originalEvent (SortableJS may fire onEnd with stale coords).
+function _kbDragEnd(_originalEvent) {
+    const navTarget = _kbNavDropTarget;
+    _kbNavDropTarget = null;
     if (_kbDragMoveOff) { _kbDragMoveOff(); _kbDragMoveOff = null; }
     const nav  = document.getElementById('kb-col-nav');
     nav.classList.remove('kb-dragging');
@@ -422,27 +430,7 @@ function _kbDragEnd(originalEvent) {
     if (hint) hint.textContent = '';
     document.querySelectorAll('.kb-nav-pill.drag-target')
         .forEach(p => p.classList.remove('drag-target'));
-
-    // Determine final drop coordinates (touch or mouse)
-    let cx, cy;
-    if (originalEvent) {
-        const t = originalEvent.changedTouches?.[0] ?? originalEvent;
-        cx = t.clientX; cy = t.clientY;
-    }
-
-    if (cx != null) {
-        const navRect = nav.getBoundingClientRect();
-        if (cy >= navRect.top && cy <= navRect.bottom &&
-            cx >= navRect.left && cx <= navRect.right) {
-            // Dropped on the nav bar — find specific pill by rect
-            const pill = [...nav.querySelectorAll('.kb-nav-pill')].find(p => {
-                const r = p.getBoundingClientRect();
-                return cx >= r.left && cx <= r.right;
-            });
-            return pill ? pill.dataset.kbCol : _kbFocusedColValue();
-        }
-    }
-    return null;
+    return navTarget;   // null when pointer was not over nav at release
 }
 
 // ── Column nav pills ──────────────────────────────────────────────────────────
