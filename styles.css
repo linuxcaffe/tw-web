@@ -1030,37 +1030,38 @@ body.kanban-page .app-container { flex: 1; min-height: 0; display: flex; flex-di
 .kb-nav-pill.active  { color: rgba(255,255,255,0.85); }
 .kb-nav-pill.focused { color: #fff; outline: 2px solid rgba(255,255,255,0.65); outline-offset: 1px; }
 
-/* ── Drag overlay: horizontal pills stack into full-width vertical rows ── */
+/* ── Drag overlay: triggered when pointer enters the nav bar ── */
 .kb-col-nav.kb-dragging {
-    padding: 5px 8px 7px;
+    padding: 4px 8px 4px;
     background: rgba(0,0,0,0.3);
     border-bottom-color: rgba(255,255,255,0.1);
 }
+/* Pills stack vertically, filling the full nav width */
 .kb-col-nav.kb-dragging .kb-nav-cols {
     flex-direction: column;
     flex-wrap: nowrap;
-    gap: 4px;
+    gap: 0;
     overflow: visible;
 }
 .kb-col-nav.kb-dragging .kb-nav-pill {
     width: 100%;
-    height: 30px;
+    height: 28px;
     padding: 0 12px;
-    border-radius: 4px;
+    border-radius: 0;
     font-size: 12px; font-weight: 500;
-    opacity: 0.6;
+    opacity: 0.28;          /* dim — only hovered row stands out */
     outline: none; box-shadow: none; transform: none;
     display: flex; align-items: center;
+    transition: opacity 0.08s, filter 0.08s;
 }
-/* hovered row brightens with its own column color — no white flash */
+/* Hovered row lights up with its own column color */
 .kb-col-nav.kb-dragging .kb-nav-pill.drag-target {
     opacity: 1;
-    filter: brightness(1.5) saturate(1.2);
-    transform: translateX(3px);
+    filter: brightness(1.4) saturate(1.1);
 }
 /* Hide Sortable ghost inside the nav strip */
 .kb-nav-cols .sortable-ghost { display: none !important; }
-/* Hint span unused in new design */
+/* Hint span unused */
 .kb-drag-hint { display: none !important; }
 
 /* board — fills remaining height, no scroll (visibility managed by JS) */

@@ -351,13 +351,13 @@ function _kbApplyVisibility() {
 // ── Drag to nav pill ──────────────────────────────────────────────────────────
 function _kbDragStart(_uuid) {
     _kbNavDropTarget = null;
-    const nav = document.getElementById('kb-col-nav');
-    nav.classList.add('kb-dragging');
+    // kb-dragging is NOT set here — the move handler adds/removes it as the
+    // pointer enters/leaves the nav so the stack only appears on demand.
 
+    const nav = document.getElementById('kb-col-nav');
     let panTimer = null;
 
     const handler = e => {
-        // Bounding-rect hit testing — works on mobile and through any overlapping element
         const cx = e.clientX ?? e.touches?.[0]?.clientX;
         const cy = e.clientY ?? e.touches?.[0]?.clientY;
         if (cx == null) return;
@@ -366,14 +366,18 @@ function _kbDragStart(_uuid) {
         const onNav   = cy >= navRect.top && cy <= navRect.bottom &&
                         cx >= navRect.left && cx <= navRect.right;
 
+        // Transform nav to vertical stack only while pointer is inside it
+        nav.classList.toggle('kb-dragging', onNav);
+
         document.querySelectorAll('.kb-nav-pill.drag-target')
             .forEach(p => p.classList.remove('drag-target'));
 
         if (onNav) {
-            // Find which pill the pointer is over by rect
+            // Check both X and Y — in vertical stack all pills share the same X range;
+            // only the Y position distinguishes which row is hovered
             const hovered = [...nav.querySelectorAll('.kb-nav-pill')].find(p => {
                 const r = p.getBoundingClientRect();
-                return cx >= r.left && cx <= r.right;
+                return cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
             });
             hovered?.classList.add('drag-target');
             _kbNavDropTarget = hovered ? hovered.dataset.kbCol : null;
@@ -449,20 +453,22 @@ function _kbUpdateNavPills() {
 
     // Reinitialise the nav drop zone Sortable (pills HTML was replaced above)
     if (_kbNavSortable) { _kbNavSortable.destroy(); _kbNavSortable = null; }
+    const navEl = document.getElementById('kb-col-nav');
     _kbNavSortable = new Sortable(pills, {
-        group:      { name: 'kanban', put: true, pull: false },
+        group: { name: 'kanban', put: () => navEl.classList.contains('kb-dragging'), pull: false },
         animation:  0,
         onAdd(evt) {
             const uuid = evt.item.dataset.taskId;
             let targetState = _kbNavDropTarget;
             if (targetState === null) {
-                // Dropped in a gap — find nearest pill by card midpoint
+                // Dropped in a gap — find nearest pill by vertical midpoint (stack layout)
                 const r  = evt.item.getBoundingClientRect();
-                const cx = r.left + r.width / 2;
+                const cy = r.top + r.height / 2;
                 const nearest = [...pills.querySelectorAll('.kb-nav-pill')].reduce((best, p) => {
-                    const pc = p.getBoundingClientRect().left + p.getBoundingClientRect().width / 2;
-                    return (!best || Math.abs(cx - pc) < Math.abs(cx - best.cx))
-                        ? { el: p, cx: pc } : best;
+                    const pr = p.getBoundingClientRect();
+                    const pc = pr.top + pr.height / 2;
+                    return (!best || Math.abs(cy - pc) < Math.abs(cy - best.cy))
+                        ? { el: p, cy: pc } : best;
                 }, null);
                 targetState = nearest?.el?.dataset.kbCol ?? null;
             }
