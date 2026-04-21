@@ -47,7 +47,7 @@ function _writeCache(params, cacheKey, allFetched, plannedTasks, due) {
 function _applyLoaded(myId, allFetched, plannedTasks, due) {
     if (myId !== _loadId) return;
     dueTasks       = due;
-    unplannedTasks = allFetched.filter(t => !t.scheduled);
+    unplannedTasks = allFetched.filter(t => !t.scheduled && !t.due);
     allTasks       = [...unplannedTasks, ...plannedTasks];
     applyFiltersAndDisplay();
     processTasksForCalendar(plannedTasks);
@@ -457,10 +457,12 @@ function updateCalendarTitle() {
 // ── Data loading ──────────────────────────────────────────────────────────────
 function loadTasks() {
     const myId        = ++_loadId;   // mark this wave; older in-flight calls become stale
-    const params      = window.twNav ? window.twNav.stateToParams() : 'status=pending';
     const navState    = window.twNav ? window.twNav.getState() : {};
-    // Calendar events: status-only (no context) — FS via matchesNavFilter in processTasksForCalendar
-    const calParams   = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(','));
+    const context     = (navState.context || '').trim();
+    // Drag-list: always pending, context-aware — blind to status bar
+    const params      = 'status=pending' + (context ? '&context=' + encodeURIComponent(context) : '');
+    // Calendar events: also always pending (FS via matchesNavFilter in processTasksForCalendar)
+    const calParams   = 'status=pending';
 
     // Serve from cache when clean and fresh — skips all three fetches
     const cached = _readCache(params, calParams);
@@ -708,6 +710,8 @@ function matchesNavFilter(task) {
 function applyFiltersAndDisplay() {
     const filtered = unplannedTasks.filter(matchesNavFilter);
     window.twNav?.setCount(filtered.length, unplannedTasks.length);
+    const title = document.getElementById('cal-unscheduled-title');
+    if (title) title.textContent = `${filtered.length} Unscheduled`;
     displayUnplannedTasks(sortUnplanned(filtered));
 }
 

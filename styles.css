@@ -1006,6 +1006,14 @@ h2 {
     color: var(--text-muted, #888);
 }
 
+/* ── Calendar sidebar title ──────────────────────────────────────────────── */
+.cal-unscheduled-title {
+    padding: 4px 8px 2px;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.05em;
+    color: rgba(255,255,255,0.45); text-transform: uppercase;
+    flex-shrink: 0;
+}
+
 /* ── Kanban page ─────────────────────────────────────────────────────────── */
 
 /* full-height layout, mirrors calendar page */

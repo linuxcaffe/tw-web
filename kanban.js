@@ -50,10 +50,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // clientOnly = text/project/tags/priority → only unassigned needs re-render
-    // !clientOnly = status/context changed   → full server re-fetch
+    // !clientOnly = context changed → full server re-fetch, preserve scroll/focus
     document.addEventListener('tw-filter-change', e => {
         if (e.detail && e.detail.clientOnly) kbRerenderUnassigned();
-        else kbReload();
+        else kbReload(true);
     });
 
     kbReload();
@@ -78,9 +78,9 @@ async function kbReload(preserveView = false) {
         kbAllTasks      = swimData.tasks      || [];
         kbUnassignedSrc = unassignData.tasks  || [];
         kbManualOrder   = orderData.order     || {};
-        kbColOffset     = preserveView ? savedOffset : 0;
-        // Unassigned (idx 0) never holds focus — default to first workflow column
-        kbFocusedColIdx = preserveView ? savedFocus : (kbColumns.length > 0 ? 1 : 0);
+        // On fresh load: start at offset 1 (Unassigned off-screen); focus first swimlane
+        kbColOffset     = preserveView ? savedOffset : (kbColumns.length > 0 ? 1 : 0);
+        kbFocusedColIdx = preserveView ? savedFocus  : (kbColumns.length > 0 ? 1 : 0);
         kbRenderBoard();
     } catch (e) {
         console.error('Kanban load failed:', e);
@@ -295,11 +295,9 @@ function _kbMakeCol(col, label, tasks, isUnassigned, colorIdx) {
 
 // ── Column focus ──────────────────────────────────────────────────────────────
 function _kbSetFocus(idx) {
-    // Unassigned (idx 0) never receives focus — bring it into view but keep current focus
-    if (idx === 0 && kbColumns.length > 0) { _kbBringIntoView(0); return; }
     const board = document.getElementById('kb-board');
     const cols  = [...board.querySelectorAll('.kb-col')];
-    kbFocusedColIdx = Math.max(1, Math.min(idx, cols.length - 1));
+    kbFocusedColIdx = Math.max(0, Math.min(idx, cols.length - 1));
     _kbBringIntoView(kbFocusedColIdx);
     _kbApplyFocus();
 }
@@ -328,7 +326,7 @@ function _kbApplyFocus() {
 function _kbInitResize() {
     const board = document.getElementById('kb-board');
     if (_kbResizeObs) _kbResizeObs.disconnect();
-    _kbResizeObs = new ResizeObserver(() => _kbApplyVisibility());
+    _kbResizeObs = new ResizeObserver(() => { _kbCenterFocused(); _kbApplyVisibility(); });
     _kbResizeObs.observe(board);
     _kbApplyVisibility();
 }
@@ -337,6 +335,21 @@ function _kbMaxVisible() {
     const board = document.getElementById('kb-board');
     const w     = board.clientWidth - 24; // subtract padding (2×12px)
     return Math.max(1, Math.floor((w + KB_COL_GAP) / (KB_MIN_COL_W + KB_COL_GAP)));
+}
+
+// On window resize: center the focused swimlane; Unassigned (idx 0) hides first.
+// Not called during manual pan — only from ResizeObserver.
+function _kbCenterFocused() {
+    const board  = document.getElementById('kb-board');
+    const cols   = [...board.querySelectorAll('.kb-col')];
+    const total  = cols.length;
+    const maxVis = _kbMaxVisible();
+    if (total === 0) return;
+    if (maxVis >= total) { kbColOffset = 0; return; }   // all fit — show Unassigned too
+    // Center focused column; start at minimum 1 so Unassigned hides first
+    const focus  = Math.max(1, Math.min(kbFocusedColIdx, total - 1));
+    const half   = Math.floor(maxVis / 2);
+    kbColOffset  = Math.max(1, Math.min(focus - half, total - maxVis));
 }
 
 function _kbApplyVisibility() {
@@ -462,6 +475,7 @@ function _kbUpdateNavPills() {
         group:         { name: 'kanban', put: () => navEl.classList.contains('kb-dragging'), pull: false },
         animation:     0,
         forceFallback: true,
+        draggable:     '.NONE',   // pills are not draggable — nav only accepts drops
         onAdd(evt) {
             const uuid = evt.item.dataset.taskId;
             let targetState = _kbNavDropTarget;

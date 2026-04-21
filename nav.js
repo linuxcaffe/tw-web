@@ -1213,6 +1213,12 @@
                 e.preventDefault();
                 const fi = document.getElementById('tw-filter-input');
                 if (fi) { fi.focus(); fi.select(); }
+            } else if (k === 'c') {
+                e.preventDefault();
+                document.querySelector('.tw-ctx-btn')?.focus();
+            } else if (k === 's') {
+                e.preventDefault();
+                document.querySelector('.tw-status-btn')?.focus();
             }
         });
     }
