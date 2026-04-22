@@ -1315,6 +1315,8 @@
             if (e.metaKey || e.ctrlKey || e.altKey) return;
             const tag = (e.target.tagName || '').toLowerCase();
             if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+            // Also suppress when focus is inside any open modal/dialog (e.g. CodeMirror annotation field)
+            if (e.target.closest('.modal, .task-editor-backdrop, [role="dialog"]')) return;
 
             const k = e.key;
 
