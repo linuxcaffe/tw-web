@@ -235,6 +235,11 @@ class TaskEditor {
                 this.onCancel();
             });
         }
+
+        const logBtn = this.modal.querySelector('#task-editor-log');
+        if (logBtn) {
+            logBtn.addEventListener('click', () => this.handleLog());
+        }
         
         // Auto-uppercase h→H, m→M, l→L in priority field (leaves numeric values untouched)
         const priField = this.modal.querySelector('#task-editor-priority');
@@ -300,6 +305,10 @@ class TaskEditor {
             if (title) title.textContent = texts.addTask;
             this.clearForm();
         }
+
+        // Log button only makes sense for new tasks
+        const logBtn = this.modal.querySelector('#task-editor-log');
+        if (logBtn) logBtn.style.display = task ? 'none' : '';
 
         this.modal.style.display = 'block';
 
@@ -431,7 +440,17 @@ class TaskEditor {
         const schedField    = form.querySelector('#task-editor-scheduled');
         const schedDurField = form.querySelector('#task-editor-sched-duration');
 
-        if (tagsField)     taskData.tags          = tagsField.value.split(',').map(t => t.trim()).filter(Boolean);
+        if (tagsField) {
+            const newTags = tagsField.value.split(',').map(t => t.trim()).filter(Boolean);
+            if (this.currentTask) {
+                // Edit: send diff so backend can do targeted +/- without -TAGS
+                const existing = Array.isArray(this.currentTask.tags) ? this.currentTask.tags : [];
+                taskData.tags_remove = existing.filter(t => !newTags.includes(t));
+                taskData.tags_add    = newTags.filter(t => !existing.includes(t));
+            } else {
+                taskData.tags = newTags;
+            }
+        }
         if (projectField)  taskData.project        = projectField.value;
         if (dueField)      taskData.due            = dueField.value;
         if (dueDurField)   taskData.due_duration   = dueDurField.value;
@@ -474,14 +493,67 @@ class TaskEditor {
             this.onSaveError('Network error: ' + error.message);
         }
     }
-    
+
+    handleLog() {
+        const form = this.modal.querySelector('#task-editor-form');
+        if (!form) return;
+
+        const description = form.querySelector('#task-editor-description')?.value || '';
+        if (!description) return;
+
+        const taskData = { description, priority: form.querySelector('#task-editor-priority')?.value || '' };
+
+        const tagsField     = form.querySelector('#task-editor-tags');
+        const projectField  = form.querySelector('#task-editor-project');
+        const dueField      = form.querySelector('#task-editor-due');
+        const dueDurField   = form.querySelector('#task-editor-due-duration');
+        const schedField    = form.querySelector('#task-editor-scheduled');
+        const schedDurField = form.querySelector('#task-editor-sched-duration');
+
+        if (tagsField)     taskData.tags          = tagsField.value.split(',').map(t => t.trim()).filter(Boolean);
+        if (projectField)  taskData.project        = projectField.value;
+        if (dueField)      taskData.due            = dueField.value;
+        if (dueDurField)   taskData.due_duration   = dueDurField.value;
+        if (schedField)    taskData.scheduled      = schedField.value;
+        if (schedDurField) taskData.sched_duration = schedDurField.value;
+
+        this.logTask(taskData);
+    }
+
+    async logTask(taskData) {
+        try {
+            const prepared = this.prepareTaskDataForAPI(taskData, false);
+            const response = await fetch('/api/task/log', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(prepared),
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.onSaveSuccess(null, false);
+                this.hide();
+            } else {
+                this.onSaveError(data.error || 'Failed to log task');
+            }
+        } catch (error) {
+            this.onSaveError('Network error: ' + error.message);
+        }
+    }
+
     prepareTaskDataForAPI(taskData, isEdit) {
         const preparedData = {
             description: taskData.description,
-            tags:        taskData.tags     || [],
             project:     taskData.project  || null,
             priority:    taskData.priority || null,
         };
+
+        // Edit mode sends a diff; add mode sends the full tag list
+        if (taskData.tags_add !== undefined || taskData.tags_remove !== undefined) {
+            preparedData.tags_add    = taskData.tags_add    || [];
+            preparedData.tags_remove = taskData.tags_remove || [];
+        } else {
+            preparedData.tags = taskData.tags || [];
+        }
         
         // Formater les dates si elles existent
         if (taskData.due) {

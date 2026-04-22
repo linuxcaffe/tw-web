@@ -601,13 +601,14 @@ def modify_task(task_id):
     if 'description' in data and data['description']:
         modifications.append(f'description:{data["description"]}')
 
-    if 'tags' in data:
-        # Clear all existing tags atomically in the same modify command
-        modifications.append('-TAGS')
-        if isinstance(data['tags'], list):
-            for tag in data['tags']:
-                if tag and tag.strip():
-                    modifications.append(f'+{tag.strip()}')
+    if 'tags_remove' in data:
+        for tag in data['tags_remove']:
+            if tag and str(tag).strip():
+                modifications.append(f'-{str(tag).strip()}')
+    if 'tags_add' in data:
+        for tag in data['tags_add']:
+            if tag and str(tag).strip():
+                modifications.append(f'+{str(tag).strip()}')
 
     if 'due' in data:
         modifications.append(f'due:{data["due"]}' if data['due'] else 'due:')
@@ -776,6 +777,39 @@ def add_task():
         'error': create_result.get('stderr', 'Failed to create task'),
         'task': None,
         'warnings': _warnings(create_result)
+    })
+
+@app.route('/api/task/log', methods=['POST'])
+def log_task():
+    """Log a completed task via 'task log' — same args as add but marks done immediately."""
+    data = request.get_json()
+    if not data.get('description'):
+        return jsonify({'success': False, 'error': 'Description is required'}), 400
+
+    args = ['task', 'log', data['description']]
+
+    if data.get('tags'):
+        if isinstance(data['tags'], list):
+            for tag in data['tags']:
+                args.append(f'+{tag}')
+    if data.get('due'):
+        args.append(f'due:{data["due"]}')
+    if data.get('scheduled'):
+        args.append(f'scheduled:{data["scheduled"]}')
+    if data.get('priority'):
+        args.append(f'priority:{data["priority"]}')
+    if data.get('project'):
+        args.append(f'project:{data["project"]}')
+    if data.get('sched_duration'):
+        args.append(f'sched_duration:{data["sched_duration"]}')
+    if data.get('due_duration'):
+        args.append(f'due_duration:{data["due_duration"]}')
+
+    result = run_task_command(args)
+    return jsonify({
+        'success': result['success'],
+        'error':   result.get('stderr', '') if not result['success'] else None,
+        'warnings': _warnings(result),
     })
 
 @app.route('/api/task/<task_id>/annotate', methods=['POST'])

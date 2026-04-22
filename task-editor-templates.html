@@ -17,17 +17,17 @@
         <form id="task-editor-form" autocomplete="off">
 
             <!-- Row 1: Description full width -->
-            <input type="text" id="task-editor-description" placeholder="Description" required>
+            <input type="text" id="task-editor-description" placeholder="Description" required autocomplete="off">
 
             <!-- Row 2: Project full width -->
             <input type="text" id="task-editor-project" placeholder="Project"
-                   list="task-editor-project-options">
+                   list="task-editor-project-options" autocomplete="off">
             <datalist id="task-editor-project-options"></datalist>
 
             <!-- Row 3: Priority 25% | Tags 75% -->
             <div class="te-row te-row-1-3">
                 <input type="text" id="task-editor-priority" placeholder="Pri (1-6,H,M,L)" maxlength="2" autocomplete="off">
-                <input type="text" id="task-editor-tags" placeholder="Tags (comma-sep)">
+                <input type="text" id="task-editor-tags" placeholder="Tags (comma-sep)" autocomplete="off">
             </div>
 
             <!-- Row 4: Due 70% | due_duration 30% -->
@@ -70,6 +70,7 @@
 
             <div class="te-actions">
                 <button type="submit"  class="btn btn-primary   btn-sm" id="task-editor-save">Save</button>
+                <button type="button"  class="btn btn-success   btn-sm" id="task-editor-log">Log</button>
                 <button type="button"  class="btn btn-secondary btn-sm" id="task-editor-cancel">Cancel</button>
             </div>
 
