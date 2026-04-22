@@ -120,7 +120,7 @@ def _get_context_filters() -> dict:
     global _ctx_cache, _ctx_cache_ts
     if time.time() - _ctx_cache_ts < 30:
         return _ctx_cache
-    result = run_task_command(['task', '_show'])
+    result = run_task_command(['task', '_show'], readonly=True)
     filters = {}
     if result['success']:
         for line in result['stdout'].splitlines():
@@ -206,19 +206,26 @@ _TW_ENV = {**os.environ, 'TW_WEB': '1'}
 # Prevents a hung interactive hook from deadlocking the Flask request.
 TASK_TIMEOUT = 15
 
-def run_task_command(args):
+def run_task_command(args, readonly=False):
     """Execute a TaskWarrior command and return the result.
     args must be a list, e.g. ['task', 'status:pending', 'export'].
     shell=True is intentionally not used.
 
     rc.confirmation=no is injected per-call (not via tw-web.rc) so it only
     applies to web-context commands, not CLI task/tw invocations.
+
+    readonly=True injects rc.hooks=off to prevent on-exit recurrence hooks from
+    firing on every read/export — avoids the reconcile() race condition where
+    concurrent requests both see no active instance and both spawn duplicates.
     """
     try:
         if args[0] != 'task':
             args = ['task'] + args
         # Inject web-only rc overrides immediately after 'task'
-        args = [args[0], 'rc.confirmation=no'] + args[1:]
+        overrides = ['rc.confirmation=no']
+        if readonly:
+            overrides.append('rc.hooks=off')
+        args = [args[0]] + overrides + args[1:]
 
         log_command(args)
 
@@ -304,7 +311,7 @@ def get_due_tasks():
         if ctx_expr:
             args += ['(', ctx_expr, ')']
     args += ['due.any:', 'scheduled.none:'] + _build_task_filter(statuses, None) + ['export']
-    result = run_task_command(args)
+    result = run_task_command(args, readonly=True)
     if result['success']:
         try:
             tasks = json.loads(result['stdout'])
@@ -324,7 +331,7 @@ def get_planned_tasks():
         if ctx_expr:
             args += ['(', ctx_expr, ')']
     args += ['scheduled.not:'] + _build_task_filter(statuses, None) + ['export']
-    result = run_task_command(args)
+    result = run_task_command(args, readonly=True)
 
     if result['success']:
         try:
@@ -392,7 +399,7 @@ def get_tasks():
     args += _build_task_filter(statuses, filter_text)
     args.append('export')
 
-    result = run_task_command(args)
+    result = run_task_command(args, readonly=True)
 
     if result['success']:
         try:
@@ -456,13 +463,13 @@ def get_projects():
     """
     active_only = request.args.get('active', '0') == '1'
 
-    r = run_task_command(['task', 'projects'])
+    r = run_task_command(['task', 'projects'], readonly=True)
     counts = _parse_task_projects(r['stdout']) if r['success'] else {}
 
     if active_only:
         names = sorted(counts.keys())
     else:
-        r2 = run_task_command(['task', '_projects'])
+        r2 = run_task_command(['task', '_projects'], readonly=True)
         all_names = sorted({p.strip() for p in r2['stdout'].split('\n') if p.strip()}) \
                     if r2['success'] else sorted(counts.keys())
         names = all_names
@@ -475,7 +482,7 @@ def get_tags():
     """Get unique user-visible tags. ?active=1 restricts to pending tasks only."""
     active_only = request.args.get('active', '0') == '1'
     cmd = ['task', 'status:pending', '_tags'] if active_only else ['task', '_tags']
-    result = run_task_command(cmd)
+    result = run_task_command(cmd, readonly=True)
     if result['success']:
         tags = [t.strip() for t in result['stdout'].split('\n')
                 if t.strip() and not t.strip().isupper()]
@@ -485,7 +492,7 @@ def get_tags():
 @app.route('/api/stats')
 def get_stats():
     """Return the output of `task stats` for display in the UI"""
-    result = run_task_command(['task', 'rc.context=none', 'stats'])
+    result = run_task_command(['task', 'rc.context=none', 'stats'], readonly=True)
     return jsonify({'success': result['success'], 'output': result['stdout'], 'error': result['stderr']})
 
 @app.route('/api/contexts')
@@ -495,7 +502,7 @@ def get_contexts():
     # Exclude cmx composite contexts (contain ':') — they're internal plumbing
     contexts = [k for k in filters if ':' not in k]
 
-    active_result = run_task_command(['task', '_get', 'rc.context'])
+    active_result = run_task_command(['task', '_get', 'rc.context'], readonly=True)
     active = active_result['stdout'].strip() if active_result['success'] else ''
 
     return jsonify({'success': True, 'contexts': contexts, 'filters': filters, 'active': active})
@@ -509,7 +516,7 @@ def get_task(task_id):
     """Return a single task by UUID or ID (used for annotation refresh)."""
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'error': 'Invalid task ID'}), 400
-    result = run_task_command(['task', task_id, 'export'])
+    result = run_task_command(['task', task_id, 'export'], readonly=True)
     if not result['success'] or not result['stdout'].strip():
         return jsonify({'success': False, 'error': 'Task not found'}), 404
     try:
@@ -563,7 +570,7 @@ def revert_task(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
     result = run_task_command(['task', task_id, 'modify', 'status:pending'])
     if result['success']:
-        export_result = run_task_command(['task', task_id, 'export'])
+        export_result = run_task_command(['task', task_id, 'export'], readonly=True)
         if export_result['success'] and export_result['stdout'].strip():
             try:
                 tasks = json.loads(export_result['stdout'])
@@ -635,7 +642,7 @@ def modify_task(task_id):
         result = run_task_command(['task', task_id, 'modify'] + modifications)
 
         if result['success']:
-            export_result = run_task_command(['task', task_id, 'export'])
+            export_result = run_task_command(['task', task_id, 'export'], readonly=True)
             if export_result['success'] and export_result['stdout'].strip():
                 try:
                     task = json.loads(export_result['stdout'])
@@ -758,7 +765,7 @@ def add_task():
     create_result = run_task_command(args)
 
     if create_result['success']:
-        export_result = run_task_command(['task', '+LATEST', 'export'])
+        export_result = run_task_command(['task', '+LATEST', 'export'], readonly=True)
         if export_result['success'] and export_result['stdout'].strip():
             try:
                 task = json.loads(export_result['stdout'])
@@ -892,7 +899,7 @@ def sync_info():
     import shutil
     if shutil.which('gittw'):
         return jsonify({'method': 'gittw (git-based sync)'})
-    result = run_task_command(['task', '_show'])
+    result = run_task_command(['task', '_show'], readonly=True)
     has_server = any(
         line.startswith('taskd.server=') and line.split('=', 1)[1].strip()
         for line in result['stdout'].splitlines()
@@ -1000,7 +1007,7 @@ def hook_answer():
 
 
 if __name__ == '__main__':
-    check_result = run_task_command(['task', 'version'])
+    check_result = run_task_command(['task', 'version'], readonly=True)
     if not check_result['success']:
         print("Warning: TaskWarrior doesn't seem to be installed or accessible")
         print("Please install TaskWarrior: sudo apt-get install taskwarrior")
