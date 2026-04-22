@@ -401,6 +401,16 @@ function setupEventListeners() {
     document.querySelectorAll('.view-btn[data-view]').forEach(btn =>
         btn.addEventListener('click', (e) => changeView(e.currentTarget.dataset.view))
     );
+
+    document.addEventListener('keydown', e => {
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        const tag = (e.target.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+        if (e.target.closest('.modal, .task-editor-backdrop, [role="dialog"]')) return;
+        if (e.key === 'T') { e.preventDefault(); calendar.today(); updateCalendarTitle(); }
+        else if (e.key === 'ArrowLeft')  { e.preventDefault(); calendar.prev();  updateCalendarTitle(); }
+        else if (e.key === 'ArrowRight') { e.preventDefault(); calendar.next();  updateCalendarTitle(); }
+    });
 }
 
 const _SLOT_CYCLE = ['00:15:00', '00:30:00', '01:00:00'];
@@ -461,8 +471,8 @@ function loadTasks() {
     const context     = (navState.context || '').trim();
     // Drag-list: always pending, context-aware — blind to status bar
     const params      = 'status=pending' + (context ? '&context=' + encodeURIComponent(context) : '');
-    // Calendar events: also always pending (FS via matchesNavFilter in processTasksForCalendar)
-    const calParams   = 'status=pending';
+    // Calendar events: follow status bar (completed, deleted, waiting, recurring all visible)
+    const calParams   = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(','));
 
     // Serve from cache when clean and fresh — skips all three fetches
     const cached = _readCache(params, calParams);

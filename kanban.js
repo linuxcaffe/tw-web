@@ -57,6 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
         else kbReload(true);
     });
 
+    document.addEventListener('tw-open-add', () => { if (taskEditor) taskEditor.show(null); });
+
     kbReload();
 });
 
