@@ -29,6 +29,7 @@ let _kbDragMoveOff   = null;
 let _kbIsDragging    = false; // true only between onStart and onEnd
 let _kbNavDropTarget = null;  // state string when pointer is over nav bar, else null
 let _kbNavSortable   = null;  // Sortable instance on #kb-nav-cols (nav drop zone)
+const _KB_FOCUS_KEY  = 'tw-kb-focus-col'; // persists focused column across page navigation
 let taskEditor;  // global — TaskCardManager's edit handler references this by name
 
 const kbCardManager = new TaskCardManager(new TaskActionHandler({
@@ -78,9 +79,16 @@ async function kbReload(preserveView = false) {
         kbAllTasks      = swimData.tasks      || [];
         kbUnassignedSrc = unassignData.tasks  || [];
         kbManualOrder   = orderData.order     || {};
-        // On fresh load: start at offset 1 (Unassigned off-screen); focus first swimlane
-        kbColOffset     = preserveView ? savedOffset : (kbColumns.length > 0 ? 1 : 0);
-        kbFocusedColIdx = preserveView ? savedFocus  : (kbColumns.length > 0 ? 1 : 0);
+        // On fresh load: restore persisted focus column; default to first swimlane
+        if (!preserveView) {
+            const savedCol  = sessionStorage.getItem(_KB_FOCUS_KEY);
+            const swimIdx   = savedCol !== null ? kbColumns.indexOf(savedCol) : -1;
+            kbFocusedColIdx = swimIdx >= 0 ? swimIdx + 1 : (kbColumns.length > 0 ? 1 : 0);
+            kbColOffset     = kbColumns.length > 0 ? 1 : 0;
+        } else {
+            kbFocusedColIdx = savedFocus;
+            kbColOffset     = savedOffset;
+        }
         kbRenderBoard();
     } catch (e) {
         console.error('Kanban load failed:', e);
@@ -317,8 +325,11 @@ function _kbFocusedColValue() {
 
 function _kbApplyFocus() {
     const board = document.getElementById('kb-board');
-    [...board.querySelectorAll('.kb-col')].forEach((c, i) =>
-        c.classList.toggle('kb-col--focused', i === kbFocusedColIdx));
+    const cols  = [...board.querySelectorAll('.kb-col')];
+    cols.forEach((c, i) => c.classList.toggle('kb-col--focused', i === kbFocusedColIdx));
+    // Persist so focus survives Agenda → back navigation
+    const focusedCol = cols[kbFocusedColIdx]?.dataset.col;
+    if (focusedCol !== undefined) sessionStorage.setItem(_KB_FOCUS_KEY, focusedCol);
     _kbUpdateNavPillState();
 }
 

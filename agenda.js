@@ -47,6 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (message) showNotification(message, type || 'info');
     });
 
+    window.twNav?.initProjectsSidebar(document.getElementById('tw-proj-sidebar'));
+    window.twNav?.initTagsSidebar(document.getElementById('tw-tags-sidebar'));
     loadAgenda();
     document.addEventListener('tw-open-add',      () => { if (taskEditor) taskEditor.show(null); });
     document.addEventListener('tw-filter-change', loadAgenda);

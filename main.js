@@ -543,6 +543,8 @@ class TaskWarriorUI {
 let app;
 document.addEventListener('DOMContentLoaded', () => {
     app = new TaskWarriorUI();
+    window.twNav?.initProjectsSidebar(document.getElementById('tw-proj-sidebar'));
+    window.twNav?.initTagsSidebar(document.getElementById('tw-tags-sidebar'));
     // Initialiser taskCardManager avec le gestionnaire d'actions spécifique à main.js
     taskCardManager = new TaskCardManager(new ScriptTaskActionHandler());
     

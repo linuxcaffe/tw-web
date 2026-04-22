@@ -73,7 +73,8 @@
         try { sessionStorage.setItem(COUNT_KEY, text); } catch {}
     }
 
-    window.twNav = { getState, setState, stateToParams, setCount, openSyncDialog };
+    window.twNav = { getState, setState, stateToParams, setCount, openSyncDialog,
+                     initProjectsSidebar, initTagsSidebar };
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     function activePage() {
@@ -852,6 +853,123 @@
                 closeMenu();
             };
         } catch { body.innerHTML = '<div class="tw-panel-error">Failed to load tags</div>'; }
+    }
+
+    // ── Inline sidebars (List / Agenda pages) ────────────────────────────────
+    async function initProjectsSidebar(container) {
+        if (!container) return;
+        let mode = localStorage.getItem('tw-proj-mode') || 'active';
+        let allProjects = [];
+        let sbCollapsed;
+        try { sbCollapsed = new Set(JSON.parse(localStorage.getItem('tw-proj-collapsed') || '[]')); }
+        catch { sbCollapsed = new Set(); }
+        function saveSbCollapsed() {
+            localStorage.setItem('tw-proj-collapsed', JSON.stringify([...sbCollapsed]));
+        }
+
+        function render() {
+            const state = getState();
+            const names = allProjects.map(p => p.name);
+            let html =
+                `<div class="tw-sb-label">Projects</div>` +
+                `<div class="tw-toggle-bar">` +
+                    `<button class="tw-toggle-btn${mode==='active'?' active':''}" data-mode="active">active</button>` +
+                    `<button class="tw-toggle-btn${mode==='all'?' active':''}" data-mode="all">all</button>` +
+                    `<span class="tw-proj-total">${allProjects.length}</span>` +
+                `</div>` +
+                `<button class="tw-pick-item${!state.project?' active':''}" data-pick=""><span class="tw-proj-label">All projects</span></button>` +
+                `<button class="tw-pick-item${state.project==='.none:'?' active':''}" data-pick=".none:"><span class="tw-proj-label">No project</span></button>`;
+            if (allProjects.length) {
+                html += `<div class="tw-pick-section-label">Projects</div>`;
+                allProjects.forEach(({ name, count }) => {
+                    const parts    = name.split('.');
+                    const depth    = parts.length - 1;
+                    const label    = parts[parts.length - 1];
+                    const pad      = 16 + depth * 12;
+                    const isParent = names.some(n => n.startsWith(name + '.'));
+                    const isColl   = sbCollapsed.has(name);
+                    const hidden   = parts.some((_, i) => i > 0 && sbCollapsed.has(parts.slice(0, i).join('.')));
+                    if (hidden) return;
+                    const arrow = isParent ? `<span class="tw-proj-arrow">${isColl ? '▶' : '▼'}</span>` : `<span class="tw-proj-arrow"></span>`;
+                    const badge = count ? `<span class="tw-proj-count">${count}</span>` : '';
+                    if (isParent) {
+                        html += `<button class="tw-pick-item${state.project===name?' active':''}" data-fold="${esc(name)}" style="padding-left:${pad}px" title="${esc(name)}">${arrow}<span class="tw-proj-label" data-pick="${esc(name)}">${esc(label)}</span>${badge}</button>`;
+                    } else {
+                        html += `<button class="tw-pick-item${state.project===name?' active':''}" data-pick="${esc(name)}" style="padding-left:${pad}px" title="${esc(name)}">${arrow}<span class="tw-proj-label">${esc(label)}</span>${badge}</button>`;
+                    }
+                });
+            }
+            container.innerHTML = html;
+        }
+
+        async function load(m) {
+            mode = m; localStorage.setItem('tw-proj-mode', mode);
+            try {
+                const d = await fetch('/api/projects' + (mode==='all'?'':'?active=1')).then(r=>r.json());
+                allProjects = (d.projects||[]).filter(p=>p&&p.name);
+                render();
+            } catch { container.innerHTML = '<div class="tw-panel-error">Failed to load</div>'; }
+        }
+
+        container.addEventListener('click', e => {
+            const tog = e.target.closest('[data-mode]'); if (tog) { load(tog.dataset.mode); return; }
+            const lbl = e.target.closest('.tw-proj-label[data-pick]');
+            if (lbl) { setState({ project: lbl.dataset.pick }, { clientOnly: true }); return; }
+            const fold = e.target.closest('[data-fold]');
+            if (fold) {
+                const n = fold.dataset.fold;
+                if (sbCollapsed.has(n)) sbCollapsed.delete(n); else sbCollapsed.add(n);
+                saveSbCollapsed(); render(); return;
+            }
+            const btn = e.target.closest('[data-pick]');
+            if (btn) setState({ project: btn.dataset.pick }, { clientOnly: true });
+        });
+        document.addEventListener('tw-filter-change', render);
+        await load(mode);
+    }
+
+    async function initTagsSidebar(container) {
+        if (!container) return;
+        let mode = localStorage.getItem('tw-tags-mode') || 'active';
+        let allTags = [];
+
+        function render() {
+            const state = getState();
+            const sel   = (state.tags||'').split(',').map(t=>t.trim()).filter(Boolean);
+            let html =
+                `<div class="tw-sb-label">Tags</div>` +
+                `<div class="tw-toggle-bar">` +
+                    `<button class="tw-toggle-btn${mode==='active'?' active':''}" data-mode="active">active</button>` +
+                    `<button class="tw-toggle-btn${mode==='all'?' active':''}" data-mode="all">all</button>` +
+                    `<span class="tw-proj-total">${allTags.length}</span>` +
+                `</div>` +
+                `<button class="tw-pick-item${!sel.length?' active':''}" data-pick=""><span class="tw-proj-label">All tags</span></button>` +
+                `<button class="tw-pick-item${state.tags==='.none:'?' active':''}" data-pick=".none:"><span class="tw-proj-label">No tags</span></button>`;
+            if (allTags.length) {
+                html += `<div class="tw-pick-section-label">Tags</div>`;
+                allTags.forEach(t => {
+                    html += `<button class="tw-pick-item${sel.includes(t)?' active':''}" data-pick="${esc(t)}"><span class="tw-proj-label">+${esc(t)}</span></button>`;
+                });
+            }
+            container.innerHTML = html;
+        }
+
+        async function load(m) {
+            mode = m; localStorage.setItem('tw-tags-mode', mode);
+            try {
+                const d = await fetch('/api/tags'+(mode==='all'?'':'?active=1')).then(r=>r.json());
+                allTags = (d.tags||[]).filter(Boolean).sort();
+                render();
+            } catch { container.innerHTML = '<div class="tw-panel-error">Failed to load</div>'; }
+        }
+
+        container.addEventListener('click', e => {
+            const tog = e.target.closest('[data-mode]'); if (tog) { load(tog.dataset.mode); return; }
+            const btn = e.target.closest('[data-pick]');
+            if (btn) setState({ tags: btn.dataset.pick }, { clientOnly: true });
+        });
+        document.addEventListener('tw-filter-change', render);
+        await load(mode);
     }
 
     // ── Stats panel ───────────────────────────────────────────────────────────
