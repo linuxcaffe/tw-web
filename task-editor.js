@@ -484,6 +484,7 @@ class TaskEditor {
             const data = await response.json();
             
             if (data.success) {
+                if (data.deferred_cmd) window.twTerminal?.offerTerminal(data.deferred_cmd);
                 this.onSaveSuccess(data.task, isEdit);
                 this.hide();
             } else {
@@ -530,6 +531,7 @@ class TaskEditor {
             });
             const data = await response.json();
             if (data.success) {
+                if (data.deferred_cmd) window.twTerminal?.offerTerminal(data.deferred_cmd);
                 this.onSaveSuccess(null, false);
                 this.hide();
             } else {

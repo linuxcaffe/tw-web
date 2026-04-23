@@ -40,6 +40,9 @@ class TaskActionHandler {
                 } else {
                     this.onTaskUpdate(null);
                 }
+                if (data.deferred_cmd) {
+                    window.twTerminal?.offerTerminal(data.deferred_cmd);
+                }
                 if (data.warnings && data.warnings.length > 0) {
                     this.showNotification(data.warnings.join(' | '), 'warning');
                 } else {

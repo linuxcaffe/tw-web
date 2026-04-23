@@ -144,6 +144,27 @@ CORS(app)
 _PROMPT_DIR = Path('/tmp/tw-web-prompts')
 _PROMPT_DIR.mkdir(exist_ok=True)
 
+# ── Hook spool (deferred interactive commands) ────────────────────────────────
+# Hooks that cannot run interactively write a shell command to this directory.
+# Flask drains it after every write command and returns deferred_cmd to the UI,
+# which offers an "Open in terminal" banner so the user can run it manually.
+_SPOOL_DIR = Path('/tmp/tw-web-spool')
+_SPOOL_DIR.mkdir(exist_ok=True)
+
+def _drain_spool():
+    """Read and delete all *.cmd files from the spool dir; return list of command strings."""
+    cmds = []
+    try:
+        for f in sorted(_SPOOL_DIR.glob('*.cmd')):
+            try:
+                cmds.append(f.read_text().strip())
+                f.unlink()
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return cmds
+
 _sse_clients: dict[int, Queue] = {}
 _sse_lock = threading.Lock()
 
@@ -198,10 +219,18 @@ def _get_recurrence_filter():
 RECURRING_FILTER = _get_recurrence_filter()
 
 # Environment passed to every task/hook subprocess.
-# TW_WEB=1 signals hooks that they are running in a non-interactive web context.
-# Hooks should check this and skip prompts, curses UIs, or interactive tools
-# (hledger-add, fzf, vim, whiptail, etc.), using defaults or deferring instead.
-_TW_ENV = {**os.environ, 'TW_WEB': '1'}
+# Fleet-wide non-interactive client conventions:
+#   TW_WEB=1        — legacy; kept for existing hooks
+#   TW_NOINTERACT=1 — any non-terminal client (tw-web, tw-gtk, Electron, …)
+#   TW_CLIENT=web   — identifies this specific client for client-specific behaviour
+#   TW_SPOOL_DIR    — hooks write deferred commands here instead of blocking
+_TW_ENV = {
+    **os.environ,
+    'TW_WEB':        '1',
+    'TW_NOINTERACT': '1',
+    'TW_CLIENT':     'web',
+    'TW_SPOOL_DIR':  str(_SPOOL_DIR),
+}
 
 # Timeout (seconds) for any single task command.
 # Prevents a hung interactive hook from deadlocking the Flask request.
@@ -243,12 +272,17 @@ def run_task_command(args, readonly=False):
             args, capture_output=True, text=True,
             env=_TW_ENV, timeout=TASK_TIMEOUT
         )
-        return {
+        out = {
             'success': result.returncode == 0,
             'stdout': result.stdout,
             'stderr': result.stderr,
             'returncode': result.returncode
         }
+        if not readonly:
+            spooled = _drain_spool()
+            if spooled:
+                out['deferred_cmds'] = spooled
+        return out
     except subprocess.TimeoutExpired:
         return {
             'success':   False,
@@ -512,6 +546,11 @@ def _warnings(result):
     """Extract non-empty stderr lines as a warnings list."""
     return [l for l in result['stderr'].splitlines() if l.strip()]
 
+def _deferred_cmd(result):
+    """Return the first deferred spool command from a write result, or None."""
+    cmds = result.get('deferred_cmds', [])
+    return cmds[0] if cmds else None
+
 @app.route('/api/task/<task_id>', methods=['GET'])
 def get_task(task_id):
     """Return a single task by UUID or ID (used for annotation refresh)."""
@@ -534,11 +573,12 @@ def start_task(task_id):
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
     result = run_task_command(['task', task_id, 'start'])
-    return jsonify({
-        'success': result['success'],
-        'message': result['stdout'] if result['success'] else result['stderr'],
-        'warnings': _warnings(result)
-    })
+    resp = {'success': result['success'],
+            'message': result['stdout'] if result['success'] else result['stderr'],
+            'warnings': _warnings(result)}
+    dc = _deferred_cmd(result)
+    if dc: resp['deferred_cmd'] = dc
+    return jsonify(resp)
 
 @app.route('/api/task/<task_id>/stop', methods=['POST'])
 def stop_task(task_id):
@@ -546,11 +586,12 @@ def stop_task(task_id):
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
     result = run_task_command(['task', task_id, 'stop'])
-    return jsonify({
-        'success': result['success'],
-        'message': result['stdout'] if result['success'] else result['stderr'],
-        'warnings': _warnings(result)
-    })
+    resp = {'success': result['success'],
+            'message': result['stdout'] if result['success'] else result['stderr'],
+            'warnings': _warnings(result)}
+    dc = _deferred_cmd(result)
+    if dc: resp['deferred_cmd'] = dc
+    return jsonify(resp)
 
 @app.route('/api/task/<task_id>/done', methods=['POST'])
 def complete_task(task_id):
@@ -558,11 +599,12 @@ def complete_task(task_id):
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
     result = run_task_command(['task', task_id, 'done'])
-    return jsonify({
-        'success': result['success'],
-        'message': result['stdout'] if result['success'] else result['stderr'],
-        'warnings': _warnings(result)
-    })
+    resp = {'success': result['success'],
+            'message': result['stdout'] if result['success'] else result['stderr'],
+            'warnings': _warnings(result)}
+    dc = _deferred_cmd(result)
+    if dc: resp['deferred_cmd'] = dc
+    return jsonify(resp)
 
 @app.route('/api/task/<task_id>/revert', methods=['POST'])
 def revert_task(task_id):
@@ -591,11 +633,12 @@ def delete_task(task_id):
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
     result = run_task_command(['task', task_id, 'delete'])
-    return jsonify({
-        'success': result['success'],
-        'message': result['stdout'] if result['success'] else result['stderr'],
-        'warnings': _warnings(result)
-    })
+    resp = {'success': result['success'],
+            'message': result['stdout'] if result['success'] else result['stderr'],
+            'warnings': _warnings(result)}
+    dc = _deferred_cmd(result)
+    if dc: resp['deferred_cmd'] = dc
+    return jsonify(resp)
 
 @app.route('/api/task/<task_id>/modify', methods=['PUT'])
 def modify_task(task_id):
@@ -642,21 +685,22 @@ def modify_task(task_id):
     if modifications:
         result = run_task_command(['task', task_id, 'modify'] + modifications)
 
+        dc = _deferred_cmd(result)
         if result['success']:
             export_result = run_task_command(['task', task_id, 'export'], readonly=True)
             if export_result['success'] and export_result['stdout'].strip():
                 try:
                     task = json.loads(export_result['stdout'])
                     if task:
-                        return jsonify({
-                            'success': True,
-                            'message': result['stdout'],
-                            'task': task[0],
-                            'warnings': _warnings(result)
-                        })
+                        resp = {'success': True, 'message': result['stdout'],
+                                'task': task[0], 'warnings': _warnings(result)}
+                        if dc: resp['deferred_cmd'] = dc
+                        return jsonify(resp)
                 except (json.JSONDecodeError, IndexError) as e:
                     print(f"Error parsing task data: {e}")
-                    return jsonify({'success': True, 'message': result['stdout'], 'task': None, 'warnings': _warnings(result)})
+                    resp = {'success': True, 'message': result['stdout'], 'task': None, 'warnings': _warnings(result)}
+                    if dc: resp['deferred_cmd'] = dc
+                    return jsonify(resp)
 
         return jsonify({
             'success': False,
@@ -765,18 +809,17 @@ def add_task():
 
     create_result = run_task_command(args)
 
+    dc = _deferred_cmd(create_result)
     if create_result['success']:
         export_result = run_task_command(['task', '+LATEST', 'export'], readonly=True)
         if export_result['success'] and export_result['stdout'].strip():
             try:
                 task = json.loads(export_result['stdout'])
                 if task:
-                    return jsonify({
-                        'success': True,
-                        'message': 'Task created successfully',
-                        'task': task[0],
-                        'warnings': _warnings(create_result)
-                    })
+                    resp = {'success': True, 'message': 'Task created successfully',
+                            'task': task[0], 'warnings': _warnings(create_result)}
+                    if dc: resp['deferred_cmd'] = dc
+                    return jsonify(resp)
             except (json.JSONDecodeError, IndexError) as e:
                 print(f"Error parsing task data: {e}")
 
@@ -814,11 +857,12 @@ def log_task():
         args.append(f'due_duration:{data["due_duration"]}')
 
     result = run_task_command(args)
-    return jsonify({
-        'success': result['success'],
-        'error':   result.get('stderr', '') if not result['success'] else None,
-        'warnings': _warnings(result),
-    })
+    resp = {'success': result['success'],
+            'error':   result.get('stderr', '') if not result['success'] else None,
+            'warnings': _warnings(result)}
+    dc = _deferred_cmd(result)
+    if dc: resp['deferred_cmd'] = dc
+    return jsonify(resp)
 
 @app.route('/api/task/<task_id>/annotate', methods=['POST'])
 def annotate_task(task_id):
@@ -830,10 +874,11 @@ def annotate_task(task_id):
     if not text:
         return jsonify({'success': False, 'error': 'Annotation text is required'}), 400
     result = run_task_command(['task', task_id, 'annotate', text])
-    return jsonify({
-        'success': result['success'],
-        'error':   result['stderr'] if not result['success'] else None,
-    })
+    resp = {'success': result['success'],
+            'error':   result['stderr'] if not result['success'] else None}
+    dc = _deferred_cmd(result)
+    if dc: resp['deferred_cmd'] = dc
+    return jsonify(resp)
 
 @app.route('/api/task/<task_id>/annotation', methods=['DELETE'])
 def delete_annotation(task_id):
