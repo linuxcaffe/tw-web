@@ -10,6 +10,7 @@ import subprocess
 import json
 import os
 import re
+import shlex
 import shutil
 import time
 import threading
@@ -236,6 +237,11 @@ _TW_ENV = {
 # Prevents a hung interactive hook from deadlocking the Flask request.
 TASK_TIMEOUT = 15
 
+# Marker written to stderr by hooks that abort because they need a terminal.
+# Flask detects this and returns deferred_cmd = the original clean command,
+# so the frontend can offer "Run in terminal" with the full task command.
+TW_INTERACTIVE_MARKER = 'TW_INTERACTIVE_REQUIRED'
+
 def run_task_command(args, readonly=False):
     """Execute a TaskWarrior command and return the result.
     args must be a list, e.g. ['task', 'status:pending', 'export'].
@@ -279,6 +285,11 @@ def run_task_command(args, readonly=False):
             'returncode': result.returncode
         }
         if not readonly:
+            # Hook signalled it needs a terminal → launch one immediately and
+            # let the client know so it can suppress the error notification.
+            if not out['success'] and TW_INTERACTIVE_MARKER in result.stderr:
+                out['terminal_launched'] = _launch_terminal(clean_cmd)
+            # Drain any spool files written by hooks
             spooled = _drain_spool()
             if spooled:
                 out['deferred_cmds'] = spooled
@@ -547,8 +558,10 @@ def _warnings(result):
     return [l for l in result['stderr'].splitlines() if l.strip()]
 
 def _deferred_cmd(result):
-    """Return the first deferred spool command from a write result, or None."""
-    cmds = result.get('deferred_cmds', [])
+    """Return the deferred command for a write result (interactive abort or spool), or None."""
+    if result.get('deferred_cmd'):        # interactive abort path (hook exited with marker)
+        return result['deferred_cmd']
+    cmds = result.get('deferred_cmds', [])  # spool path (hook wrote .cmd file)
     return cmds[0] if cmds else None
 
 @app.route('/api/task/<task_id>', methods=['GET'])
@@ -599,10 +612,13 @@ def complete_task(task_id):
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
     result = run_task_command(['task', task_id, 'done'])
+    if result.get('terminal_launched'):
+        return jsonify({'success': False, 'terminal_launched': True,
+                        'message': 'Opening in terminal…'})
+    dc = _deferred_cmd(result)
     resp = {'success': result['success'],
             'message': result['stdout'] if result['success'] else result['stderr'],
             'warnings': _warnings(result)}
-    dc = _deferred_cmd(result)
     if dc: resp['deferred_cmd'] = dc
     return jsonify(resp)
 
@@ -1040,6 +1056,32 @@ def _terminal_available():
         return False, 'No terminal emulator found (tried xterm, gnome-terminal, alacritty, …)'
     return True, exe
 
+def _launch_terminal(cmd=''):
+    """Launch a terminal window with cmd pre-loaded. Returns True if launched."""
+    ok, _ = _terminal_available()
+    if not ok:
+        return False
+    exe, flag = _find_terminal()
+    if cmd:
+        fd, script_path = tempfile.mkstemp(prefix='tw-web-', suffix='.sh')
+        try:
+            with os.fdopen(fd, 'w') as f:
+                f.write('#!/bin/bash\n')
+                f.write(f'{cmd}\n')
+                f.write('echo\necho "[done — press Enter to close]"\nread\n')
+                f.write(f'rm -f {shlex.quote(script_path)}\n')
+            os.chmod(script_path, 0o700)
+        except Exception:
+            return False
+        full_cmd = [exe, flag, script_path]
+    else:
+        full_cmd = [exe]
+    try:
+        subprocess.Popen(full_cmd, env=os.environ, start_new_session=True)
+        return True
+    except Exception:
+        return False
+
 @app.route('/api/terminal/check', methods=['GET'])
 def terminal_check():
     """Report whether a terminal emulator is available on this display."""
@@ -1055,22 +1097,12 @@ def open_terminal():
     if not ok:
         return jsonify({'success': False, 'error': detail}), 400
 
-    exe, flag = _find_terminal()
     data = request.get_json(silent=True) or {}
     cmd  = (data.get('cmd') or '').strip()
-
-    if cmd:
-        # Wrap in bash so the window stays open long enough to read output
-        shell_cmd = f'{cmd}; echo; echo "[done — press Enter to close]"; read'
-        full_cmd  = [exe, flag, 'bash', '-c', shell_cmd]
-    else:
-        full_cmd = [exe]   # bare terminal, user gets a shell
-
-    try:
-        subprocess.Popen(full_cmd, env=os.environ, start_new_session=True)
+    exe, _ = _find_terminal()
+    if _launch_terminal(cmd):
         return jsonify({'success': True, 'terminal': exe, 'cmd': cmd or None})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+    return jsonify({'success': False, 'error': 'Could not launch terminal'}), 500
 
 @app.route('/api/events')
 def sse_stream():

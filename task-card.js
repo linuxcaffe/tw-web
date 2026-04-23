@@ -48,6 +48,8 @@ class TaskActionHandler {
                 } else {
                     this.showNotification(`Task ${action} successful`, 'success');
                 }
+            } else if (data.terminal_launched) {
+                this.showNotification('Opening in terminal…', 'info');
             } else if (data.timed_out && data.cmd) {
                 window.twTerminal?.offerTerminal(data.cmd);
             } else {
