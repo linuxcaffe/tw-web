@@ -10,6 +10,7 @@ import subprocess
 import json
 import os
 import re
+import shutil
 import time
 import threading
 from queue import Queue, Empty
@@ -221,6 +222,7 @@ def run_task_command(args, readonly=False):
     try:
         if args[0] != 'task':
             args = ['task'] + args
+        clean_cmd = ' '.join(args)   # human-readable before rc overrides
         # Inject web-only rc overrides immediately after 'task'
         overrides = ['rc.confirmation=no']
         if readonly:
@@ -249,13 +251,12 @@ def run_task_command(args, readonly=False):
         }
     except subprocess.TimeoutExpired:
         return {
-            'success': False,
-            'stdout': '',
-            'stderr': (
-                f'Command timed out after {TASK_TIMEOUT}s. '
-                'A hook may require terminal interaction — run this command in a terminal instead.'
-            ),
-            'returncode': -1
+            'success':   False,
+            'stdout':    '',
+            'stderr':    f'Command timed out after {TASK_TIMEOUT}s — a hook likely needs terminal interaction.',
+            'returncode': -1,
+            'timed_out': True,
+            'cmd':       clean_cmd,
         }
     except Exception as e:
         return {
@@ -960,6 +961,71 @@ def sync_tasks():
         'output': output,
         'warnings': _warnings(result)
     })
+
+# ── Terminal launch ───────────────────────────────────────────────────────────
+
+# Ordered by preference; flag is the arg that separates terminal options from
+# the command to run (None = terminal accepts bare command args without a flag).
+_TERMINAL_CANDIDATES = [
+    ('xterm',           '-e'),
+    ('gnome-terminal',  '--'),
+    ('alacritty',       '-e'),
+    ('konsole',         '-e'),
+    ('xfce4-terminal',  '-e'),
+    ('mate-terminal',   '-e'),
+    ('lxterminal',      '-e'),
+    ('tilix',           '-e'),
+    ('kitty',           '-e'),
+    ('foot',            '-e'),
+]
+
+def _find_terminal():
+    """Return (exe, flag) for the first terminal emulator found, or (None, None)."""
+    for name, flag in _TERMINAL_CANDIDATES:
+        if shutil.which(name):
+            return name, flag
+    return None, None
+
+def _terminal_available():
+    display = os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')
+    if not display:
+        return False, 'No display — desktop only'
+    exe, _ = _find_terminal()
+    if not exe:
+        return False, 'No terminal emulator found (tried xterm, gnome-terminal, alacritty, …)'
+    return True, exe
+
+@app.route('/api/terminal/check', methods=['GET'])
+def terminal_check():
+    """Report whether a terminal emulator is available on this display."""
+    ok, detail = _terminal_available()
+    return jsonify({'available': ok, 'detail': detail})
+
+@app.route('/api/terminal', methods=['POST'])
+def open_terminal():
+    """Launch a terminal window, optionally pre-loaded with a command.
+    JSON body: { "cmd": "task 42 done" }  (omit or empty to open a blank shell)
+    """
+    ok, detail = _terminal_available()
+    if not ok:
+        return jsonify({'success': False, 'error': detail}), 400
+
+    exe, flag = _find_terminal()
+    data = request.get_json(silent=True) or {}
+    cmd  = (data.get('cmd') or '').strip()
+
+    if cmd:
+        # Wrap in bash so the window stays open long enough to read output
+        shell_cmd = f'{cmd}; echo; echo "[done — press Enter to close]"; read'
+        full_cmd  = [exe, flag, 'bash', '-c', shell_cmd]
+    else:
+        full_cmd = [exe]   # bare terminal, user gets a shell
+
+    try:
+        subprocess.Popen(full_cmd, env=os.environ, start_new_session=True)
+        return jsonify({'success': True, 'terminal': exe, 'cmd': cmd or None})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/events')
 def sse_stream():

@@ -45,8 +45,10 @@ class TaskActionHandler {
                 } else {
                     this.showNotification(`Task ${action} successful`, 'success');
                 }
+            } else if (data.timed_out && data.cmd) {
+                window.twTerminal?.offerTerminal(data.cmd);
             } else {
-                this.showNotification(data.message || `Failed to ${action} task`, 'error');
+                this.showNotification(data.message || data.error || `Failed to ${action} task`, 'error');
             }
         } catch (error) {
             this.showNotification('Network error: ' + error.message, 'error');

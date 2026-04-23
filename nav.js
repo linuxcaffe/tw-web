@@ -41,7 +41,7 @@
         { id: 'deleted',   label: 'Deleted'   },
     ];
 
-    const MENU_ITEMS = ['About', 'Projects', 'Tags', 'Stats', 'Settings', 'Sync'];
+    const MENU_ITEMS = ['About', 'Projects', 'Tags', 'Stats', 'Settings', 'Sync', 'Terminal'];
 
     // ── State ─────────────────────────────────────────────────────────────────
     function defaultState() {
@@ -198,6 +198,34 @@
 #tw-filter-bar.active { display: flex; }
 .tw-fbar-item strong { color: rgba(255,255,255,0.65); font-weight: 500; }
 .tw-fbar-sep { color: rgba(255,255,255,0.2); }
+
+/* terminal offer banner */
+#tw-terminal-offer {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+    background: #1a1a2e; border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 8px; padding: 12px 16px;
+    display: flex; align-items: flex-start; gap: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5); z-index: 20002;
+    max-width: min(600px, 94vw); box-sizing: border-box;
+    animation: tw-offer-in 0.2s ease;
+}
+@keyframes tw-offer-in { from { opacity:0; transform: translateX(-50%) translateY(10px); } }
+#tw-terminal-offer-body { flex: 1; min-width: 0; }
+#tw-terminal-offer-title { font-size: 13px; color: rgba(255,255,255,0.55); margin-bottom: 4px; }
+#tw-terminal-offer-cmd {
+    font-family: monospace; font-size: 12px; color: #e2e8f0;
+    word-break: break-all; background: rgba(0,0,0,0.3);
+    border-radius: 4px; padding: 4px 6px; margin-bottom: 10px;
+}
+#tw-terminal-offer-actions { display: flex; gap: 8px; }
+.tw-offer-btn {
+    padding: 5px 14px; border: none; border-radius: 5px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.tw-offer-btn-run  { background: #3498db; color: #fff; }
+.tw-offer-btn-run:hover  { background: #2980b9; }
+.tw-offer-btn-dismiss { background: rgba(255,255,255,0.1); color: #ecf0f1; }
+.tw-offer-btn-dismiss:hover { background: rgba(255,255,255,0.18); }
 
 /* hook prompt dialog */
 #tw-prompt-backdrop {
@@ -501,6 +529,7 @@
             else if (action === 'tags')       { openTagsPanel();     }
             else if (action === 'stats')      { openStatsPanel();    }
             else if (action === 'settings')   { openSettingsPanel(); }
+            else if (action === 'terminal')   { closeMenu(); openTerminal(); }
             else { closeMenu(); document.dispatchEvent(new CustomEvent('tw-menu-action', { detail: { action } })); }
         });
 
@@ -715,6 +744,62 @@
                     `uda.priority.values=1,2,3,4,5,6,H,M,L` +
                 `</p>` +
             `</div>`;
+    }
+
+    // ── Terminal launch ───────────────────────────────────────────────────────
+    async function openTerminal(cmd) {
+        try {
+            const r = await fetch('/api/terminal', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ cmd: cmd || '' }),
+            });
+            const d = await r.json();
+            if (!d.success) {
+                document.dispatchEvent(new CustomEvent('tw-show-notification',
+                    { detail: { message: d.error || 'Could not open terminal', type: 'error' } }));
+            }
+        } catch (e) {
+            document.dispatchEvent(new CustomEvent('tw-show-notification',
+                { detail: { message: 'Terminal request failed', type: 'error' } }));
+        }
+    }
+    function offerTerminal(cmd) {
+        // Remove any existing offer first
+        document.getElementById('tw-terminal-offer')?.remove();
+
+        const el = document.createElement('div');
+        el.id = 'tw-terminal-offer';
+        el.innerHTML =
+            `<div id="tw-terminal-offer-body">` +
+                `<div id="tw-terminal-offer-title">Hook timed out — run in terminal?</div>` +
+                `<div id="tw-terminal-offer-cmd">${esc(cmd)}</div>` +
+                `<div id="tw-terminal-offer-actions">` +
+                    `<button class="tw-offer-btn tw-offer-btn-run">▶ Open in terminal</button>` +
+                    `<button class="tw-offer-btn tw-offer-btn-dismiss">Dismiss</button>` +
+                `</div>` +
+            `</div>`;
+
+        el.querySelector('.tw-offer-btn-run').addEventListener('click', () => {
+            el.remove();
+            openTerminal(cmd);
+        });
+        el.querySelector('.tw-offer-btn-dismiss').addEventListener('click', () => el.remove());
+        document.body.appendChild(el);
+    }
+
+    // Expose for page scripts (e.g. to retry a timed-out command in terminal)
+    window.twTerminal = { open: openTerminal, offerTerminal };
+
+    async function _initTerminalVisibility() {
+        try {
+            const r = await fetch('/api/terminal/check');
+            const d = await r.json();
+            if (!d.available) {
+                const btn = document.querySelector('.tw-menu-item[data-menu="terminal"]');
+                if (btn) btn.style.display = 'none';
+            }
+        } catch { /* ignore — keep the button visible */ }
     }
 
     // ── Projects panel ────────────────────────────────────────────────────────
@@ -1344,10 +1429,11 @@
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => { init(); _initSSE(); _initKeys(); });
+        document.addEventListener('DOMContentLoaded', () => { init(); _initSSE(); _initKeys(); _initTerminalVisibility(); });
     } else {
         init();
         _initSSE();
         _initKeys();
+        _initTerminalVisibility();
     }
 }());
