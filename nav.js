@@ -755,7 +755,10 @@
                 body:    JSON.stringify({ cmd: cmd || '' }),
             });
             const d = await r.json();
-            if (!d.success) {
+            if (d.success) {
+                document.dispatchEvent(new CustomEvent('tw-show-notification',
+                    { detail: { message: `Launching ${d.terminal || 'terminal'}…`, type: 'info' } }));
+            } else {
                 document.dispatchEvent(new CustomEvent('tw-show-notification',
                     { detail: { message: d.error || 'Could not open terminal', type: 'error' } }));
             }
@@ -772,7 +775,7 @@
         el.id = 'tw-terminal-offer';
         el.innerHTML =
             `<div id="tw-terminal-offer-body">` +
-                `<div id="tw-terminal-offer-title">Hook timed out — run in terminal?</div>` +
+                `<div id="tw-terminal-offer-title">Action queued — run in terminal?</div>` +
                 `<div id="tw-terminal-offer-cmd">${esc(cmd)}</div>` +
                 `<div id="tw-terminal-offer-actions">` +
                     `<button class="tw-offer-btn tw-offer-btn-run">▶ Open in terminal</button>` +
