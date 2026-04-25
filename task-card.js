@@ -217,7 +217,8 @@ class TaskCardManager {
         for (const [k, v] of Object.entries(task)) {
             if (CORE.has(k)) continue;
             if (v === null || v === undefined || v === '') continue;
-            pairs.push({ key: k, text: `${k}:${Array.isArray(v) ? v.join(',') : v}` });
+            const fmt = Array.isArray(v) ? v.map(x => this._fmtVal(x)).join(',') : this._fmtVal(v);
+            pairs.push({ key: k, text: `${k}:${fmt}` });
         }
 
         pairs.sort((a, b) => a.key.localeCompare(b.key));
@@ -227,6 +228,21 @@ class TaskCardManager {
         pairs.forEach(p => parts.push(p.text));
 
         return parts.join(', ');
+    }
+
+    _fmtVal(v) {
+        const s = String(v);
+        // TW date: 20260425T120000Z
+        const dm = s.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+        if (dm) {
+            const d = new Date(Date.UTC(+dm[1],+dm[2]-1,+dm[3],+dm[4],+dm[5],+dm[6]));
+            const yr = d.getFullYear() !== new Date().getFullYear() ? {year:'numeric'} : {};
+            return d.toLocaleDateString(undefined, {month:'short', day:'numeric', ...yr});
+        }
+        // UUID: truncate to first 8 chars
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s))
+            return s.slice(0, 8);
+        return s;
     }
 
     _due(due) {
