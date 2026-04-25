@@ -259,14 +259,16 @@ class TaskEditor {
             syncDtColor(inp);
         });
 
-        // Date field clear buttons — valueAsNumber=NaN is the reliable way to clear
-        // datetime-local in WebKit; .value='' is often ignored
+        // Date field clear buttons — type-switch trick: WebKit ignores .value='' on
+        // datetime-local but respects it when type is temporarily 'text'.
         this.modal.querySelectorAll('.te-clr').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 const target = this.modal.querySelector('#' + btn.dataset.clears);
                 if (!target) return;
-                target.valueAsNumber = NaN;
+                target.type  = 'text';
+                target.value = '';
+                target.type  = 'datetime-local';
                 target.dispatchEvent(new Event('change', { bubbles: true }));
             });
         });
