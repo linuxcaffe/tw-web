@@ -128,24 +128,27 @@ class TaskCardManager {
     }
 
     createTaskCard(task) {
-        const pri   = String(task.priority || '');
-        const tags  = (task.tags || []).filter(t => !TaskCardManager.SYSTEM_TAGS.has(t));
+        const pri    = String(task.priority || '');
+        const tags   = (task.tags || []).filter(t => !TaskCardManager.SYSTEM_TAGS.has(t));
         const active = !!task.start;
 
         const priClass = ['1','2','H'].includes(pri) ? 'pri-high'
                        : ['3','4','M'].includes(pri) ? 'pri-med'
                        : ['5','6','L'].includes(pri) ? 'pri-low' : '';
 
-        const proj     = task.project ? `<span class="card-proj">${this._e(task.project)}</span>` : '';
-        const dueHtml  = this._due(task.due);
+        const proj      = task.project ? `<span class="card-proj">${this._e(task.project)}</span>` : '';
+        const dueHtml   = this._due(task.due);
         const schedHtml = this._sched(task.scheduled);
-        const durHtml  = task.sched_duration ? `<span class="card-dur">⏱ ${this._fmtDur(this._parseDur(task.sched_duration))}</span>` : '';
-        const tagsHtml = tags.map(t => `<span class="card-tag">+${this._e(t)}</span>`).join('');
+        const durHtml   = task.sched_duration ? `<span class="card-dur">⏱ ${this._fmtDur(this._parseDur(task.sched_duration))}</span>` : '';
+        const tagsHtml  = tags.map(t => `<span class="card-tag">+${this._e(t)}</span>`).join('');
 
         const anns = task.annotations || [];
         const annHtml = anns.length
             ? `<div class="card-annotations">${anns.map(a => `<div class="card-ann">${this._e(a.description)}</div>`).join('')}</div>`
             : '';
+
+        const extrasStr  = this._extras(task);
+        const extrasHtml = extrasStr ? `<div class="card-extras">${this._e(extrasStr)}</div>` : '';
 
         const card = document.createElement('div');
         card.className = 'task-card';
@@ -157,16 +160,16 @@ class TaskCardManager {
         else if (task.scheduled)             card.dataset.type = 'scheduled';
         else if (task.due)                   card.dataset.type = 'due';
 
-        const dotHtml = priClass ? `<span class="card-pri-dot ${priClass}"></span>` : '';
+        const dotHtml     = priClass ? `<span class="card-pri-dot ${priClass}"></span>` : '';
+        const metaContent = proj + dueHtml + schedHtml + durHtml + tagsHtml;
+        const metaHtml    = metaContent ? `<div class="card-meta">${metaContent}</div>` : '';
         if (anns.length) card.dataset.annotated = '1';
 
         card.innerHTML =
             `<div class="card-main">` +
                 `<div class="card-desc">${dotHtml}<span class="card-desc-text">${this._e(task.description)}</span></div>` +
-                `<div class="card-meta">` +
-                    (pri ? `<span class="card-pri ${priClass}">${pri}</span>` : '') +
-                    proj + dueHtml + schedHtml + durHtml + tagsHtml +
-                `</div>` +
+                metaHtml +
+                extrasHtml +
                 annHtml +
             `</div>` +
             `<div class="card-actions">` +
@@ -178,6 +181,52 @@ class TaskCardManager {
             `</div>`;
 
         return card;
+    }
+
+    _extras(task) {
+        // Fields rendered elsewhere — never appear in extras
+        const CORE = new Set([
+            'uuid','description','status','priority','project','tags',
+            'due','scheduled','sched_duration',
+            'entry','modified','start','end',
+            'annotations','mask','imask','parent',
+            'id','urgency',
+        ]);
+        const pairs = [];  // {key, text} — sorted alpha after id
+
+        if (task.depends) {
+            const deps = Array.isArray(task.depends) ? task.depends
+                       : String(task.depends).split(',').map(s => s.trim());
+            pairs.push({ key: 'dep', text: 'dep:' + deps.map(u => u.slice(0, 8)).join(',') });
+        }
+
+        if (task.recur) pairs.push({ key: 'recur', text: `recur:${task.recur}` });
+
+        if (task.urgency != null)
+            pairs.push({ key: 'urgency', text: `urgency:${Math.round(task.urgency * 10) / 10}` });
+
+        if (task.wait) {
+            const m = task.wait.match(/^(\d{4})(\d{2})(\d{2})/);
+            const lbl = m ? new Date(+m[1], +m[2]-1, +m[3])
+                                .toLocaleDateString(undefined, {month:'short', day:'numeric'})
+                          : task.wait;
+            pairs.push({ key: 'wait', text: `wait:${lbl}` });
+        }
+
+        // Unknown UDAs
+        for (const [k, v] of Object.entries(task)) {
+            if (CORE.has(k)) continue;
+            if (v === null || v === undefined || v === '') continue;
+            pairs.push({ key: k, text: `${k}:${Array.isArray(v) ? v.join(',') : v}` });
+        }
+
+        pairs.sort((a, b) => a.key.localeCompare(b.key));
+
+        const parts = [];
+        if (task.id) parts.push(`id:${task.id}`);
+        pairs.forEach(p => parts.push(p.text));
+
+        return parts.join(', ');
     }
 
     _due(due) {
