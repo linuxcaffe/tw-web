@@ -629,6 +629,20 @@
     }
 
     // ── Command mode ─────────────────────────────────────────────────────────
+    const _HIST_KEY = 'tw-cmd-history';
+    const _HIST_MAX = 50;
+    let _cmdHistory = [];
+    let _cmdHistPos = -1;    // -1 = not navigating; counts back from end
+    let _cmdHistDraft = '';  // preserves current input while navigating
+    try { _cmdHistory = JSON.parse(localStorage.getItem(_HIST_KEY)) || []; } catch {}
+
+    function _cmdHistPush(cmd) {
+        if (_cmdHistory[_cmdHistory.length - 1] === cmd) return; // no consecutive dupes
+        _cmdHistory.push(cmd);
+        if (_cmdHistory.length > _HIST_MAX) _cmdHistory.shift();
+        try { localStorage.setItem(_HIST_KEY, JSON.stringify(_cmdHistory)); } catch {}
+    }
+
     // Known TW verbs and report names — bare tokens only, so "+list" or "pro:list" won't match
     const _TW_CMDS = new Set([
         'add','annotate','append','calc','completed','config','count',
@@ -669,6 +683,10 @@
         const inp = document.getElementById('tw-cmd-input');
         const cmd = (inp?.value || '').trim();
         if (!cmd) return;
+
+        _cmdHistPush(cmd);
+        _cmdHistPos = -1;
+        _cmdHistDraft = '';
 
         // Filter-only expression (no command verb) → raw filter override on List page
         if (_isFilterOnly(cmd)) {
@@ -752,9 +770,23 @@
         document.getElementById('tw-mode-toggle')?.addEventListener('click', _toggleCmdMode);
         document.getElementById('tw-cmd-run')?.addEventListener('click', _runCmd);
         document.getElementById('tw-cmd-input')?.addEventListener('keydown', e => {
-            if (e.key === 'Enter')  { e.preventDefault(); _runCmd(); }
-            if (e.key === 'Escape') { e.target.value = ''; _hideCmdOutput(); }
-            // Escape bubbles to global handler which blurs the input and focuses the logo button
+            if (e.key === 'Enter') { e.preventDefault(); _runCmd(); return; }
+            if (e.key === 'Escape') { e.target.value = ''; _cmdHistPos = -1; _cmdHistDraft = ''; _hideCmdOutput(); return; }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (!_cmdHistory.length) return;
+                if (_cmdHistPos === -1) { _cmdHistDraft = e.target.value; _cmdHistPos = _cmdHistory.length; }
+                if (_cmdHistPos > 0) e.target.value = _cmdHistory[--_cmdHistPos];
+                return;
+            }
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (_cmdHistPos === -1) return;
+                _cmdHistPos++;
+                e.target.value = _cmdHistPos < _cmdHistory.length ? _cmdHistory[_cmdHistPos] : (_cmdHistDraft || '');
+                if (_cmdHistPos >= _cmdHistory.length) _cmdHistPos = -1;
+                return;
+            }
         });
 
         // Logo → side menu
