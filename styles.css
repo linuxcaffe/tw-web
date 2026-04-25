@@ -423,7 +423,7 @@ h2 {
     align-items: center;
 }
 /* Card view: meta sits on its own line, right-aligned — description always owns full width */
-:is(#tasks-container, #unplanned-tasks):not(.list-view) .task-card:not(.collapsed) .card-meta {
+:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card:not(.collapsed) .card-meta {
     justify-content: flex-end;
     margin-top: 2px;
 }
@@ -444,8 +444,8 @@ h2 {
     clear: both;
 }
 /* Hide extras in collapsed and list-view (non-expanded) states */
-:is(#tasks-container, #unplanned-tasks):not(.list-view) .task-card.collapsed .card-extras,
-:is(#tasks-container, #unplanned-tasks).list-view .task-card:not(.expanded) .card-extras { display: none; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-extras,
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded) .card-extras { display: none; }
 
 .card-annotations { margin-top: 5px; }
 .card-ann {
@@ -501,89 +501,89 @@ h2 {
 }
 
 /* ── List view ───────────────────────────────────────────────── */
-:is(#tasks-container, #unplanned-tasks).list-view .task-card {
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card {
     margin-bottom: 2px;
     border-radius: 3px;
     padding: 0;
     cursor: pointer;
 }
-:is(#tasks-container, #unplanned-tasks).list-view .card-main {
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-main {
     display: flex;
     flex-wrap: wrap;          /* meta wraps below desc when there's no room */
     align-items: baseline;
     gap: 0 8px;
     padding: 3px 8px;
 }
-:is(#tasks-container, #unplanned-tasks).list-view .card-desc {
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-desc {
     flex: 1 1 0;
     min-width: min(160px, 100%);
     margin-bottom: 0;
     font-size: 0.88rem;
     align-items: center;
 }
-:is(#tasks-container, #unplanned-tasks).list-view .card-desc-text {
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-desc-text {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-:is(#tasks-container, #unplanned-tasks).list-view .card-meta {
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-meta {
     flex: 0 0 auto;           /* meta never squeezes desc; wraps to next line if needed */
     white-space: nowrap;
     gap: 4px;
 }
-:is(#tasks-container, #unplanned-tasks).list-view .card-meta .card-pri,
-:is(#tasks-container, #unplanned-tasks).list-view .card-meta .card-dur { display: none; }
-:is(#tasks-container, #unplanned-tasks).list-view .card-actions { display: none; }
-:is(#tasks-container, #unplanned-tasks).list-view .task-card:not(.expanded) .card-annotations { display: none; }
-:is(#tasks-container, #unplanned-tasks).list-view .task-card:hover { box-shadow: none; background: #f8f8f8; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-meta .card-pri,
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-meta .card-dur { display: none; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-actions { display: none; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded) .card-annotations { display: none; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:hover { box-shadow: none; background: #f8f8f8; }
 
 /* ── Collapsed card within card view ────────────────────────── */
-:is(#tasks-container, #unplanned-tasks):not(.list-view) .task-card.collapsed {
+:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed {
     margin-bottom: 2px;
     border-radius: 3px;
     cursor: pointer;
 }
-:is(#tasks-container, #unplanned-tasks):not(.list-view) .task-card.collapsed .card-main {
+:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-main {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 4px 10px;
 }
-:is(#tasks-container, #unplanned-tasks):not(.list-view) .task-card.collapsed .card-desc {
+:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-desc {
     margin-bottom: 0;
     flex: 1;
     align-items: center;
 }
-:is(#tasks-container, #unplanned-tasks):not(.list-view) .task-card.collapsed .card-desc-text {
+:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-desc-text {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-:is(#tasks-container, #unplanned-tasks):not(.list-view) .task-card.collapsed .card-meta .card-pri,
-:is(#tasks-container, #unplanned-tasks):not(.list-view) .task-card.collapsed .card-meta .card-dur { display: none; }
-:is(#tasks-container, #unplanned-tasks):not(.list-view) .task-card.collapsed .card-actions { display: none; }
-:is(#tasks-container, #unplanned-tasks):not(.list-view) .task-card.collapsed .card-annotations { display: none; }
-:is(#tasks-container, #unplanned-tasks):not(.list-view) .task-card.collapsed:hover { box-shadow: none; background: #f8f8f8; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-meta .card-pri,
+:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-meta .card-dur { display: none; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-actions { display: none; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-annotations { display: none; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed:hover { box-shadow: none; background: #f8f8f8; }
 
 /* ── Expanded card within list view ─────────────────────────── */
-:is(#tasks-container, #unplanned-tasks).list-view .task-card.expanded {
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded {
     margin-bottom: 7px;
     border-radius: 6px;
     cursor: default;
 }
-:is(#tasks-container, #unplanned-tasks).list-view .task-card.expanded .card-main {
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-main {
     display: block;
     padding: 8px 12px;
 }
-:is(#tasks-container, #unplanned-tasks).list-view .task-card.expanded .card-desc {
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-desc {
     margin-bottom: 4px;
     white-space: normal;
 }
-:is(#tasks-container, #unplanned-tasks).list-view .task-card.expanded .card-meta .card-pri,
-:is(#tasks-container, #unplanned-tasks).list-view .task-card.expanded .card-meta .card-due,
-:is(#tasks-container, #unplanned-tasks).list-view .task-card.expanded .card-meta .card-dur { display: inline; }
-:is(#tasks-container, #unplanned-tasks).list-view .task-card.expanded .card-actions { display: flex; }
-:is(#tasks-container, #unplanned-tasks).list-view .task-card.expanded:hover { box-shadow: 0 3px 8px rgba(0,0,0,0.1); background: #fff; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-meta .card-pri,
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-meta .card-due,
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-meta .card-dur { display: inline; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-actions { display: flex; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded:hover { box-shadow: 0 3px 8px rgba(0,0,0,0.1); background: #fff; }
 
 /* Modal */
 .modal {
@@ -1163,48 +1163,12 @@ body.kanban-page .app-container { flex: 1; min-height: 0; display: flex; flex-di
     flex: 1; overflow-y: auto; padding: 6px 8px; min-height: 60px;
     background: rgba(255,255,255,0.018); border-radius: 0 0 7px 7px;
 }
-.kb-col-body .task-card { margin-bottom: 6px; position: relative; padding-left: 18px; }
+.kb-col-body .task-card { margin-bottom: 6px; }
 .kb-col-body .task-card:last-child { margin-bottom: 0; }
 
-/* left-strip toggle — tap to expand/collapse individual card */
-.card-toggle {
-    position: absolute; left: 0; top: 0; bottom: 0; width: 18px;
-    cursor: pointer; display: flex; align-items: flex-start;
-    justify-content: center; padding-top: 7px; user-select: none;
-}
-.card-toggle::before {
-    content: '›'; font-size: 11px; line-height: 1; display: block;
-    color: rgba(255,255,255,0.22); transition: transform 0.15s, color 0.15s;
-}
-/* card view (default expanded): chevron points down, dim */
-.kb-col-body:not(.list-view) .task-card:not(.card--collapsed) .card-toggle::before {
-    transform: rotate(90deg); color: rgba(255,255,255,0.15);
-}
-/* list view with per-card expand: chevron points down */
-.kb-col-body.list-view .task-card.card--expanded .card-toggle::before {
-    transform: rotate(90deg); color: rgba(255,255,255,0.45);
-}
-
-/* card view: CRUD always visible at bottom */
-.kb-col-body:not(.list-view) .card-actions { display: flex; }
-
-/* per-card collapse in card-view */
-.kb-col-body:not(.list-view) .task-card.card--collapsed .card-meta,
-.kb-col-body:not(.list-view) .task-card.card--collapsed .card-annotations,
-.kb-col-body:not(.list-view) .task-card.card--collapsed .card-actions { display: none; }
-.kb-col-body:not(.list-view) .task-card.card--collapsed .card-desc { margin-bottom: 0; }
-
-/* list view: priority dot + description only */
-.kb-col-body.list-view .card-meta,
-.kb-col-body.list-view .card-annotations,
-.kb-col-body.list-view .card-actions { display: none; }
-.kb-col-body.list-view .card-desc { margin-bottom: 0; }
-
-/* per-card expand in list-view */
-.kb-col-body.list-view .task-card.card--expanded .card-meta,
-.kb-col-body.list-view .task-card.card--expanded .card-annotations { display: block; }
-.kb-col-body.list-view .task-card.card--expanded .card-actions { display: flex; }
-.kb-col-body.list-view .task-card.card--expanded .card-desc { margin-bottom: 4px; }
+/* Kanban card cursor: grab to signal draggability */
+.kb-col-body .task-card { cursor: grab; }
+.kb-col-body .task-card:active { cursor: grabbing; }
 
 /* empty column hint */
 .kb-empty {

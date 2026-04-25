@@ -24,7 +24,7 @@ let kbUnassignedSrc = [];   // unassigned tasks — status-filtered, no context
 let kbManualOrder   = {};   // { col: [uuid, ...] } loaded from server
 let kbColOffset     = 0;
 let kbFocusedColIdx = 0;
-let _kbResizeObs     = null;
+let _kbResizeObs    = null;
 let _kbDragMoveOff   = null;
 let _kbIsDragging    = false; // true only between onStart and onEnd
 let _kbNavDropTarget = null;  // state string when pointer is over nav bar, else null
@@ -263,9 +263,6 @@ function _kbMakeCol(col, label, tasks, isUnassigned, colorIdx) {
     if (sorted.length) {
         sorted.forEach(t => {
             const card = kbCardManager.createTaskCard(t);
-            const tog  = document.createElement('span');
-            tog.className = 'card-toggle';
-            card.appendChild(tog);
             body.appendChild(card);
         });
     } else {
@@ -279,7 +276,8 @@ function _kbMakeCol(col, label, tasks, isUnassigned, colorIdx) {
         forceFallback: true,   // use pointer tracking so pointermove fires during drag
         ghostClass:    'sortable-ghost',
         chosenClass:   'sortable-chosen',
-        filter:        '.card-toggle',
+        delay:         150,
+        delayOnTouchOnly: false,
         onStart(evt) { _kbDragStart(evt.item.dataset.taskId); },
         onEnd(evt) {
             _kbDragEnd();  // cleanup move listeners, nav styling
@@ -343,10 +341,13 @@ function _kbApplyFocus() {
 function _kbInitResize() {
     const board = document.getElementById('kb-board');
     if (_kbResizeObs) _kbResizeObs.disconnect();
-    _kbResizeObs = new ResizeObserver(() => { _kbCenterFocused(); _kbApplyVisibility(); });
+    // ResizeObserver handles only layout recalculation — never _kbCenterFocused().
+    // _kbCenterFocused() is wired exclusively to genuine window resize events (below).
+    _kbResizeObs = new ResizeObserver(() => _kbApplyVisibility());
     _kbResizeObs.observe(board);
-    _kbApplyVisibility();
 }
+
+window.addEventListener('resize', () => { _kbCenterFocused(); _kbApplyVisibility(); });
 
 function _kbMaxVisible() {
     const board = document.getElementById('kb-board');
@@ -527,13 +528,12 @@ document.addEventListener('click', e => {
         if (idx >= 0 && idx !== kbFocusedColIdx) _kbSetFocus(idx);
     }
 
-    // Per-card expand/collapse toggle
-    const tog = e.target.closest('.card-toggle');
-    if (tog) {
-        const card     = tog.closest('.task-card');
-        const listView = tog.closest('.kb-col-body')?.classList.contains('list-view');
-        if (listView) card.classList.toggle('card--expanded');
-        else          card.classList.toggle('card--collapsed');
+    // Per-card expand/collapse — click anywhere on card except action buttons
+    const card = e.target.closest('.kb-col-body .task-card');
+    if (card && !e.target.closest('[data-task-action]')) {
+        const listView = card.closest('.kb-col-body')?.classList.contains('list-view');
+        if (listView) card.classList.toggle('expanded');
+        else          card.classList.toggle('collapsed');
         return;
     }
 
@@ -577,11 +577,7 @@ document.addEventListener('change', e => {
         : kbAllTasks.filter(t => (t.state || '') === col);
     body.innerHTML = '';
     kbSort(src, col).forEach(t => {
-        const card = kbCardManager.createTaskCard(t);
-        const tog  = document.createElement('span');
-        tog.className = 'card-toggle';
-        card.appendChild(tog);
-        body.appendChild(card);
+        body.appendChild(kbCardManager.createTaskCard(t));
     });
 });
 
