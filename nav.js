@@ -511,7 +511,7 @@
                 `</div>` +
                 `<div id="tw-cmd-section">` +
                     `<div class="tw-filter-wrap tw-cmd-wrap">` +
-                        `<input id="tw-cmd-input" type="text" placeholder="task command…" autocomplete="off" spellcheck="false">` +
+                        `<input id="tw-cmd-input" type="text" placeholder="command or filter expression…" autocomplete="off" spellcheck="false">` +
                     `</div>` +
                     `<button id="tw-cmd-run" title="Run (Enter)">↵</button>` +
                 `</div>` +
@@ -593,6 +593,20 @@
     }
 
     // ── Command mode ─────────────────────────────────────────────────────────
+    // Known TW verbs and report names — bare tokens only, so "+list" or "pro:list" won't match
+    const _TW_CMDS = new Set([
+        'add','annotate','append','calc','completed','config','count',
+        'delete','denotate','done','duplicate','edit','execute','export',
+        'help','import','log','modify','prepend','purge','start','stop',
+        'sync','undo','version',
+        'list','all','long','ls','minimal','newest','next','oldest',
+        'overdue','ready','recurring','unblocked','waiting','blocked',
+        'burndown','calendar','ghistory','history','summary','timesheet',
+    ]);
+    function _isFilterOnly(cmd) {
+        return !cmd.split(/\s+/).some(tok => _TW_CMDS.has(tok.toLowerCase()));
+    }
+
     let _cmdMode = false;
 
     function _toggleCmdMode() {
@@ -619,6 +633,18 @@
         const inp = document.getElementById('tw-cmd-input');
         const cmd = (inp?.value || '').trim();
         if (!cmd) return;
+
+        // Filter-only expression (no command verb) → apply as List page filter
+        if (_isFilterOnly(cmd)) {
+            setState({ filter: cmd }, { clientOnly: true });
+            inp.value = '';
+            if (_cmdMode) _toggleCmdMode();
+            if (window.location.pathname !== '/') {
+                window.location.href = '/';
+            }
+            return;
+        }
+
         const out = document.getElementById('tw-cmd-output');
         if (out) { out.innerHTML = '<button id="tw-cmd-output-close" title="Close">×</button>Running…'; out.classList.add('active'); }
         try {
@@ -635,7 +661,6 @@
                 out.classList.add('active');
                 document.getElementById('tw-cmd-output-close')?.addEventListener('click', _hideCmdOutput);
             }
-            // Refresh task list after any command
             document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
         } catch (err) {
             if (out) { out.innerHTML = `<button id="tw-cmd-output-close" title="Close">×</button><span>Network error: ${esc(err.message)}</span>`; out.classList.add('active'); document.getElementById('tw-cmd-output-close')?.addEventListener('click', _hideCmdOutput); }
