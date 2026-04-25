@@ -667,7 +667,15 @@
         if (fi) fi.style.display = _cmdMode ? 'none' : '';
         if (cs) cs.classList.toggle('active', _cmdMode);
         if (_cmdMode) {
-            document.getElementById('tw-cmd-input')?.focus();
+            const inp = document.getElementById('tw-cmd-input');
+            if (inp) {
+                if (_rawFilter) {
+                    inp.value = _rawFilter;
+                    _cmdHistPos  = _cmdHistory.length; // ArrowUp → history, ArrowDown → empty
+                    _cmdHistDraft = '';
+                }
+                inp.focus();
+            }
         } else {
             document.getElementById('tw-filter-input')?.focus();
             _hideCmdOutput();
