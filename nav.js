@@ -691,7 +691,6 @@
         // Filter-only expression (no command verb) → raw filter override on List page
         if (_isFilterOnly(cmd)) {
             inp.value = '';
-            if (_cmdMode) _toggleCmdMode();
             setRawFilter(cmd);
             if (window.location.pathname !== '/') {
                 window.location.href = '/';
