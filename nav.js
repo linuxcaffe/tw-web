@@ -25,6 +25,7 @@
     const CTX_KEY      = 'tw-contexts';
     const CTX_FILT_KEY = 'tw-ctx-filters';
     const COUNT_KEY    = 'tw-count-text';
+    const GT_KEY       = 'tw-grand-total';
 
     const PAGES = [
         { id: 'tasks',    href: '/',                      label: 'List'       },
@@ -41,7 +42,7 @@
         { id: 'deleted',   label: 'Deleted'   },
     ];
 
-    const MENU_ITEMS = ['About', 'Projects', 'Tags', 'Stats', 'Settings', 'Sync', 'Terminal'];
+    const MENU_ITEMS = ['About', 'Projects', 'Tags', 'Stats', 'Settings', 'Sync', 'Terminal', 'Help'];
 
     // ── State ─────────────────────────────────────────────────────────────────
     function defaultState() {
@@ -72,9 +73,25 @@
         if (el) el.textContent = text;
         try { sessionStorage.setItem(COUNT_KEY, text); } catch {}
     }
+    function setGrandTotal(n, params) {
+        try { sessionStorage.setItem(GT_KEY, JSON.stringify({ n, params, ts: Date.now() })); } catch {}
+    }
+    // Returns the unfiltered total for the given params (status+context), or null if not cached.
+    function getGrandTotal(params) {
+        try {
+            const x = JSON.parse(sessionStorage.getItem(GT_KEY));
+            if (x && x.params === params && (Date.now() - x.ts) < 60_000) return x.n;
+        } catch {}
+        // Fall back to shared task cache (written by main.js with serverTotal, or calendar with tasks array)
+        try {
+            const s = JSON.parse(sessionStorage.getItem('tw-tasks-cache'));
+            if (s && s.params === params) return s.serverTotal ?? s.tasks?.length ?? null;
+        } catch {}
+        return null;
+    }
 
-    window.twNav = { getState, setState, stateToParams, setCount, openSyncDialog,
-                     initProjectsSidebar, initTagsSidebar };
+    window.twNav = { getState, setState, stateToParams, setCount, setGrandTotal, getGrandTotal,
+                     openSyncDialog, initProjectsSidebar, initTagsSidebar, showNotification };
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     function activePage() {
@@ -367,6 +384,30 @@
 }
 .tw-settings-input:focus { outline: none; border-color: #3498db; background: rgba(255,255,255,0.12); }
 
+/* notification toast */
+.notification {
+    position: fixed; bottom: 20px; right: 20px;
+    max-width: min(420px, calc(100vw - 40px));
+    padding: 10px 14px; border-radius: 6px; color: white;
+    font-weight: 500; font-size: 14px; line-height: 1.4;
+    word-break: break-word; z-index: 10000;
+    display: flex; align-items: flex-start; gap: 6px;
+    transform: translateX(calc(100% + 40px));
+    transition: transform 0.3s ease;
+    cursor: default; user-select: text;
+}
+.notification.show    { transform: translateX(0); }
+.notification.success { background: #27ae60; }
+.notification.error   { background: #e74c3c; }
+.notification.warning { background: #e67e22; }
+.notification.info    { background: #2980b9; }
+.notif-close {
+    background: none; border: none; color: rgba(255,255,255,0.7);
+    cursor: pointer; font-size: 18px; padding: 0 0 0 4px; line-height: 1;
+    flex-shrink: 0; align-self: flex-start;
+}
+.notif-close:hover { color: #fff; }
+
 /* responsive — stack both bars at BREAK */
 @media (max-width: ${BREAK}px) {
     #tw-nav-bar {
@@ -460,6 +501,20 @@
         bar.classList.toggle('active', parts.length > 0);
     }
 
+    // ── Notification toast ────────────────────────────────────────────────────
+    function showNotification(message, type = 'success') {
+        const el  = document.getElementById('tw-notification');
+        const txt = document.getElementById('tw-notif-text');
+        if (!el) return;
+        if (txt) txt.textContent = message; else el.textContent = message;
+        el.className = `notification ${type} show`;
+        const timeout = (window.twNotifTimeout != null) ? window.twNotifTimeout : 3000;
+        clearTimeout(showNotification._t);
+        if (timeout > 0) {
+            showNotification._t = setTimeout(() => el.classList.remove('show'), timeout);
+        }
+    }
+
     // ── Apply state to live DOM ───────────────────────────────────────────────
     function _applyState(state) {
         [
@@ -480,13 +535,24 @@
     }
 
     // ── Side menu ─────────────────────────────────────────────────────────────
-    function openMenu()  {
+    let _kbNav = false;  // true when last interaction was keyboard-driven
+    document.addEventListener('keydown',   () => { _kbNav = true;  }, { capture: true });
+    document.addEventListener('mousedown', () => { _kbNav = false; }, { capture: true });
+
+    function openMenu() {
         document.getElementById('tw-side-menu').classList.add('open');
         document.getElementById('tw-menu-backdrop').classList.add('open');
+        if (_kbNav) {
+            // Focus first visible menu item so arrow keys work immediately
+            requestAnimationFrame(() => {
+                document.querySelector('#tw-menu-list .tw-menu-item')?.focus();
+            });
+        }
     }
     function closeMenu() {
         document.getElementById('tw-side-menu').classList.remove('open');
         document.getElementById('tw-menu-backdrop').classList.remove('open');
+        document.getElementById('tw-logo-btn')?.focus();
     }
 
     // ── Event wiring ──────────────────────────────────────────────────────────
@@ -530,7 +596,23 @@
             else if (action === 'stats')      { openStatsPanel();    }
             else if (action === 'settings')   { openSettingsPanel(); }
             else if (action === 'terminal')   { closeMenu(); openTerminal(); }
+            else if (action === 'help')       { closeMenu(); window.location.href = '/help.html'; }
             else { closeMenu(); document.dispatchEvent(new CustomEvent('tw-menu-action', { detail: { action } })); }
+        });
+
+        // Arrow-key navigation inside the side menu
+        document.getElementById('tw-side-menu').addEventListener('keydown', e => {
+            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Escape') return;
+            e.preventDefault();
+            if (e.key === 'Escape') { closeMenu(); return; }
+            const items = [...document.querySelectorAll('#tw-menu-list .tw-menu-item')].filter(
+                b => b.offsetParent !== null  // only visible items
+            );
+            const idx = items.indexOf(document.activeElement);
+            const next = e.key === 'ArrowDown'
+                ? items[Math.min(idx + 1, items.length - 1)]
+                : items[Math.max(idx - 1, 0)];
+            next?.focus();
         });
 
         // Brand text → force refresh (bypass cache) with blink
@@ -638,6 +720,19 @@
                 `</div>` +
             `</div>`;
         document.body.appendChild(syncDlg);
+
+        // Notification toast — single shared element for all pages
+        const notifEl = document.createElement('div');
+        notifEl.id = 'tw-notification';
+        notifEl.className = 'notification';
+        notifEl.innerHTML =
+            `<span id="tw-notif-text" style="flex:1"></span>` +
+            `<button class="notif-close" id="tw-notif-close">×</button>`;
+        document.body.appendChild(notifEl);
+        notifEl.querySelector('#tw-notif-close').addEventListener('click', () =>
+            notifEl.classList.remove('show'));
+        document.addEventListener('tw-show-notification', e =>
+            showNotification(e.detail.message, e.detail.type));
 
         // Restore count from last visit immediately (before API returns)
         const savedCount = sessionStorage.getItem(COUNT_KEY);
@@ -1396,19 +1491,31 @@
         'A': '/agenda.html',
         'C': '/calendar-planner.html',
     };
-    const _CAL_KEYS = { 'D': 'day', 'W': 'week', 'M': 'month' };
+    const _CAL_KEYS = { 'D': 'day', 'W': 'week', 'M': 'month', 'T': 'today' };
 
     function _initKeys() {
         document.addEventListener('keydown', (e) => {
             if (e.metaKey || e.ctrlKey || e.altKey) return;
+            const k   = e.key;
             const tag = (e.target.tagName || '').toLowerCase();
-            if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+            const inInput = tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable;
+
+            // Escape always returns focus to logo — essential for escaping filter inputs
+            if (k === 'Escape') {
+                if (inInput) e.target.blur();
+                document.getElementById('tw-logo-btn')?.focus();
+                e.preventDefault();
+                return;
+            }
+
+            if (inInput) return;
             // Also suppress when focus is inside any open modal/dialog (e.g. CodeMirror annotation field)
             if (e.target.closest('.modal, .task-editor-backdrop, [role="dialog"]')) return;
 
-            const k = e.key;
-
-            if (_PAGE_KEYS[k]) {
+            if (k === '?') {
+                e.preventDefault();
+                window.location.href = '/help.html';
+            } else if (_PAGE_KEYS[k]) {
                 e.preventDefault();
                 window.location.href = _PAGE_KEYS[k];
             } else if (_CAL_KEYS[k] && typeof changeView === 'function') {

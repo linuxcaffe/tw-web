@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1a1a1a">
+    <link rel="manifest" href="/manifest.json">
+    <title>Help — tw-web</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="nav.js"></script>
+    <style>
+        body { background: #1a1a1a; color: #ecf0f1; }
+        .help-page { max-width: 720px; margin: 0 auto; padding: 24px 20px 60px; }
+        .help-page h1 { color: #ecf0f1; font-size: 1.4rem; margin-bottom: 4px; }
+        .help-page .help-subtitle { color: rgba(255,255,255,0.4); font-size: 13px; margin-bottom: 32px; }
+        .help-section { margin-bottom: 32px; }
+        .help-section h2 {
+            font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+            text-transform: uppercase; color: rgba(255,255,255,0.35);
+            margin-bottom: 10px; padding-bottom: 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+        }
+        .help-table { width: 100%; border-collapse: collapse; }
+        .help-table tr { border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .help-table tr:last-child { border-bottom: none; }
+        .help-table td { padding: 7px 4px; font-size: 13px; color: rgba(255,255,255,0.75); vertical-align: top; }
+        .help-table td:first-child { width: 120px; }
+        kbd {
+            display: inline-block; padding: 2px 7px; font-size: 11px; font-family: monospace;
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 3px; color: #ecf0f1; white-space: nowrap;
+        }
+        .help-note {
+            font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 20px;
+            padding: 10px 14px; background: rgba(255,255,255,0.04);
+            border-radius: 6px; border-left: 3px solid rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body>
+
+<div class="help-page">
+    <h1>tw-web Help</h1>
+    <p class="help-subtitle">Keyboard shortcuts &amp; quick reference</p>
+
+    <div class="help-section">
+        <h2>Navigation</h2>
+        <table class="help-table">
+            <tr><td><kbd>L</kbd></td><td>Task list</td></tr>
+            <tr><td><kbd>K</kbd></td><td>Kanban board</td></tr>
+            <tr><td><kbd>A</kbd></td><td>Agenda</td></tr>
+            <tr><td><kbd>C</kbd></td><td>Calendar planner</td></tr>
+            <tr><td><kbd>?</kbd></td><td>This help page</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Focus menu button (always — essential for escaping filters)</td></tr>
+            <tr><td><kbd>Enter</kbd> on menu</td><td>Open side menu</td></tr>
+            <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Navigate menu items</td></tr>
+            <tr><td><kbd>Esc</kbd> in menu</td><td>Close menu, return focus to menu button</td></tr>
+        </table>
+    </div>
+
+    <div class="help-section">
+        <h2>Task list</h2>
+        <table class="help-table">
+            <tr><td><kbd>a</kbd></td><td>Add new task</td></tr>
+            <tr><td><kbd>f</kbd></td><td>Focus filter input</td></tr>
+            <tr><td><kbd>c</kbd></td><td>Focus context buttons</td></tr>
+            <tr><td><kbd>s</kbd></td><td>Focus status buttons</td></tr>
+        </table>
+    </div>
+
+    <div class="help-section">
+        <h2>Calendar</h2>
+        <table class="help-table">
+            <tr><td><kbd>D</kbd></td><td>Day view</td></tr>
+            <tr><td><kbd>W</kbd></td><td>Week view</td></tr>
+            <tr><td><kbd>M</kbd></td><td>Month view</td></tr>
+            <tr><td><kbd>T</kbd></td><td>Jump to today</td></tr>
+        </table>
+    </div>
+
+    <div class="help-section">
+        <h2>Configuration</h2>
+        <table class="help-table">
+            <tr><td><kbd>Menu → Settings</kbd></td><td>Notification timeout, kanban columns, calendar day range &amp; default view</td></tr>
+            <tr><td><kbd>~/.task/config/tw-web.rc</kbd></td><td>Taskwarrior settings — UDAs, urgency coefficients, recurrence engine</td></tr>
+        </table>
+    </div>
+
+    <p class="help-note">More to come. If something is missing or broken, check the browser console and the tw-web server log.</p>
+</div>
+
+</body>
+</html>

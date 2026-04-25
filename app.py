@@ -63,20 +63,18 @@ _SETTINGS_SCHEMA = {
 }
 
 def _load_settings():
-    """Return merged settings: hardcoded defaults ← config.py ← settings.json."""
+    """Return merged settings: schema defaults ← config.py (KANBAN_COLUMNS only) ← settings.json."""
     out = {}
     for key, meta in _SETTINGS_SCHEMA.items():
         out[key] = meta['default']
-    # config.py layer (NOTIFICATION_TIMEOUT, KANBAN_COLUMNS if present)
+    # config.py — only KANBAN_COLUMNS (deployment-level override; no other settings live here)
     try:
         import config as _cfg
-        if hasattr(_cfg, 'NOTIFICATION_TIMEOUT'):
-            out['notification_timeout'] = int(_cfg.NOTIFICATION_TIMEOUT)
         if hasattr(_cfg, 'KANBAN_COLUMNS'):
             out['kanban_columns'] = list(_cfg.KANBAN_COLUMNS)
     except Exception:
         pass
-    # settings.json layer — wins over config.py
+    # settings.json — single source of truth for all runtime settings; wins over defaults
     try:
         if _SETTINGS_PATH.exists():
             saved = json.loads(_SETTINGS_PATH.read_text())

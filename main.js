@@ -138,11 +138,6 @@ class TaskWarriorUI {
             window.twPollSyncStatus?.();
         });
 
-        // Notification close button
-        const notifClose = document.getElementById('notif-close');
-        if (notifClose) notifClose.addEventListener('click', () => {
-            document.getElementById('notification').classList.remove('show');
-        });
     }
 
     // ── Sort ─────────────────────────────────────────────────────────────────
@@ -316,6 +311,7 @@ class TaskWarriorUI {
             if (tasksData.success) {
                 this.tasks       = tasksData.tasks;
                 this.serverTotal = totalData && totalData.success ? totalData.tasks.length : this.tasks.length;
+                window.twNav?.setGrandTotal(this.serverTotal, params);
                 try {
                     sessionStorage.setItem(cacheKey, JSON.stringify(
                         { params, tasks: this.tasks, serverTotal: this.serverTotal, ts: Date.now() }
@@ -517,18 +513,8 @@ class TaskWarriorUI {
     }
 
     showNotification(message, type = 'success') {
-        const notification = document.getElementById('notification');
-        const textEl = document.getElementById('notif-text');
-        if (textEl) textEl.textContent = message;
-        else notification.textContent = message;
-        notification.className = `notification ${type} show`;
-
-        const timeout = (window.twNotifTimeout != null) ? window.twNotifTimeout : 3000;
-        clearTimeout(this._notifTimer);
-        if (timeout > 0) {
-            this._notifTimer = setTimeout(() => notification.classList.remove('show'), timeout);
-        }
-        // timeout === 0: manual close only via × button
+        document.dispatchEvent(new CustomEvent('tw-show-notification',
+            { detail: { message, type } }));
     }
 
     escapeHtml(text) {
@@ -555,6 +541,7 @@ document.addEventListener('DOMContentLoaded', () => {
         language: 'en',
         modalId: 'unified-task-editor',
         onSaveSuccess: (task, isEdit) => app.handleTaskSaveSuccess(task, isEdit),
+        onLogSuccess: () => app.showNotification('Task logged', 'success'),
         onSaveError: (error) => app.showNotification(error, 'error'),
         onCancel: () => app.handleTaskCancel()
     });

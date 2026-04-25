@@ -44,11 +44,12 @@ function _writeCache(params, cacheKey, allFetched, plannedTasks, due) {
     } catch {}
 }
 
-function _applyLoaded(myId, allFetched, plannedTasks, due) {
+function _applyLoaded(myId, allFetched, plannedTasks, due, params) {
     if (myId !== _loadId) return;
     dueTasks       = due;
     unplannedTasks = allFetched.filter(t => !t.scheduled && !t.due);
     allTasks       = [...unplannedTasks, ...plannedTasks];
+    window.twNav?.setGrandTotal(allFetched.length, params);
     applyFiltersAndDisplay();
     processTasksForCalendar(plannedTasks);
 }
@@ -104,6 +105,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             language:       'en',
             modalId:        'unified-task-editor',
             onSaveSuccess:  () => loadTasks(),
+            onLogSuccess:   () => showCalNotification('Task logged', 'success'),
             onSaveError:    (err) => showCalNotification(err, 'error'),
             onCancel:       () => {}
         });
@@ -118,12 +120,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.addEventListener('tw-open-add',      () => { if (taskEditor) taskEditor.show(null); });
     document.addEventListener('tw-filter-change', () => loadTasks());
     document.addEventListener('tw-sync-complete', () => loadTasks());
-    document.addEventListener('tw-show-notification', (e) => {
-        const { message, type } = e.detail || {};
-        if (message) showCalNotification(message, type || 'info');
-    });
-    document.getElementById('notif-close')?.addEventListener('click', () =>
-        document.getElementById('notification')?.classList.remove('show'));
 
     // Navigate to date/view from URL params (e.g. Agenda page date-header click)
     const params    = new URLSearchParams(location.search);
@@ -431,6 +427,10 @@ function _cycleSlot() {
 function _updateSlotLabel() { /* labels removed — cycle is silent */ }
 
 function changeView(view) {
+    if (view === 'today') {
+        calendar.today();
+        return;
+    }
     const fcViews   = { week: 'timeGridWeek', day: 'timeGridDay', month: 'dayGridMonth' };
     const currentFC = calendar.view.type;
     const isTimegrid = view === 'week' || view === 'day';
@@ -477,7 +477,7 @@ function loadTasks() {
     // Serve from cache when clean and fresh — skips all three fetches
     const cached = _readCache(params, calParams);
     if (cached) {
-        _applyLoaded(myId, cached.allFetched, cached.plannedTasks, cached.due);
+        _applyLoaded(myId, cached.allFetched, cached.plannedTasks, cached.due, params);
         return;
     }
 
@@ -496,7 +496,7 @@ function loadTasks() {
             const due          = dueData.success      ? (dueData.data  || []) : [];
 
             _writeCache(params, calParams, allFetched, plannedTasks, due);
-            _applyLoaded(myId, allFetched, plannedTasks, due);
+            _applyLoaded(myId, allFetched, plannedTasks, due, params);
         })
         .catch(err => {
             if (myId !== _loadId) return;   // stale — a newer call is handling things
@@ -718,8 +718,14 @@ function matchesNavFilter(task) {
 }
 
 function applyFiltersAndDisplay() {
+    // Nav counter mirrors agenda: tasks on the calendar (planned+due), not the unscheduled sidebar
+    const calendarTasks = [...allTasks.filter(t => t.scheduled), ...dueTasks];
+    const calFiltered   = calendarTasks.filter(matchesNavFilter);
+    const p  = window.twNav?.stateToParams() ?? '';
+    const gt = window.twNav?.getGrandTotal(p) ?? calendarTasks.length;
+    window.twNav?.setCount(calFiltered.length, gt);
+
     const filtered = unplannedTasks.filter(matchesNavFilter);
-    window.twNav?.setCount(filtered.length, unplannedTasks.length);
     const title = document.getElementById('cal-unscheduled-title');
     if (title) title.textContent = `${filtered.length} Unscheduled`;
     displayUnplannedTasks(sortUnplanned(filtered));
@@ -871,13 +877,8 @@ function setupCalTooltip() {
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 function showCalNotification(message, type = 'info') {
-    const el  = document.getElementById('notification');
-    const txt = document.getElementById('notif-text');
-    if (!el) return;
-    if (txt) txt.textContent = message; else el.textContent = message;
-    el.className = `notification ${type} show`;
-    clearTimeout(showCalNotification._t);
-    showCalNotification._t = setTimeout(() => el.classList.remove('show'), 3000);
+    document.dispatchEvent(new CustomEvent('tw-show-notification',
+        { detail: { message, type } }));
 }
 
 // ── Backend API ───────────────────────────────────────────────────────────────

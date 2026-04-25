@@ -838,7 +838,8 @@ h2 {
     resize: vertical;
     box-sizing: border-box;
 }
-.te-ann-editor-btns { display: flex; gap: 6px; }
+.te-ann-editor-btns { display: flex; gap: 8px; align-items: center; }
+.te-ann-esc-hint { font-size: 11px; color: rgba(255,255,255,0.35); }
 
 /* Status banner (completed / deleted tasks in editor) */
 .te-status-banner {
@@ -885,33 +886,6 @@ h2 {
     margin-bottom: 20px;
     border: 1px solid #f5c6cb;
 }
-
-/* Notifications */
-.notification {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    padding: 10px 14px;
-    border-radius: 6px;
-    color: white;
-    font-weight: 500;
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    transform: translateX(400px);
-    transition: transform 0.3s ease;
-}
-.notification.show { transform: translateX(0); }
-.notification.success { background: #27ae60; }
-.notification.error   { background: #e74c3c; }
-.notification.warning { background: #e67e22; }
-
-.notif-close {
-    background: none; border: none; color: rgba(255,255,255,0.7);
-    cursor: pointer; font-size: 18px; padding: 0 0 0 8px; line-height: 1;
-}
-.notif-close:hover { color: #fff; }
 
 /* Sync dialog */
 .sync-dialog-backdrop {

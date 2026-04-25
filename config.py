@@ -1,20 +1,19 @@
 """
 tw-web configuration settings
+
+Runtime settings (notification timeout, calendar options, kanban columns) live in
+Menu → Settings and are saved to settings.json — no server restart needed.
+
+This file is for deployment-level overrides only.
 """
 
 # Developer mode settings
-DEVELOPER_MODE = False  # Set to False to disable developer mode
+DEVELOPER_MODE = False
 DEBUG_FILE = 'command.debug'
 
-# Notification display time in milliseconds.
-# Set to 0 to disable auto-dismiss (notifications show an × close button instead).
-NOTIFICATION_TIMEOUT = 3000
-
-# Kanban board columns — optional, overrides the built-in default.
-# Must match the values used in the 'state' UDA on your tasks.
-# Tasks with no state value appear in a grey "Unassigned" column.
-# Also add to your taskrc:
-#   uda.state.type=string
-#   uda.state.label=State
+# Kanban board columns — optional deployment override.
+# Normally set via Menu → Settings. Uncomment to hard-code at the server level.
+# Must match 'state' UDA values; tasks with no state appear in "Unassigned".
+#   uda.state.type=string  (add to tw-web.rc)
 #
 # KANBAN_COLUMNS = ['backlog', 'todo', 'doing', 'review', 'done']

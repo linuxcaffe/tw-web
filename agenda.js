@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
         language: 'en',
         modalId: 'unified-task-editor',
         onSaveSuccess: () => loadAgenda(),
+        onLogSuccess:  () => showNotification('Task logged', 'success'),
         onSaveError:   (err) => showNotification(err, 'error'),
         onCancel:      () => {}
     });
@@ -40,12 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
         else card.classList.toggle('collapsed');
     });
 
-    document.getElementById('notif-close')
-        ?.addEventListener('click', () => document.getElementById('notification')?.classList.remove('show'));
-    document.addEventListener('tw-show-notification', (e) => {
-        const { message, type } = e.detail || {};
-        if (message) showNotification(message, type || 'info');
-    });
 
     window.twNav?.initProjectsSidebar(document.getElementById('tw-proj-sidebar'));
     window.twNav?.initTagsSidebar(document.getElementById('tw-tags-sidebar'));
@@ -135,6 +130,8 @@ function renderAgenda(scheduled, due) {
     });
 
     const total = items.length;
+    const p     = window.twNav?.stateToParams() ?? '';
+    let grandTotal = window.twNav?.getGrandTotal(p) ?? null;
 
     // Client-side filtering (mirrors main.js / calendar-planner.js)
     const filter   = (navState.filter   || '').trim().toLowerCase();
@@ -150,7 +147,18 @@ function renderAgenda(scheduled, due) {
         return true;
     });
 
-    window.twNav?.setCount(filtered.length, total);
+    window.twNav?.setCount(filtered.length, grandTotal ?? total);
+
+    // If grand total isn't cached yet, fetch it in the background and update the counter
+    if (grandTotal === null && window.twNav) {
+        fetch('/api/tasks?' + p).then(r => r.json()).then(data => {
+            if (data.success && Array.isArray(data.tasks)) {
+                grandTotal = data.tasks.length;
+                window.twNav.setGrandTotal(grandTotal, p);
+                window.twNav.setCount(filtered.length, grandTotal);
+            }
+        }).catch(() => {});
+    }
 
     if (filtered.length === 0) {
         container.innerHTML = total === 0
@@ -235,11 +243,6 @@ class AgendaActionHandler extends TaskActionHandler {
 // ── Notifications ─────────────────────────────────────────────────────────────
 
 function showNotification(message, type = 'info') {
-    const el  = document.getElementById('notification');
-    const txt = document.getElementById('notif-text');
-    if (!el) return;
-    if (txt) txt.textContent = message; else el.textContent = message;
-    el.className = `notification ${type} show`;
-    clearTimeout(showNotification._t);
-    showNotification._t = setTimeout(() => el.classList.remove('show'), 3000);
+    document.dispatchEvent(new CustomEvent('tw-show-notification',
+        { detail: { message, type } }));
 }

@@ -47,6 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
         language:       'en',
         modalId:        'unified-task-editor',
         onSave:         () => kbReload(),
+        onLogSuccess:   () => document.dispatchEvent(new CustomEvent('tw-show-notification',
+                            { detail: { message: 'Task logged', type: 'success' } })),
         onCancel:       () => {},
     });
 
@@ -92,6 +94,7 @@ async function kbReload(preserveView = false) {
             kbColOffset     = savedOffset;
         }
         kbRenderBoard();
+        window.twNav?.setCount(kbAllTasks.length, kbUnassignedSrc.length);
     } catch (e) {
         console.error('Kanban load failed:', e);
         document.dispatchEvent(new CustomEvent('tw-show-notification',
@@ -208,12 +211,13 @@ function kbRenderBoard() {
 function kbRerenderUnassigned() {
     const board    = document.getElementById('kb-board');
     const assigned = new Set(kbColumns);
+    const filtered = kbNavFilter(kbUnassignedSrc.filter(t => !assigned.has(t.state || '')));
     const existing = board.querySelector('.kb-col[data-col=""]');
-    const fresh    = _kbMakeCol('', 'Unassigned',
-        kbNavFilter(kbUnassignedSrc.filter(t => !assigned.has(t.state || ''))), true, -1);
+    const fresh    = _kbMakeCol('', 'Unassigned', filtered, true, -1);
     if (existing) board.replaceChild(fresh, existing); else board.prepend(fresh);
     _kbApplyVisibility();
     _kbApplyFocus();
+    window.twNav?.setCount(kbAllTasks.length, kbUnassignedSrc.length);
 }
 
 function _kbColKey(col) { return col === '' ? '__unassigned__' : col; }

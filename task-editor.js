@@ -22,6 +22,7 @@ class TaskEditor {
         this.onCancel = options.onCancel || (() => {});
         this.onSaveSuccess = options.onSaveSuccess || (() => {});
         this.onSaveError = options.onSaveError || (() => {});
+        this.onLogSuccess = options.onLogSuccess || (() => {});
         
         this.init();
     }
@@ -258,15 +259,23 @@ class TaskEditor {
             syncDtColor(inp);
         });
 
-        // Date field clear buttons
+        // Date field clear buttons — valueAsNumber=NaN is the reliable way to clear
+        // datetime-local in WebKit; .value='' is often ignored
         this.modal.querySelectorAll('.te-clr').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
                 const target = this.modal.querySelector('#' + btn.dataset.clears);
-                if (target) target.value = '';
+                if (!target) return;
+                target.valueAsNumber = NaN;
+                target.dispatchEvent(new Event('change', { bubbles: true }));
             });
         });
 
-        // Événement de soumission du formulaire
+        // Save button (type=button to prevent native datetime-local validation/focus)
+        const saveBtn = this.modal.querySelector('#task-editor-save');
+        if (saveBtn) saveBtn.addEventListener('click', () => this.handleSave());
+
+        // Keep form submit as fallback for Enter key
         if (form) {
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
@@ -532,8 +541,8 @@ class TaskEditor {
             const data = await response.json();
             if (data.success) {
                 if (data.deferred_cmd) window.twTerminal?.offerTerminal(data.deferred_cmd);
-                this.onSaveSuccess(null, false);
                 this.hide();
+                this.onLogSuccess();
             } else {
                 this.onSaveError(data.error || 'Failed to log task');
             }
@@ -557,13 +566,11 @@ class TaskEditor {
             preparedData.tags = taskData.tags || [];
         }
         
-        // Formater les dates si elles existent
-        if (taskData.due) {
-            preparedData.due = this.formatDateForTask(taskData.due);
-        }
-        if (taskData.scheduled) {
-            preparedData.scheduled = this.formatDateForTask(taskData.scheduled);
-        }
+        // Always send date fields — empty string signals "clear this date" to the backend
+        if (taskData.due !== undefined)
+            preparedData.due = taskData.due ? this.formatDateForTask(taskData.due) : '';
+        if (taskData.scheduled !== undefined)
+            preparedData.scheduled = taskData.scheduled ? this.formatDateForTask(taskData.scheduled) : '';
         
         if (taskData.due_duration)   preparedData.due_duration   = taskData.due_duration;
         if (taskData.sched_duration) preparedData.sched_duration = taskData.sched_duration;
@@ -716,12 +723,15 @@ class TaskEditor {
     _cmInstance() { return this._annCm || null; }
 
     _openAnnEditor(existingText, anchorRow) {
-        const wrap      = this.modal.querySelector('#te-ann-editor-wrap');
-        const host      = this.modal.querySelector('#te-ann-cm-host');
-        const saveBtn   = this.modal.querySelector('#te-ann-save-btn');
-        const cancelBtn = this.modal.querySelector('#te-ann-cancel-btn');
-        const addBtn    = this.modal.querySelector('#te-ann-add-btn');
+        const wrap    = this.modal.querySelector('#te-ann-editor-wrap');
+        const host    = this.modal.querySelector('#te-ann-cm-host');
+        const saveBtn = this.modal.querySelector('#te-ann-save-btn');
+        const addBtn  = this.modal.querySelector('#te-ann-add-btn');
         if (!wrap || !host) return;
+
+        // Hide the main form actions so only one Save is visible at a time
+        const actions = this.modal.querySelector('.te-actions');
+        if (actions) actions.style.display = 'none';
 
         // Destroy any previous CM instance
         if (this._annCm) { this._annCm.destroy(); this._annCm = null; }
@@ -784,14 +794,21 @@ class TaskEditor {
             this._hideAnnEditor();
         };
 
-        cancelBtn.onclick = () => this._hideAnnEditor();
+        // Escape dismisses the annotation editor
+        wrap._escHandler = (e) => { if (e.key === 'Escape') { e.stopPropagation(); this._hideAnnEditor(); } };
+        wrap.addEventListener('keydown', wrap._escHandler);
     }
 
     _hideAnnEditor() {
-        const wrap   = this.modal.querySelector('#te-ann-editor-wrap');
-        const addBtn = this.modal.querySelector('#te-ann-add-btn');
-        if (wrap)   wrap.style.display = 'none';
-        if (addBtn) addBtn.style.display = '';
+        const wrap    = this.modal.querySelector('#te-ann-editor-wrap');
+        const addBtn  = this.modal.querySelector('#te-ann-add-btn');
+        const actions = this.modal.querySelector('.te-actions');
+        if (wrap) {
+            if (wrap._escHandler) { wrap.removeEventListener('keydown', wrap._escHandler); delete wrap._escHandler; }
+            wrap.style.display = 'none';
+        }
+        if (addBtn)  addBtn.style.display  = '';
+        if (actions) actions.style.display = '';
         this.modal.querySelectorAll('.te-ann-row').forEach(r => r.classList.remove('te-ann-editing'));
         if (this._annCm) { this._annCm.destroy(); this._annCm = null; }
         const host = this.modal.querySelector('#te-ann-cm-host');
