@@ -94,7 +94,7 @@ async function kbReload(preserveView = false) {
             kbColOffset     = savedOffset;
         }
         kbRenderBoard();
-        window.twNav?.setCount(kbAllTasks.length, kbUnassignedSrc.length);
+        window.twNav?.setCount(kbAllTasks.filter(t => t.state).length, kbUnassignedSrc.length);
     } catch (e) {
         console.error('Kanban load failed:', e);
         document.dispatchEvent(new CustomEvent('tw-show-notification',

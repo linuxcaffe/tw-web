@@ -169,6 +169,16 @@ body.cal-page .app-container {
     border-bottom: 1px solid var(--border-color);
     background: #fafafa;
 }
+.cal-unscheduled-title {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary, #555);
+    padding-left: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 .tasks-container {
     flex: 1;

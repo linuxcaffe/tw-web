@@ -44,12 +44,11 @@ function _writeCache(params, cacheKey, allFetched, plannedTasks, due) {
     } catch {}
 }
 
-function _applyLoaded(myId, allFetched, plannedTasks, due, params) {
+function _applyLoaded(myId, allFetched, plannedTasks, due) {
     if (myId !== _loadId) return;
     dueTasks       = due;
     unplannedTasks = allFetched.filter(t => !t.scheduled && !t.due);
     allTasks       = [...unplannedTasks, ...plannedTasks];
-    window.twNav?.setGrandTotal(allFetched.length, params);
     applyFiltersAndDisplay();
     processTasksForCalendar(plannedTasks);
 }
@@ -477,7 +476,7 @@ function loadTasks() {
     // Serve from cache when clean and fresh — skips all three fetches
     const cached = _readCache(params, calParams);
     if (cached) {
-        _applyLoaded(myId, cached.allFetched, cached.plannedTasks, cached.due, params);
+        _applyLoaded(myId, cached.allFetched, cached.plannedTasks, cached.due);
         return;
     }
 
@@ -496,7 +495,7 @@ function loadTasks() {
             const due          = dueData.success      ? (dueData.data  || []) : [];
 
             _writeCache(params, calParams, allFetched, plannedTasks, due);
-            _applyLoaded(myId, allFetched, plannedTasks, due, params);
+            _applyLoaded(myId, allFetched, plannedTasks, due);
         })
         .catch(err => {
             if (myId !== _loadId) return;   // stale — a newer call is handling things
@@ -522,10 +521,10 @@ function processTasksForCalendar(scheduledTasks) {
     }
 
     const events = [];
-    scheduledTasks.filter(matchesNavFilter).forEach(task => {
+    scheduledTasks.forEach(task => {
         try { const e = createCalendarEvent(task); if (e) events.push(e); } catch (_) {}
     });
-    dueTasks.filter(matchesNavFilter).forEach(task => {
+    dueTasks.forEach(task => {
         try { const e = createDueEvent(task); if (e) events.push(e); } catch (_) {}
     });
 
@@ -718,13 +717,23 @@ function matchesNavFilter(task) {
 }
 
 function applyFiltersAndDisplay() {
-    // Nav counter mirrors agenda: tasks on the calendar (planned+due), not the unscheduled sidebar
+    // Nav counter: dated tasks (calendar events) — status-only, no context, no text filter
+    const navState      = window.twNav ? window.twNav.getState() : {};
+    const calParams     = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(','));
     const calendarTasks = [...allTasks.filter(t => t.scheduled), ...dueTasks];
-    const calFiltered   = calendarTasks.filter(matchesNavFilter);
-    const p  = window.twNav?.stateToParams() ?? '';
-    const gt = window.twNav?.getGrandTotal(p) ?? calendarTasks.length;
-    window.twNav?.setCount(calFiltered.length, gt);
+    let gt = window.twNav?.getGrandTotal(calParams) ?? null;
+    window.twNav?.setCount(calendarTasks.length, gt ?? calendarTasks.length);
+    if (gt === null && window.twNav) {
+        fetch('/api/tasks?' + calParams).then(r => r.json()).then(data => {
+            if (data.success && Array.isArray(data.tasks)) {
+                gt = data.tasks.length;
+                window.twNav.setGrandTotal(gt, calParams);
+                window.twNav.setCount(calendarTasks.length, gt);
+            }
+        }).catch(() => {});
+    }
 
+    // Drag-list: always pending + context + nav filter
     const filtered = unplannedTasks.filter(matchesNavFilter);
     const title = document.getElementById('cal-unscheduled-title');
     if (title) title.textContent = `${filtered.length} Unscheduled`;
