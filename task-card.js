@@ -190,7 +190,7 @@ class TaskCardManager {
             'due','scheduled','sched_duration',
             'entry','modified','start','end',
             'annotations','mask','imask','parent',
-            'id','urgency',
+            'id','urgency','depends','wait','recur',
         ]);
         const pairs = [];  // {key, text} — sorted alpha after id
 
