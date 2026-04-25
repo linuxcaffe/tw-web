@@ -90,8 +90,16 @@
         return null;
     }
 
+    function showOutput(text) {
+        const out = document.getElementById('tw-cmd-output');
+        if (!out) return;
+        out.innerHTML = `<button id="tw-cmd-output-close" title="Close">×</button><span>${esc(String(text))}</span>`;
+        out.classList.add('active');
+        document.getElementById('tw-cmd-output-close')?.addEventListener('click', _hideCmdOutput);
+    }
+
     window.twNav = { getState, setState, stateToParams, setCount, setGrandTotal, getGrandTotal,
-                     openSyncDialog, initProjectsSidebar, initTagsSidebar, showNotification };
+                     openSyncDialog, initProjectsSidebar, initTagsSidebar, showNotification, showOutput };
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     function activePage() {
@@ -167,10 +175,50 @@
     color: #fff; font-size: 13px; padding: 5px 0;
 }
 .tw-filter-wrap input::placeholder { color: rgba(255,255,255,0.35); }
-#tw-filter-input  { width: 90px;  min-width: 28px; }
-#tw-pri-input     { width: 42px;  min-width: 20px; }
+#tw-filter-input  { width: 110px; min-width: 30px; }
+#tw-pri-input     { width: 26px;  min-width: 14px; }
 #tw-project-input { width: 80px;  min-width: 28px; }
 #tw-tags-input    { width: 70px;  min-width: 28px; }
+
+/* mode-toggle icon button */
+#tw-mode-toggle {
+    background: none; border: none; color: rgba(255,255,255,0.5);
+    cursor: pointer; font-size: 16px; padding: 2px 4px; border-radius: 4px;
+    flex-shrink: 0; line-height: 1;
+}
+#tw-mode-toggle:hover { color: #fff; background: rgba(255,255,255,0.12); }
+#tw-mode-toggle.cmd-active { color: #3498db; }
+
+/* filter inputs group */
+#tw-filter-inputs { display: flex; align-items: center; gap: 4px; }
+
+/* command section */
+#tw-cmd-section { display: none; flex: 1; align-items: center; gap: 4px; min-width: 0; }
+#tw-cmd-section.active { display: flex; }
+.tw-cmd-wrap { flex: 1; min-width: 0; }
+.tw-cmd-wrap input { width: 100%; min-width: 80px; font-family: monospace; }
+#tw-cmd-run {
+    background: rgba(255,255,255,0.12); border: none; color: rgba(255,255,255,0.8);
+    cursor: pointer; font-size: 15px; padding: 3px 8px; border-radius: 4px; flex-shrink: 0;
+}
+#tw-cmd-run:hover { background: #3498db; color: #fff; }
+
+/* command output bar */
+#tw-cmd-output {
+    display: none; background: #111827; color: #d4d4d8;
+    font-family: monospace; font-size: 12px; line-height: 1.5;
+    padding: 6px 14px; white-space: pre-wrap;
+    max-height: 180px; overflow-y: auto;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    position: relative;
+}
+#tw-cmd-output.active { display: block; }
+#tw-cmd-output-close {
+    position: absolute; top: 4px; right: 8px;
+    background: none; border: none; color: rgba(255,255,255,0.35);
+    cursor: pointer; font-size: 14px; padding: 0 2px; line-height: 1;
+}
+#tw-cmd-output-close:hover { color: #fff; }
 .tw-inp-clear {
     background: none; border: none; color: rgba(255,255,255,0.4);
     cursor: pointer; font-size: 14px; padding: 0 1px; line-height: 1; display: none;
@@ -418,7 +466,8 @@
     }
     .tw-bar-left  { flex-wrap: wrap; width: 100%; justify-content: flex-start; }
     .tw-bar-right { flex-wrap: wrap; width: 100%; justify-content: flex-end; }
-    #tw-filter-input, #tw-pri-input, #tw-project-input, #tw-tags-input { width: 55px; min-width: 22px; }
+    #tw-filter-input, #tw-project-input, #tw-tags-input { width: 55px; min-width: 22px; }
+    #tw-pri-input { width: 22px; min-width: 14px; }
     .tw-name-full  { display: none; }
     .tw-name-short { display: inline; }
 }
@@ -441,21 +490,30 @@
                 links +
             `</div>` +
             `<div class="tw-bar-right">` +
-                `<div class="tw-filter-wrap">` +
-                    `<input id="tw-filter-input"  type="text" placeholder="filter.."  autocomplete="off">` +
-                    `<button class="tw-inp-clear" id="tw-filter-clear"  title="Clear">×</button>` +
+                `<button id="tw-mode-toggle" title="Toggle: filters / command mode (f)">⇅</button>` +
+                `<div id="tw-filter-inputs">` +
+                    `<div class="tw-filter-wrap">` +
+                        `<input id="tw-filter-input"  type="text" placeholder="filter.."  autocomplete="off">` +
+                        `<button class="tw-inp-clear" id="tw-filter-clear"  title="Clear">×</button>` +
+                    `</div>` +
+                    `<div class="tw-filter-wrap">` +
+                        `<input id="tw-pri-input"     type="text" placeholder="p.."       autocomplete="off">` +
+                        `<button class="tw-inp-clear" id="tw-pri-clear"    title="Clear">×</button>` +
+                    `</div>` +
+                    `<div class="tw-filter-wrap">` +
+                        `<input id="tw-project-input" type="text" placeholder="project.." autocomplete="off">` +
+                        `<button class="tw-inp-clear" id="tw-project-clear" title="Clear">×</button>` +
+                    `</div>` +
+                    `<div class="tw-filter-wrap">` +
+                        `<input id="tw-tags-input"    type="text" placeholder="tags.."    autocomplete="off">` +
+                        `<button class="tw-inp-clear" id="tw-tags-clear"   title="Clear">×</button>` +
+                    `</div>` +
                 `</div>` +
-                `<div class="tw-filter-wrap">` +
-                    `<input id="tw-pri-input"     type="text" placeholder="pri.."     autocomplete="off">` +
-                    `<button class="tw-inp-clear" id="tw-pri-clear"    title="Clear">×</button>` +
-                `</div>` +
-                `<div class="tw-filter-wrap">` +
-                    `<input id="tw-project-input" type="text" placeholder="project.." autocomplete="off">` +
-                    `<button class="tw-inp-clear" id="tw-project-clear" title="Clear">×</button>` +
-                `</div>` +
-                `<div class="tw-filter-wrap">` +
-                    `<input id="tw-tags-input"    type="text" placeholder="tags.."    autocomplete="off">` +
-                    `<button class="tw-inp-clear" id="tw-tags-clear"   title="Clear">×</button>` +
+                `<div id="tw-cmd-section">` +
+                    `<div class="tw-filter-wrap tw-cmd-wrap">` +
+                        `<input id="tw-cmd-input" type="text" placeholder="task command…" autocomplete="off" spellcheck="false">` +
+                    `</div>` +
+                    `<button id="tw-cmd-run" title="Run (Enter)">↵</button>` +
                 `</div>` +
                 `<div id="tw-add-area" title="Add task">` +
                     `<span id="tw-count" class="tw-count"></span>` +
@@ -534,6 +592,56 @@
             b.classList.toggle('active', state.statuses.includes(b.dataset.status)));
     }
 
+    // ── Command mode ─────────────────────────────────────────────────────────
+    let _cmdMode = false;
+
+    function _toggleCmdMode() {
+        _cmdMode = !_cmdMode;
+        document.getElementById('tw-mode-toggle')?.classList.toggle('cmd-active', _cmdMode);
+        const fi = document.getElementById('tw-filter-inputs');
+        const cs = document.getElementById('tw-cmd-section');
+        if (fi) fi.style.display = _cmdMode ? 'none' : '';
+        if (cs) cs.classList.toggle('active', _cmdMode);
+        if (_cmdMode) {
+            document.getElementById('tw-cmd-input')?.focus();
+        } else {
+            document.getElementById('tw-filter-input')?.focus();
+            _hideCmdOutput();
+        }
+    }
+
+    function _hideCmdOutput() {
+        const out = document.getElementById('tw-cmd-output');
+        if (out) { out.classList.remove('active'); out.textContent = ''; }
+    }
+
+    async function _runCmd() {
+        const inp = document.getElementById('tw-cmd-input');
+        const cmd = (inp?.value || '').trim();
+        if (!cmd) return;
+        const out = document.getElementById('tw-cmd-output');
+        if (out) { out.innerHTML = '<button id="tw-cmd-output-close" title="Close">×</button>Running…'; out.classList.add('active'); }
+        try {
+            const res  = await fetch('/api/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cmd }),
+            });
+            const data = await res.json();
+            const text = [data.stdout, data.stderr].filter(Boolean).join('\n').trim()
+                      || (data.success ? 'Done.' : data.error || 'Error (no output)');
+            if (out) {
+                out.innerHTML = `<button id="tw-cmd-output-close" title="Close">×</button><span>${esc(text)}</span>`;
+                out.classList.add('active');
+                document.getElementById('tw-cmd-output-close')?.addEventListener('click', _hideCmdOutput);
+            }
+            // Refresh task list after any command
+            document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
+        } catch (err) {
+            if (out) { out.innerHTML = `<button id="tw-cmd-output-close" title="Close">×</button><span>Network error: ${esc(err.message)}</span>`; out.classList.add('active'); document.getElementById('tw-cmd-output-close')?.addEventListener('click', _hideCmdOutput); }
+        }
+    }
+
     // ── Side menu ─────────────────────────────────────────────────────────────
     let _kbNav = false;  // true when last interaction was keyboard-driven
     document.addEventListener('keydown',   () => { _kbNav = true;  }, { capture: true });
@@ -578,6 +686,15 @@
         wireInput('tw-pri-input',     'tw-pri-clear',     'priority');
         wireInput('tw-project-input', 'tw-project-clear', 'project');
         wireInput('tw-tags-input',    'tw-tags-clear',    'tags');
+
+        // Mode toggle + command mode
+        document.getElementById('tw-mode-toggle')?.addEventListener('click', _toggleCmdMode);
+        document.getElementById('tw-cmd-run')?.addEventListener('click', _runCmd);
+        document.getElementById('tw-cmd-input')?.addEventListener('keydown', e => {
+            if (e.key === 'Enter')  { e.preventDefault(); _runCmd(); }
+            if (e.key === 'Escape') { e.target.value = ''; _hideCmdOutput(); }
+            // Escape bubbles to global handler which blurs the input and focuses the logo button
+        });
 
         // Logo → side menu
         document.getElementById('tw-logo-btn').addEventListener('click', openMenu);
@@ -692,8 +809,11 @@
         const backdrop = document.createElement('div');
         backdrop.id = 'tw-menu-backdrop';
 
-        // Insert order: navBar first child → btnBar → filterBar → sideMenu → backdrop
-        [backdrop, sideMenu, filterBar, btnBar, navBar].forEach(el =>
+        const cmdOutput = document.createElement('div');
+        cmdOutput.id = 'tw-cmd-output';
+
+        // Insert order: navBar first → btnBar → filterBar → cmdOutput → sideMenu → backdrop
+        [backdrop, sideMenu, cmdOutput, filterBar, btnBar, navBar].forEach(el =>
             document.body.insertBefore(el, document.body.firstChild));
 
         // Sync dialog — appended to body, managed entirely by nav.js
@@ -1526,8 +1646,7 @@
                 document.dispatchEvent(new CustomEvent('tw-open-add'));
             } else if (k === 'f') {
                 e.preventDefault();
-                const fi = document.getElementById('tw-filter-input');
-                if (fi) { fi.focus(); fi.select(); }
+                document.getElementById('tw-mode-toggle')?.focus();
             } else if (k === 'c') {
                 e.preventDefault();
                 document.querySelector('.tw-ctx-btn')?.focus();

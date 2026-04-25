@@ -43,20 +43,19 @@ class TaskActionHandler {
                 if (data.deferred_cmd) {
                     window.twTerminal?.offerTerminal(data.deferred_cmd);
                 }
-                if (data.warnings && data.warnings.length > 0) {
-                    this.showNotification(data.warnings.join(' | '), 'warning');
-                } else {
-                    this.showNotification(`Task ${action} successful`, 'success');
-                }
+                const msg = data.warnings?.length
+                    ? data.warnings.join('\n')
+                    : (data.message || `Task ${action} successful`);
+                window.twNav?.showOutput(msg);
             } else if (data.terminal_launched) {
-                this.showNotification('Opening in terminal…', 'info');
+                window.twNav?.showOutput('Opening in terminal…');
             } else if (data.timed_out && data.cmd) {
                 window.twTerminal?.offerTerminal(data.cmd);
             } else {
-                this.showNotification(data.message || data.error || `Failed to ${action} task`, 'error');
+                window.twNav?.showOutput(data.message || data.error || `Failed to ${action} task`);
             }
         } catch (error) {
-            this.showNotification('Network error: ' + error.message, 'error');
+            window.twNav?.showOutput('Network error: ' + error.message);
         }
     }
     

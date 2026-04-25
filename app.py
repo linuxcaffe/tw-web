@@ -327,6 +327,22 @@ def run_command(args):
     except Exception as e:
         return {'success': False, 'stdout': '', 'stderr': str(e), 'returncode': -1}
 
+@app.route('/api/run', methods=['POST'])
+def api_run():
+    """Expert command mode: run an arbitrary task command verbatim."""
+    data = request.get_json(silent=True) or {}
+    cmd_str = (data.get('cmd') or '').strip()
+    if not cmd_str:
+        return jsonify({'success': False, 'error': 'No command provided'})
+    try:
+        args = shlex.split(cmd_str)
+    except ValueError as e:
+        return jsonify({'success': False, 'error': f'Parse error: {e}'})
+    if not args:
+        return jsonify({'success': False, 'error': 'Empty command'})
+    result = run_task_command(args)
+    return jsonify(result)
+
 @app.route('/api/debug', methods=['POST'])
 def api_debug():
     """Temporary JS error logging endpoint"""
