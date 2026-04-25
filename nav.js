@@ -22,6 +22,7 @@
     const DEBOUNCE = 400;            // ms — filter input debounce
 
     const STATE_KEY    = 'tw-nav-state';
+    const RAW_FILTER_KEY = 'tw-raw-filter';
     const CTX_KEY      = 'tw-contexts';
     const CTX_FILT_KEY = 'tw-ctx-filters';
     const COUNT_KEY    = 'tw-count-text';
@@ -59,7 +60,26 @@
         _updateFilterBar(next);
         document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: { ...next, clientOnly } }));
     }
+    // Raw filter: complete TW expression override — survives page navigation via sessionStorage
+    let _rawFilter = '';
+    try { _rawFilter = sessionStorage.getItem(RAW_FILTER_KEY) || ''; } catch {}
+
+    function setRawFilter(expr) {
+        _rawFilter = expr.trim();
+        try { sessionStorage.setItem(RAW_FILTER_KEY, _rawFilter); } catch {}
+        _updateFilterBar(getState());
+        document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
+    }
+    function clearRawFilter() {
+        if (!_rawFilter) return;
+        _rawFilter = '';
+        try { sessionStorage.removeItem(RAW_FILTER_KEY); } catch {}
+        _updateFilterBar(getState());
+        document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
+    }
+
     function stateToParams(state) {
+        if (_rawFilter) return 'rawfilter=' + encodeURIComponent(_rawFilter);
         state = state || getState();
         const p = new URLSearchParams();
         if (state.statuses && state.statuses.length) p.set('status', state.statuses.join(','));
@@ -99,7 +119,8 @@
     }
 
     window.twNav = { getState, setState, stateToParams, setCount, setGrandTotal, getGrandTotal,
-                     openSyncDialog, initProjectsSidebar, initTagsSidebar, showNotification, showOutput };
+                     openSyncDialog, initProjectsSidebar, initTagsSidebar, showNotification, showOutput,
+                     setRawFilter, clearRawFilter };
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     function activePage() {
@@ -263,6 +284,13 @@
 #tw-filter-bar.active { display: flex; }
 .tw-fbar-item strong { color: rgba(255,255,255,0.65); font-weight: 500; }
 .tw-fbar-sep { color: rgba(255,255,255,0.2); }
+.tw-fbar-raw { color: rgba(255,255,255,0.75); font-family: monospace; }
+.tw-fbar-raw strong { color: #3498db; }
+.tw-fbar-raw-clear {
+    background: none; border: none; color: rgba(255,255,255,0.35);
+    cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; margin-left: 4px;
+}
+.tw-fbar-raw-clear:hover { color: #fff; }
 
 /* terminal offer banner */
 #tw-terminal-offer {
@@ -545,6 +573,14 @@
     function _updateFilterBar(state) {
         const bar = document.getElementById('tw-filter-bar');
         if (!bar) return;
+        if (_rawFilter) {
+            bar.innerHTML =
+                `<span class="tw-fbar-item tw-fbar-raw"><strong>⊞</strong> ${esc(_rawFilter)}</span>` +
+                `<button class="tw-fbar-raw-clear" title="Clear (Esc)">×</button>`;
+            bar.classList.add('active');
+            bar.querySelector('.tw-fbar-raw-clear')?.addEventListener('click', clearRawFilter);
+            return;
+        }
         const parts = [];
         if (state.context) {
             const ctxFilters = ss(CTX_FILT_KEY) || {};
@@ -634,11 +670,11 @@
         const cmd = (inp?.value || '').trim();
         if (!cmd) return;
 
-        // Filter-only expression (no command verb) → apply as List page filter
+        // Filter-only expression (no command verb) → raw filter override on List page
         if (_isFilterOnly(cmd)) {
-            setState({ filter: cmd }, { clientOnly: true });
             inp.value = '';
             if (_cmdMode) _toggleCmdMode();
+            setRawFilter(cmd);
             if (window.location.pathname !== '/') {
                 window.location.href = '/';
             }
@@ -1645,9 +1681,10 @@
             const tag = (e.target.tagName || '').toLowerCase();
             const inInput = tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable;
 
-            // Escape always returns focus to logo — essential for escaping filter inputs
+            // Escape: clear raw filter if active, then blur + focus logo
             if (k === 'Escape') {
                 if (inInput) e.target.blur();
+                if (_rawFilter) clearRawFilter();
                 document.getElementById('tw-logo-btn')?.focus();
                 e.preventDefault();
                 return;

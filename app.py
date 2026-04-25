@@ -442,22 +442,29 @@ def _build_task_filter(statuses, filter_text):
 def get_tasks():
     """Get all pending tasks in JSON format.
     Query params: status (comma-separated), filter (text), context (name).
+    rawfilter: complete TW filter expression override — bypasses all other params.
     """
-    statuses    = [s.strip() for s in request.args.get('status', 'pending').split(',') if s.strip()]
-    # Sanitise filter text: keep only alphanumeric, spaces, and common safe chars
-    raw_filter  = request.args.get('filter', '').strip()
-    filter_text = re.sub(r'[^\w\s\-\.]', '', raw_filter)[:80]
-    context     = request.args.get('context', '').strip()
+    rawfilter = request.args.get('rawfilter', '').strip()
+    if rawfilter:
+        try:
+            filter_args = shlex.split(rawfilter)
+        except ValueError as e:
+            return jsonify({'success': False, 'error': f'Invalid filter: {e}'}), 400
+        args = ['task', 'rc.context=none'] + filter_args + ['export']
+    else:
+        statuses    = [s.strip() for s in request.args.get('status', 'pending').split(',') if s.strip()]
+        raw_filter  = request.args.get('filter', '').strip()
+        filter_text = re.sub(r'[^\w\s\-\.]', '', raw_filter)[:80]
+        context     = request.args.get('context', '').strip()
 
-    args = ['task']
-    # Apply context as an inline filter (no rc.context= so TW state is never mutated)
-    if context:
-        ctx_filters = _get_context_filters()
-        ctx_expr = ctx_filters.get(context)
-        if ctx_expr:
-            args += ['(', ctx_expr, ')']
-    args += _build_task_filter(statuses, filter_text)
-    args.append('export')
+        args = ['task']
+        if context:
+            ctx_filters = _get_context_filters()
+            ctx_expr = ctx_filters.get(context)
+            if ctx_expr:
+                args += ['(', ctx_expr, ')']
+        args += _build_task_filter(statuses, filter_text)
+        args.append('export')
 
     result = run_task_command(args, readonly=True)
 
