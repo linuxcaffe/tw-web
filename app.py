@@ -245,7 +245,7 @@ TASK_TIMEOUT = 15
 # so the frontend can offer "Run in terminal" with the full task command.
 TW_INTERACTIVE_MARKER = 'TW_INTERACTIVE_REQUIRED'
 
-def run_task_command(args, readonly=False, extra_overrides=None):
+def run_task_command(args, readonly=False, extra_overrides=None, extra_env=None):
     """Execute a TaskWarrior command and return the result.
     args must be a list, e.g. ['task', 'status:pending', 'export'].
     shell=True is intentionally not used.
@@ -279,9 +279,10 @@ def run_task_command(args, readonly=False, extra_overrides=None):
                 'returncode': 0
             }
 
+        env = {**_TW_ENV, **(extra_env or {})}
         result = subprocess.run(
             args, capture_output=True, text=True,
-            env=_TW_ENV, timeout=TASK_TIMEOUT
+            env=env, timeout=TASK_TIMEOUT
         )
         out = {
             'success': result.returncode == 0,
@@ -334,11 +335,58 @@ def run_command(args):
     except Exception as e:
         return {'success': False, 'stdout': '', 'stderr': str(e), 'returncode': -1}
 
+# ── Preflight helpers for /api/run ───────────────────────────────────────────
+_MUTATING_VERBS = {
+    'add', 'modify', 'mod', 'mo',
+    'delete', 'del', 'dele',
+    'done', 'do', 'don',
+    'start', 'sta', 'star',
+    'stop', 'sto',
+    'annotate', 'ann', 'anno',
+    'append', 'app', 'appe',
+    'prepend', 'pre', 'prep',
+    'duplicate', 'dup', 'dupl',
+    'purge', 'pur',
+}
+# Verbs that act on a single implicit target — no bulk risk
+_BULK_SAFE_VERBS = {'add', 'sync', 'sy', 'syn', 'undo', 'un', 'und', 'import', 'im', 'imp'}
+
+def _parse_preflight(args):
+    """Split user args into (filter_args, verb).  Ignores rc.xxx tokens."""
+    filter_args, verb = [], None
+    for tok in args:
+        if tok.startswith('rc.') or tok == 'task':
+            continue
+        if verb is None and tok.lower() in _MUTATING_VERBS:
+            verb = tok.lower()
+            break
+        filter_args.append(tok)
+    return filter_args, verb
+
+def _detect_preflight(stderr):
+    """Return the parsed preflight signal dict if present in stderr, else None."""
+    for line in stderr.splitlines():
+        line = line.strip()
+        if not line.startswith('{'):
+            continue
+        try:
+            data = json.loads(line)
+            if data.get('type') == 'tw_preflight':
+                return data
+        except json.JSONDecodeError:
+            pass
+    return None
+
 @app.route('/api/run', methods=['POST'])
 def api_run():
-    """Expert command mode: run an arbitrary task command verbatim."""
+    """Expert command mode: run an arbitrary task command verbatim.
+    On first call, the on-launch preflight hook may block bulk operations and
+    return {"preflight":true,...}.  Re-POST with confirmed:true to proceed.
+    """
     data = request.get_json(silent=True) or {}
-    cmd_str = (data.get('cmd') or '').strip()
+    cmd_str   = (data.get('cmd') or '').strip()
+    confirmed = bool(data.get('confirmed', False))
+
     if not cmd_str:
         return jsonify({'success': False, 'error': 'No command provided'})
     try:
@@ -347,7 +395,32 @@ def api_run():
         return jsonify({'success': False, 'error': f'Parse error: {e}'})
     if not args:
         return jsonify({'success': False, 'error': 'Empty command'})
-    result = run_task_command(args, extra_overrides=['rc.bulk=0'])
+
+    # Build env extras for the preflight hook protocol
+    extra_env = {}
+    if confirmed:
+        extra_env['TW_PREFLIGHT_CONFIRMED'] = '1'
+    else:
+        filter_args, verb = _parse_preflight(args)
+        if verb and verb not in _BULK_SAFE_VERBS and filter_args:
+            extra_env['TW_PREFLIGHT_VERB']   = verb
+            extra_env['TW_PREFLIGHT_FILTER'] = ' '.join(filter_args)
+            extra_env['TW_PREFLIGHT_CMD']    = cmd_str
+
+    result = run_task_command(args, extra_overrides=['rc.bulk=0'], extra_env=extra_env)
+
+    # Check if the preflight hook blocked the command
+    if not result['success'] and not confirmed:
+        signal = _detect_preflight(result.get('stderr', ''))
+        if signal:
+            return jsonify({
+                'preflight': True,
+                'count':     signal['count'],
+                'verb':      signal['verb'],
+                'filter':    signal['filter'],
+                'cmd':       cmd_str,
+            })
+
     return jsonify(result)
 
 @app.route('/api/debug', methods=['POST'])

@@ -240,6 +240,14 @@
     cursor: pointer; font-size: 14px; padding: 0 2px; line-height: 1;
 }
 #tw-cmd-output-close:hover { color: #fff; }
+.tw-preflight-yes, .tw-preflight-no {
+    border: none; border-radius: 4px; cursor: pointer;
+    font-size: 12px; padding: 3px 10px; margin-left: 10px;
+}
+.tw-preflight-yes { background: #27ae60; color: #fff; }
+.tw-preflight-yes:hover { background: #2ecc71; }
+.tw-preflight-no  { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7); }
+.tw-preflight-no:hover  { background: rgba(255,255,255,0.22); color: #fff; }
 .tw-inp-clear {
     background: none; border: none; color: rgba(255,255,255,0.4);
     cursor: pointer; font-size: 14px; padding: 0 1px; line-height: 1; display: none;
@@ -733,7 +741,13 @@
         }
 
         const out = document.getElementById('tw-cmd-output');
-        if (out) { out.innerHTML = '<button id="tw-cmd-output-close" title="Close">×</button>Running…'; out.classList.add('active'); }
+        function _showOut(html) {
+            if (!out) return;
+            out.innerHTML = `<button id="tw-cmd-output-close" title="Close">×</button>${html}`;
+            out.classList.add('active');
+            document.getElementById('tw-cmd-output-close')?.addEventListener('click', _hideCmdOutput);
+        }
+        _showOut('Running…');
         try {
             const res  = await fetch('/api/run', {
                 method: 'POST',
@@ -741,16 +755,39 @@
                 body: JSON.stringify({ cmd }),
             });
             const data = await res.json();
+
+            if (data.preflight) {
+                _showOut(
+                    `<span>This will <strong>${esc(data.verb)}</strong> <strong>${data.count}</strong> tasks` +
+                    ` matching <code>${esc(data.filter)}</code>. Proceed?</span>` +
+                    `<button class="tw-preflight-yes">Yes, do it</button>` +
+                    `<button class="tw-preflight-no">Cancel</button>`
+                );
+                out.querySelector('.tw-preflight-yes')?.addEventListener('click', async () => {
+                    _showOut('Running…');
+                    try {
+                        const r2   = await fetch('/api/run', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ cmd, confirmed: true }),
+                        });
+                        const d2   = await r2.json();
+                        const txt2 = [d2.stdout, d2.stderr].filter(Boolean).join('\n').trim()
+                                  || (d2.success ? 'Done.' : d2.error || 'Error (no output)');
+                        _showOut(`<span>${esc(txt2)}</span>`);
+                        document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
+                    } catch (e) { _showOut(`<span>Network error: ${esc(e.message)}</span>`); }
+                });
+                out.querySelector('.tw-preflight-no')?.addEventListener('click', _hideCmdOutput);
+                return;
+            }
+
             const text = [data.stdout, data.stderr].filter(Boolean).join('\n').trim()
                       || (data.success ? 'Done.' : data.error || 'Error (no output)');
-            if (out) {
-                out.innerHTML = `<button id="tw-cmd-output-close" title="Close">×</button><span>${esc(text)}</span>`;
-                out.classList.add('active');
-                document.getElementById('tw-cmd-output-close')?.addEventListener('click', _hideCmdOutput);
-            }
+            _showOut(`<span>${esc(text)}</span>`);
             document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
         } catch (err) {
-            if (out) { out.innerHTML = `<button id="tw-cmd-output-close" title="Close">×</button><span>Network error: ${esc(err.message)}</span>`; out.classList.add('active'); document.getElementById('tw-cmd-output-close')?.addEventListener('click', _hideCmdOutput); }
+            _showOut(`<span>Network error: ${esc(err.message)}</span>`);
         }
     }
 
