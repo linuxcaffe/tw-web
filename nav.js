@@ -643,18 +643,44 @@
         try { localStorage.setItem(_HIST_KEY, JSON.stringify(_cmdHistory)); } catch {}
     }
 
-    // Known TW verbs and report names — bare tokens only, so "+list" or "pro:list" won't match
+    // Known TW verbs + common abbreviations — bare tokens only ("+list" or "pro:list" won't match)
     const _TW_CMDS = new Set([
+        // full verbs
         'add','annotate','append','calc','completed','config','count',
         'delete','denotate','done','duplicate','edit','execute','export',
         'help','import','log','modify','prepend','purge','start','stop',
         'sync','undo','version',
-        'list','all','long','ls','minimal','newest','next','oldest',
-        'overdue','ready','recurring','unblocked','waiting','blocked',
+        // common abbreviations TW accepts
+        'mod','mo',                          // modify
+        'do','don',                          // done
+        'del','dele',                        // delete
+        'sta','star',                        // start
+        'sto',                               // stop
+        'ann','anno',                        // annotate
+        'app','appe',                        // append
+        'pre','prep',                        // prepend
+        'dup','dupl',                        // duplicate
+        'ed','edi',                          // edit
+        'ex','exp',                          // execute/export
+        'im','imp',                          // import
+        'sy','syn',                          // sync
+        'un','und',                          // undo
+        'co','con','conf',                   // config
+        'co','cou',                          // count
+        // report names + abbreviations
+        'list','li','lis',
+        'all','al',
+        'long','lo','lon',
+        'ls','minimal','newest','next','ne','nex',
+        'oldest','overdue','ready','recurring',
+        'unblocked','waiting','blocked',
         'burndown','calendar','ghistory','history','summary','timesheet',
     ]);
     function _isFilterOnly(cmd) {
-        return !cmd.split(/\s+/).some(tok => _TW_CMDS.has(tok.toLowerCase()));
+        const tokens = cmd.trim().split(/\s+/);
+        // Any expression starting with a bare number is a task-ID reference → command
+        if (/^\d+(-\d+)?(,\d+(-\d+)?)*$/.test(tokens[0])) return false;
+        return !tokens.some(tok => _TW_CMDS.has(tok.toLowerCase()));
     }
 
     let _cmdMode = false;
