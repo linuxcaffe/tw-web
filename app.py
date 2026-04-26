@@ -726,14 +726,23 @@ def get_projects():
 
 @app.route('/api/tags')
 def get_tags():
-    """Get unique user-visible tags. ?active=1 restricts to pending tasks only."""
-    active_only = request.args.get('active', '0') == '1'
-    cmd = ['task', 'status:pending', '_tags'] if active_only else ['task', '_tags']
-    result = run_task_command(cmd, readonly=True)
+    """Get user-visible tags with pending-task counts.
+    Returns {tags: [...], counts: {tag: n}} sorted alphabetically.
+    Active-mode sidebar uses client-side counts from tw-tasks-loaded event instead.
+    """
+    result = run_task_command(['task', 'status:pending', 'export'], readonly=True)
     if result['success']:
-        tags = [t.strip() for t in result['stdout'].split('\n')
-                if t.strip() and not t.strip().isupper()]
-        return jsonify({'success': True, 'tags': tags})
+        try:
+            tasks = json.loads(result['stdout'] or '[]')
+        except Exception:
+            tasks = []
+        counts = {}
+        for t in tasks:
+            for tag in (t.get('tags') or []):
+                if tag and not tag.isupper():
+                    counts[tag] = counts.get(tag, 0) + 1
+        tags = sorted(counts.keys())
+        return jsonify({'success': True, 'tags': tags, 'counts': counts})
     return jsonify({'success': False, 'error': result['stderr']}), 500
 
 @app.route('/api/stats')

@@ -67,7 +67,7 @@ body {
 .list-sidebar .tw-panel-error { color: #c0392b; padding: 10px 12px; font-size: 12px; }
 
 /* Responsive: tags hide first, then projects */
-@media (max-width: 1100px) { .list-tags-sidebar  { display: none; } }
+@media (max-width: 860px)  { .list-tags-sidebar  { display: none; } }
 @media (max-width: 800px)  { .list-proj-sidebar  { display: none; } }
 
 /* List page header row */

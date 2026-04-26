@@ -450,6 +450,7 @@ class TaskWarriorUI {
         this.updateProjectsList();
 
         if (window.twNav) window.twNav.setCount(filteredTasks.length, this.serverTotal != null ? this.serverTotal : this.tasks.length);
+        document.dispatchEvent(new CustomEvent('tw-tasks-loaded', { detail: { tasks: filteredTasks } }));
 
         // Filter badge: show active text filter
         const badge = document.getElementById('filter-badge');

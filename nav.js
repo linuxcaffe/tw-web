@@ -807,21 +807,28 @@
         document.getElementById('tw-mode-toggle')?.classList.toggle('cmd-active', _cmdMode);
         const fi = document.getElementById('tw-filter-inputs');
         const cs = document.getElementById('tw-cmd-section');
-        if (fi) fi.style.display = _cmdMode ? 'none' : '';
-        if (cs) cs.classList.toggle('active', _cmdMode);
         if (_cmdMode) {
+            // Pin cmd-section width to match filter-inputs so the mode icon stays put
+            if (fi && cs) cs.style.width = fi.offsetWidth + 'px';
+            if (fi) fi.style.display = 'none';
+            cs?.classList.add('active');
+            // Clear filter inputs and state when entering cmd mode
+            ['tw-filter-input', 'tw-pri-input', 'tw-project-input', 'tw-tags-input'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            setState({ filter: '', priority: '', project: '', tags: '' }, { clientOnly: true });
             const inp = document.getElementById('tw-cmd-input');
-            if (inp) {
-                if (_rawFilter) {
-                    inp.value = _rawFilter;
-                    _cmdHistPos  = _cmdHistory.length; // ArrowUp → history, ArrowDown → empty
-                    _cmdHistDraft = '';
-                }
-                inp.focus();
-            }
+            if (inp) { inp.value = ''; inp.focus(); }
+            _cmdHistPos = -1; _cmdHistDraft = '';
         } else {
+            cs?.classList.remove('active');
+            if (cs) cs.style.width = '';
+            if (fi) fi.style.display = '';
+            // Clear cmd input when returning to filter mode
+            const inp = document.getElementById('tw-cmd-input');
+            if (inp) { inp.value = ''; _hideCmdOutput(); }
             document.getElementById('tw-filter-input')?.focus();
-            _hideCmdOutput();
         }
     }
 
@@ -1372,45 +1379,86 @@
     }
 
     // ── Tags panel ────────────────────────────────────────────────────────────
+    function _countTagsFromTasks(tasks) {
+        const c = {};
+        (tasks || []).forEach(t => {
+            (t.tags || []).forEach(tag => {
+                if (tag && !tag.match(/^[A-Z]+$/)) c[tag] = (c[tag] || 0) + 1;
+            });
+        });
+        return c;
+    }
+
+    // Shared tag-render helper (used by both panel and sidebar)
+    function _renderTagList(container, tagCounts, mode, selTags, curState, onMode, onPick) {
+        const tags = Object.keys(tagCounts).sort((a, b) => {
+            const d = (tagCounts[b]||0) - (tagCounts[a]||0);
+            return d !== 0 ? d : a.localeCompare(b);
+        });
+        let html =
+            `<div class="tw-toggle-bar">` +
+                `<button class="tw-toggle-btn${mode==='active'?' active':''}" data-mode="active">active</button>` +
+                `<button class="tw-toggle-btn${mode==='all'?' active':''}" data-mode="all">all</button>` +
+                `<span class="tw-proj-total">${tags.length}</span>` +
+            `</div>` +
+            `<button class="tw-pick-item${!selTags.length?' active':''}" data-pick=""><span class="tw-proj-label">All tags</span></button>` +
+            `<button class="tw-pick-item${curState.tags==='.none:'?' active':''}" data-pick=".none:"><span class="tw-proj-label">No tags</span></button>`;
+        if (tags.length) {
+            html += `<div class="tw-pick-section-label">Tags</div>`;
+            tags.forEach(t => {
+                const count = tagCounts[t] || 0;
+                const badge = count ? `<span class="tw-proj-count">${count}</span>` : '';
+                html += `<button class="tw-pick-item${selTags.includes(t)?' active':''}" data-pick="${esc(t)}">` +
+                        `<span class="tw-proj-label">+${esc(t)}</span>${badge}</button>`;
+            });
+        }
+        container.innerHTML = html;
+        container.onclick = e => {
+            const tog = e.target.closest('[data-mode]'); if (tog) { onMode(tog.dataset.mode); return; }
+            const btn = e.target.closest('[data-pick]'); if (btn) onPick(btn.dataset.pick);
+        };
+    }
+
     async function openTagsPanel(mode) {
         if (mode === undefined) mode = localStorage.getItem('tw-tags-mode') || 'active';
         localStorage.setItem('tw-tags-mode', mode);
         openPanel('Tags');
         const body = panelBody();
-        try {
-            const r = await fetch('/api/tags' + (mode === 'all' ? '' : '?active=1'));
-            const d = await r.json();
-            const allTags = (d.tags || []).filter(Boolean).sort();
-            const state   = getState();
-            const sel     = (state.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+        let panelTagCounts = {};
 
-            let html =
-                `<div class="tw-toggle-bar">` +
-                    `<button class="tw-toggle-btn${mode === 'active' ? ' active' : ''}" data-mode="active">active</button>` +
-                    `<button class="tw-toggle-btn${mode === 'all'    ? ' active' : ''}" data-mode="all">all</button>` +
-                    `<span class="tw-proj-total">${allTags.length}</span>` +
-                `</div>` +
-                `<button class="tw-pick-item${!sel.length ? ' active' : ''}" data-pick="">` +
-                    `<span class="tw-proj-label">All tags</span></button>` +
-                `<button class="tw-pick-item${state.tags === '.none:' ? ' active' : ''}" data-pick=".none:">` +
-                    `<span class="tw-proj-label">No tags</span></button>`;
-            if (allTags.length) {
-                html += `<div class="tw-pick-section-label">Tags</div>`;
-                allTags.forEach(t => {
-                    html += `<button class="tw-pick-item${sel.includes(t) ? ' active' : ''}" data-pick="${esc(t)}">` +
-                            `<span class="tw-proj-label">+${esc(t)}</span></button>`;
-                });
+        function renderPanel() {
+            const state = getState();
+            const sel   = (state.tags||'').split(',').map(t=>t.trim()).filter(Boolean);
+            _renderTagList(body, panelTagCounts, mode, sel, state,
+                m => openTagsPanel(m),
+                pick => { setState({ tags: pick }, { clientOnly: true }); closeMenu(); }
+            );
+        }
+
+        async function loadPanel(m) {
+            mode = m; localStorage.setItem('tw-tags-mode', mode);
+            if (mode === 'all') {
+                try {
+                    const d = await fetch('/api/tags').then(r => r.json());
+                    panelTagCounts = d.counts || {};
+                } catch { body.innerHTML = '<div class="tw-panel-error">Failed to load tags</div>'; return; }
             }
-            body.innerHTML = html;
-            body.onclick = e => {
-                const tog = e.target.closest('[data-mode]');
-                if (tog) { openTagsPanel(tog.dataset.mode); return; }
-                const btn = e.target.closest('[data-pick]');
-                if (!btn) return;
-                setState({ tags: btn.dataset.pick }, { clientOnly: true });
-                closeMenu();
-            };
-        } catch { body.innerHTML = '<div class="tw-panel-error">Failed to load tags</div>'; }
+            // active mode: use latest tw-tasks-loaded payload
+            renderPanel();
+        }
+
+        // Active mode: refresh when tasks change while panel is open
+        const onTasksLoaded = e => { if (mode === 'active') { panelTagCounts = _countTagsFromTasks(e.detail.tasks); renderPanel(); } };
+        document.addEventListener('tw-tasks-loaded', onTasksLoaded);
+        // Clean up listener when panel closes (next openPanel call replaces body)
+        const obs = new MutationObserver(() => {
+            if (!document.contains(body)) { document.removeEventListener('tw-tasks-loaded', onTasksLoaded); obs.disconnect(); }
+        });
+        obs.observe(document.body, { childList: true, subtree: true });
+
+        // Seed active mode from last known tasks if available
+        if (mode === 'active' && window._twLastTasks) panelTagCounts = _countTagsFromTasks(window._twLastTasks);
+        await loadPanel(mode);
     }
 
     // ── Inline sidebars (List / Agenda pages) ────────────────────────────────
@@ -1489,43 +1537,42 @@
     async function initTagsSidebar(container) {
         if (!container) return;
         let mode = localStorage.getItem('tw-tags-mode') || 'active';
-        let allTags = [];
+        let tagCounts = {};  // tag → count
 
         function render() {
             const state = getState();
             const sel   = (state.tags||'').split(',').map(t=>t.trim()).filter(Boolean);
-            let html =
-                `<div class="tw-sb-label">Tags</div>` +
-                `<div class="tw-toggle-bar">` +
-                    `<button class="tw-toggle-btn${mode==='active'?' active':''}" data-mode="active">active</button>` +
-                    `<button class="tw-toggle-btn${mode==='all'?' active':''}" data-mode="all">all</button>` +
-                    `<span class="tw-proj-total">${allTags.length}</span>` +
-                `</div>` +
-                `<button class="tw-pick-item${!sel.length?' active':''}" data-pick=""><span class="tw-proj-label">All tags</span></button>` +
-                `<button class="tw-pick-item${state.tags==='.none:'?' active':''}" data-pick=".none:"><span class="tw-proj-label">No tags</span></button>`;
-            if (allTags.length) {
-                html += `<div class="tw-pick-section-label">Tags</div>`;
-                allTags.forEach(t => {
-                    html += `<button class="tw-pick-item${sel.includes(t)?' active':''}" data-pick="${esc(t)}"><span class="tw-proj-label">+${esc(t)}</span></button>`;
-                });
-            }
-            container.innerHTML = html;
+            _renderTagList(container, tagCounts, mode, sel, state,
+                m => load(m),
+                pick => setState({ tags: pick }, { clientOnly: true })
+            );
+            // Prepend sidebar section label (panel version doesn't need it)
+            container.insertAdjacentHTML('afterbegin', `<div class="tw-sb-label">Tags</div>`);
         }
 
         async function load(m) {
             mode = m; localStorage.setItem('tw-tags-mode', mode);
-            try {
-                const d = await fetch('/api/tags'+(mode==='all'?'':'?active=1')).then(r=>r.json());
-                allTags = (d.tags||[]).filter(Boolean).sort();
+            if (mode === 'all') {
+                try {
+                    const d = await fetch('/api/tags').then(r => r.json());
+                    tagCounts = d.counts || {};
+                    render();
+                } catch { container.innerHTML = '<div class="tw-panel-error">Failed to load</div>'; }
+            } else {
+                // active mode: filter-sensitive, populated by tw-tasks-loaded event
                 render();
-            } catch { container.innerHTML = '<div class="tw-panel-error">Failed to load</div>'; }
+            }
         }
 
-        container.addEventListener('click', e => {
-            const tog = e.target.closest('[data-mode]'); if (tog) { load(tog.dataset.mode); return; }
-            const btn = e.target.closest('[data-pick]');
-            if (btn) setState({ tags: btn.dataset.pick }, { clientOnly: true });
+        // Active mode: re-derive counts from the current filtered task list
+        document.addEventListener('tw-tasks-loaded', e => {
+            window._twLastTasks = e.detail.tasks;
+            if (mode === 'active') {
+                tagCounts = _countTagsFromTasks(e.detail.tasks);
+                render();
+            }
         });
+
         document.addEventListener('tw-filter-change', render);
         await load(mode);
     }
@@ -1875,8 +1922,13 @@
             const tag = (e.target.tagName || '').toLowerCase();
             const inInput = tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable;
 
-            // Escape: clear raw filter if active, then blur + focus logo
+            // Escape: close menu if open, else clear raw filter / blur input → focus logo
             if (k === 'Escape') {
+                if (document.getElementById('tw-side-menu')?.classList.contains('open')) {
+                    closeMenu();
+                    e.preventDefault();
+                    return;
+                }
                 if (inInput) e.target.blur();
                 if (_rawFilter) clearRawFilter();
                 document.getElementById('tw-logo-btn')?.focus();
