@@ -204,15 +204,20 @@ def _get_recurrence_filter():
     Reads recurrence.field from tw-web.rc (via task _show):
       recurrence.field=r    → r.any:    (recurrence-overhaul hook)
       recurrence.field=recur or unset → +RECURRING (standard TW)
+    Uses rc.hooks=off so slow on-exit hooks don't block Flask startup.
     """
-    result = subprocess.run(
-        ['task', '_show'], capture_output=True, text=True
-    )
-    for line in result.stdout.splitlines():
-        if line.startswith('recurrence.field='):
-            field = line.split('=', 1)[1].strip()
-            if field and field != 'recur':
-                return f'{field}.any:'
+    try:
+        result = subprocess.run(
+            ['task', 'rc.hooks=off', 'rc.confirmation=no', '_show'],
+            capture_output=True, text=True, timeout=5
+        )
+        for line in result.stdout.splitlines():
+            if line.startswith('recurrence.field='):
+                field = line.split('=', 1)[1].strip()
+                if field and field != 'recur':
+                    return f'{field}.any:'
+    except Exception:
+        pass
     return '+RECURRING'
 
 RECURRING_FILTER = _get_recurrence_filter()
