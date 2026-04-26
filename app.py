@@ -245,7 +245,7 @@ TASK_TIMEOUT = 15
 # so the frontend can offer "Run in terminal" with the full task command.
 TW_INTERACTIVE_MARKER = 'TW_INTERACTIVE_REQUIRED'
 
-def run_task_command(args, readonly=False):
+def run_task_command(args, readonly=False, extra_overrides=None):
     """Execute a TaskWarrior command and return the result.
     args must be a list, e.g. ['task', 'status:pending', 'export'].
     shell=True is intentionally not used.
@@ -265,6 +265,8 @@ def run_task_command(args, readonly=False):
         overrides = ['rc.confirmation=no']
         if readonly:
             overrides.append('rc.hooks=off')
+        if extra_overrides:
+            overrides.extend(extra_overrides)
         args = [args[0]] + overrides + args[1:]
 
         log_command(args)
@@ -345,7 +347,7 @@ def api_run():
         return jsonify({'success': False, 'error': f'Parse error: {e}'})
     if not args:
         return jsonify({'success': False, 'error': 'Empty command'})
-    result = run_task_command(args)
+    result = run_task_command(args, extra_overrides=['rc.bulk=0'])
     return jsonify(result)
 
 @app.route('/api/debug', methods=['POST'])
