@@ -32,6 +32,10 @@ class TaskActionHandler {
             const response = await fetch(endpoint, { method });
             const data = await response.json();
 
+            if (data.needs_pty) {
+                window.twNav?.openPty(data.cmd);
+                return;
+            }
             if (data.success) {
                 if (action === 'delete' || action === 'done') {
                     this.onTaskDelete(taskUuid);

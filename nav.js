@@ -118,9 +118,54 @@
         document.getElementById('tw-cmd-output-close')?.addEventListener('click', _hideCmdOutput);
     }
 
+    let _ptyTerm = null;
+
+    async function openPty(cmd) {
+        const out = document.getElementById('tw-cmd-output');
+        if (!out) return;
+
+        // Lazy-load xterm if not already loaded
+        if (!window.Terminal) {
+            await Promise.all([
+                new Promise(r => { const s = document.createElement('script'); s.src = '/xterm.js'; s.onload = r; document.head.appendChild(s); }),
+                new Promise(r => { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/xterm.css'; l.onload = r; document.head.appendChild(l); }),
+            ]);
+        }
+
+        // Build output bar container
+        out.innerHTML = `<button id="tw-cmd-output-close" title="Close">×</button><div id="tw-pty-container"></div>`;
+        out.classList.add('active');
+        document.getElementById('tw-cmd-output-close')?.addEventListener('click', () => {
+            _hideCmdOutput();
+            if (_ptyTerm) { _ptyTerm.dispose(); _ptyTerm = null; }
+        });
+
+        const term = new window.Terminal({ rows: 10, cols: 80, fontSize: 12, fontFamily: 'monospace', theme: { background: '#0a0a0a', foreground: '#d4d4d8' }, convertEol: true, scrollback: 200 });
+        _ptyTerm = term;
+        term.open(document.getElementById('tw-pty-container'));
+        term.focus();
+
+        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        const ws = new WebSocket(`${proto}://${location.host}/ws/pty`);
+
+        ws.onopen = () => ws.send(JSON.stringify({ cmd }));
+        ws.onmessage = e => {
+            if (e.data === '\r\n[done]\r\n') {
+                term.writeln('\r\n\x1b[32m[done]\x1b[0m');
+                document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: window.twNav.getState() }));
+                return;
+            }
+            term.write(e.data);
+        };
+        ws.onclose = () => {};
+        ws.onerror = () => {};
+
+        term.onData(data => { if (ws.readyState === WebSocket.OPEN) ws.send(data); });
+    }
+
     window.twNav = { getState, setState, stateToParams, setCount, setGrandTotal, getGrandTotal,
                      openSyncDialog, initProjectsSidebar, initTagsSidebar, showNotification, showOutput,
-                     setRawFilter, clearRawFilter };
+                     setRawFilter, clearRawFilter, openPty };
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     function activePage() {
@@ -240,6 +285,9 @@
     cursor: pointer; font-size: 14px; padding: 0 2px; line-height: 1;
 }
 #tw-cmd-output-close:hover { color: #fff; }
+#tw-pty-container { padding: 2px 0; background: #0a0a0a; }
+#tw-pty-container .xterm { padding: 2px 6px; }
+#tw-pty-container .xterm-viewport { overflow-y: auto !important; }
 .tw-preflight-yes, .tw-preflight-no {
     border: none; border-radius: 4px; cursor: pointer;
     font-size: 12px; padding: 3px 10px; margin-left: 10px;

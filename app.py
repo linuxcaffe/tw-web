@@ -6,6 +6,7 @@ A lightweight Flask server for the tw-web Taskwarrior PWA
 
 from flask import Flask, jsonify, request, send_from_directory, Response
 from flask_cors import CORS
+from flask_sock import Sock
 import subprocess
 import json
 import os
@@ -138,6 +139,7 @@ def log_command(args):
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
+sock = Sock(app)
 
 # ── Hook prompt system ────────────────────────────────────────────────────────
 _PROMPT_DIR = Path('/tmp/tw-web-prompts')
@@ -363,19 +365,20 @@ def _parse_preflight(args):
         filter_args.append(tok)
     return filter_args, verb
 
-def _detect_preflight(stderr):
-    """Return the parsed preflight signal dict if present in stderr, else None."""
+def _detect_signal(stderr, sig_type):
+    """Return the first parsed JSON signal of sig_type from stderr, else None."""
     for line in stderr.splitlines():
         line = line.strip()
         if not line.startswith('{'):
             continue
         try:
             data = json.loads(line)
-            if data.get('type') == 'tw_preflight':
+            if data.get('type') == sig_type:
                 return data
         except json.JSONDecodeError:
             pass
     return None
+
 
 @app.route('/api/run', methods=['POST'])
 def api_run():
@@ -409,9 +412,8 @@ def api_run():
 
     result = run_task_command(args, extra_overrides=['rc.bulk=0'], extra_env=extra_env)
 
-    # Check if the preflight hook blocked the command
     if not result['success'] and not confirmed:
-        signal = _detect_preflight(result.get('stderr', ''))
+        signal = _detect_signal(result.get('stderr', ''), 'tw_preflight')
         if signal:
             return jsonify({
                 'preflight': True,
@@ -422,6 +424,103 @@ def api_run():
             })
 
     return jsonify(result)
+
+@sock.route('/ws/pty')
+def ws_pty(ws):
+    """WebSocket PTY: run a task command in a real pseudo-terminal.
+    Client sends first message: JSON {"cmd": "start 111"}
+    Then relays stdin as raw text; receives stdout/stderr as raw text.
+    Server closes the socket when the process exits.
+    """
+    import pty, select, fcntl, termios, struct, signal as _signal
+
+    first = ws.receive(timeout=10)
+    if not first:
+        return
+    try:
+        payload = json.loads(first)
+        cmd_str = payload.get('cmd', '').strip()
+    except (json.JSONDecodeError, AttributeError):
+        cmd_str = first.strip()
+
+    if not cmd_str:
+        ws.send('\r\n[pty] No command.\r\n')
+        return
+
+    try:
+        args = shlex.split(cmd_str)
+    except ValueError as e:
+        ws.send(f'\r\n[pty] Parse error: {e}\r\n')
+        return
+
+    master_fd, slave_fd = pty.openpty()
+
+    # Set sane terminal size (80×24)
+    winsize = struct.pack('HHHH', 24, 80, 0, 0)
+    fcntl.ioctl(slave_fd, termios.TIOCSWINSZ, winsize)
+
+    env = {k: v for k, v in _TW_ENV.items() if k != 'TW_NOINTERACT'}
+    env['TERM'] = 'xterm-256color'
+
+    def _pty_preexec():
+        os.setsid()
+        fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+    try:
+        proc = subprocess.Popen(
+            ['task'] + args,
+            stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+            close_fds=True, env=env,
+            preexec_fn=_pty_preexec,
+        )
+    except Exception as e:
+        os.close(master_fd); os.close(slave_fd)
+        ws.send(f'\r\n[pty] Failed to start: {e}\r\n')
+        return
+
+    os.close(slave_fd)
+
+    try:
+        while True:
+            r, _, _ = select.select([master_fd], [], [], 0.05)
+            if r:
+                try:
+                    data = os.read(master_fd, 4096)
+                except OSError:
+                    break
+                if not data:
+                    break
+                ws.send(data.decode('utf-8', errors='replace'))
+
+            # Forward input from browser to PTY
+            try:
+                inp = ws.receive(timeout=0)
+                if inp:
+                    os.write(master_fd, inp.encode('utf-8'))
+            except Exception:
+                pass
+
+            if proc.poll() is not None:
+                # Drain remaining output
+                try:
+                    while True:
+                        r2, _, _ = select.select([master_fd], [], [], 0.1)
+                        if not r2:
+                            break
+                        data = os.read(master_fd, 4096)
+                        if data:
+                            ws.send(data.decode('utf-8', errors='replace'))
+                except OSError:
+                    pass
+                break
+    finally:
+        try:
+            os.close(master_fd)
+        except OSError:
+            pass
+        proc.wait()
+
+    ws.send('\r\n[done]\r\n')
 
 @app.route('/api/debug', methods=['POST'])
 def api_debug():
@@ -686,7 +785,12 @@ def start_task(task_id):
     """Start a task"""
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
-    result = run_task_command(['task', task_id, 'start'])
+    extra_env = {'TW_PREFLIGHT_CMD': f'{task_id} start'}
+    result = run_task_command([task_id, 'start'], extra_env=extra_env)
+    if not result['success']:
+        sig = _detect_signal(result.get('stderr', ''), 'tw_needs_pty')
+        if sig:
+            return jsonify({'success': False, 'needs_pty': True, 'cmd': sig.get('cmd') or f'{task_id} start'})
     resp = {'success': result['success'],
             'message': result['stdout'] if result['success'] else result['stderr'],
             'warnings': _warnings(result)}
