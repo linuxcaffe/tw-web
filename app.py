@@ -443,16 +443,14 @@ def ws_pty(ws):
     except (json.JSONDecodeError, AttributeError):
         cmd_str = first.strip()
 
-    if not cmd_str:
-        ws.send('\r\n[pty] No command.\r\n')
-        return
-
     try:
-        args = shlex.split(cmd_str)
+        args = shlex.split(cmd_str) if cmd_str else []
     except ValueError as e:
         ws.send(f'\r\n[pty] Parse error: {e}\r\n')
         return
 
+    # Empty cmd → open tw shell
+    shell_mode = not args
     master_fd, slave_fd = pty.openpty()
 
     # Set sane terminal size (80×24)
@@ -466,9 +464,11 @@ def ws_pty(ws):
         os.setsid()
         fcntl.ioctl(0, termios.TIOCSCTTY, 0)
 
+    shell_bin = os.environ.get('SHELL') or shutil.which('bash') or 'sh'
+    cmd_argv = [shell_bin] if shell_mode else (['task'] + args)
     try:
         proc = subprocess.Popen(
-            ['task'] + args,
+            cmd_argv,
             stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
             close_fds=True, env=env,
             preexec_fn=_pty_preexec,
@@ -520,7 +520,8 @@ def ws_pty(ws):
             pass
         proc.wait()
 
-    ws.send('\r\n[done]\r\n')
+    if not shell_mode:
+        ws.send('\r\n[done]\r\n')
 
 @app.route('/api/debug', methods=['POST'])
 def api_debug():
@@ -816,10 +817,12 @@ def complete_task(task_id):
     """Mark a task as done"""
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
-    result = run_task_command(['task', task_id, 'done'])
-    if result.get('terminal_launched'):
-        return jsonify({'success': False, 'terminal_launched': True,
-                        'message': 'Opening in terminal…'})
+    extra_env = {'TW_PREFLIGHT_CMD': f'{task_id} done'}
+    result = run_task_command([task_id, 'done'], extra_env=extra_env)
+    if not result['success']:
+        sig = _detect_signal(result.get('stderr', ''), 'tw_needs_pty')
+        if sig:
+            return jsonify({'success': False, 'needs_pty': True, 'cmd': sig.get('cmd') or f'{task_id} done'})
     dc = _deferred_cmd(result)
     resp = {'success': result['success'],
             'message': result['stdout'] if result['success'] else result['stderr'],

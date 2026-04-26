@@ -133,17 +133,54 @@
         }
 
         // Build output bar container
-        out.innerHTML = `<button id="tw-cmd-output-close" title="Close">×</button><div id="tw-pty-container"></div>`;
-        out.classList.add('active');
-        document.getElementById('tw-cmd-output-close')?.addEventListener('click', () => {
+        out.innerHTML = `<div id="tw-pty-titlebar"><span>${esc(cmd || 'terminal')}</span><button id="tw-cmd-output-close" title="Close">×</button></div><div id="tw-pty-container"></div><div id="tw-pty-resize-handle"></div>`;
+        out.classList.add('active', 'pty-mode');
+        out.querySelector('#tw-cmd-output-close')?.addEventListener('click', () => {
+            out.classList.remove('pty-mode');
             _hideCmdOutput();
             if (_ptyTerm) { _ptyTerm.dispose(); _ptyTerm = null; }
         });
 
         const term = new window.Terminal({ rows: 10, cols: 80, fontSize: 12, fontFamily: 'monospace', theme: { background: '#0a0a0a', foreground: '#d4d4d8' }, convertEol: true, scrollback: 200 });
         _ptyTerm = term;
-        term.open(document.getElementById('tw-pty-container'));
+        const container = document.getElementById('tw-pty-container');
+        term.open(container);
         term.focus();
+
+        // Restore saved height and apply to terminal rows
+        const _PTY_H_KEY = 'tw-pty-height';
+        const savedH = parseInt(localStorage.getItem(_PTY_H_KEY) || '0');
+        if (savedH >= 60) {
+            container.style.height = savedH + 'px';
+            const cellH = term._core?._renderService?.dimensions?.css?.cell?.height || 17;
+            term.resize(80, Math.max(3, Math.floor(savedH / cellH)));
+        }
+
+        // Mouse-wheel: scroll xterm, don't propagate to page
+        container.addEventListener('wheel', e => { e.preventDefault(); }, { passive: false });
+
+        // Drag-to-resize handle
+        const handle = document.getElementById('tw-pty-resize-handle');
+        handle?.addEventListener('mousedown', e => {
+            e.preventDefault();
+            const startY = e.clientY;
+            const startH = container.offsetHeight;
+            handle.classList.add('dragging');
+            const onMove = ev => {
+                const newH = Math.max(60, startH + (ev.clientY - startY));
+                container.style.height = newH + 'px';
+                const cellH = term._core?._renderService?.dimensions?.css?.cell?.height || 17;
+                term.resize(80, Math.max(3, Math.floor(newH / cellH)));
+            };
+            const onUp = () => {
+                handle.classList.remove('dragging');
+                localStorage.setItem(_PTY_H_KEY, container.offsetHeight);
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
 
         const proto = location.protocol === 'https:' ? 'wss' : 'ws';
         const ws = new WebSocket(`${proto}://${location.host}/ws/pty`);
@@ -153,11 +190,21 @@
             if (e.data === '\r\n[done]\r\n') {
                 term.writeln('\r\n\x1b[32m[done]\x1b[0m');
                 document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: window.twNav.getState() }));
+                setTimeout(() => {
+                    out.classList.remove('pty-mode');
+                    _hideCmdOutput();
+                    if (_ptyTerm === term) { term.dispose(); _ptyTerm = null; }
+                }, 1200);
                 return;
             }
             term.write(e.data);
         };
-        ws.onclose = () => {};
+        ws.onclose = () => {
+            document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: window.twNav.getState() }));
+            out.classList.remove('pty-mode');
+            _hideCmdOutput();
+            if (_ptyTerm === term) { term.dispose(); _ptyTerm = null; }
+        };
         ws.onerror = () => {};
 
         term.onData(data => { if (ws.readyState === WebSocket.OPEN) ws.send(data); });
@@ -279,12 +326,26 @@
     position: relative;
 }
 #tw-cmd-output.active { display: block; }
-#tw-cmd-output-close {
-    position: absolute; top: 4px; right: 8px;
-    background: none; border: none; color: rgba(255,255,255,0.35);
-    cursor: pointer; font-size: 14px; padding: 0 2px; line-height: 1;
+#tw-cmd-output.pty-mode { padding: 0; max-height: none; overflow: visible; }
+#tw-pty-resize-handle {
+    height: 6px; cursor: ns-resize; background: rgba(255,255,255,0.04);
+    border-top: 1px solid rgba(255,255,255,0.1);
 }
-#tw-cmd-output-close:hover { color: #fff; }
+#tw-pty-resize-handle:hover, #tw-pty-resize-handle.dragging { background: rgba(100,160,255,0.18); }
+#tw-cmd-output-close {
+    position: absolute; top: 4px; right: 8px; z-index: 20;
+    background: rgba(0,0,0,0.6); border: none; color: rgba(255,255,255,0.5);
+    cursor: pointer; font-size: 14px; padding: 0 4px; line-height: 1.4;
+    border-radius: 3px;
+}
+#tw-cmd-output-close:hover { color: #fff; background: rgba(255,255,255,0.15); }
+#tw-pty-titlebar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #1a1a2e; padding: 2px 8px; font-size: 11px;
+    color: rgba(255,255,255,0.45); font-family: monospace;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+#tw-pty-titlebar span { opacity: 0.6; }
 #tw-pty-container { padding: 2px 0; background: #0a0a0a; }
 #tw-pty-container .xterm { padding: 2px 6px; }
 #tw-pty-container .xterm-viewport { overflow-y: auto !important; }
@@ -1174,24 +1235,7 @@
 
     // ── Terminal launch ───────────────────────────────────────────────────────
     async function openTerminal(cmd) {
-        try {
-            const r = await fetch('/api/terminal', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ cmd: cmd || '' }),
-            });
-            const d = await r.json();
-            if (d.success) {
-                document.dispatchEvent(new CustomEvent('tw-show-notification',
-                    { detail: { message: `Launching ${d.terminal || 'terminal'}…`, type: 'info' } }));
-            } else {
-                document.dispatchEvent(new CustomEvent('tw-show-notification',
-                    { detail: { message: d.error || 'Could not open terminal', type: 'error' } }));
-            }
-        } catch (e) {
-            document.dispatchEvent(new CustomEvent('tw-show-notification',
-                { detail: { message: 'Terminal request failed', type: 'error' } }));
-        }
+        openPty(cmd || '');
     }
     function offerTerminal(cmd) {
         // Remove any existing offer first
@@ -1865,6 +1909,9 @@
             } else if (k === 's') {
                 e.preventDefault();
                 document.querySelector('.tw-status-btn')?.focus();
+            } else if (k === 't') {
+                e.preventDefault();
+                openPty('');
             }
         });
     }
