@@ -88,7 +88,7 @@
         return p.toString();
     }
     function setCount(filtered, total) {
-        const text = `${filtered}/${total}`;
+        const text = filtered === total ? String(total) : `${filtered}/${total}`;
         const el = document.getElementById('tw-count');
         if (el) el.textContent = text;
         try { sessionStorage.setItem(COUNT_KEY, text); } catch {}
