@@ -1348,11 +1348,17 @@
     }
 
     // ── Tags panel ────────────────────────────────────────────────────────────
+    const _TW_VIRTUAL_TAGS = new Set([
+        'ACTIVE','ANNOTATED','BLOCKED','BLOCKING','CHILD','COMPLETED','DELETED',
+        'DUE','DUETODAY','LATEST','MONTH','NEXT','NOCOLOR','ORPHAN','OVERDUE',
+        'PARENT','PENDING','PRIORITY','PROJECT','QUARTER','READY','RECURRING',
+        'SCHEDULED','TAGGED','TODAY','TOMORROW','UDA','UNBLOCKED','WEEK','YEAR',
+    ]);
     function _countTagsFromTasks(tasks) {
         const c = {};
         (tasks || []).forEach(t => {
             (t.tags || []).forEach(tag => {
-                if (tag && !tag.match(/^[A-Z]+$/)) c[tag] = (c[tag] || 0) + 1;
+                if (tag && !_TW_VIRTUAL_TAGS.has(tag)) c[tag] = (c[tag] || 0) + 1;
             });
         });
         return c;
@@ -1408,7 +1414,7 @@
             mode = m; localStorage.setItem('tw-tags-mode', mode);
             if (mode === 'all') {
                 try {
-                    const d = await fetch('/api/tags').then(r => r.json());
+                    const d = await fetch('/api/tags?all=1').then(r => r.json());
                     panelTagCounts = d.counts || {};
                 } catch { body.innerHTML = '<div class="tw-panel-error">Failed to load tags</div>'; return; }
             }
@@ -1523,7 +1529,7 @@
             mode = m; localStorage.setItem('tw-tags-mode', mode);
             if (mode === 'all') {
                 try {
-                    const d = await fetch('/api/tags').then(r => r.json());
+                    const d = await fetch('/api/tags?all=1').then(r => r.json());
                     tagCounts = d.counts || {};
                     render();
                 } catch { container.innerHTML = '<div class="tw-panel-error">Failed to load</div>'; }

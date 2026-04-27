@@ -21,6 +21,13 @@ from datetime import datetime
 import tempfile
 from config import DEVELOPER_MODE, DEBUG_FILE
 
+TW_VIRTUAL_TAGS = {
+    'ACTIVE','ANNOTATED','BLOCKED','BLOCKING','CHILD','COMPLETED','DELETED',
+    'DUE','DUETODAY','LATEST','MONTH','NEXT','NOCOLOR','ORPHAN','OVERDUE',
+    'PARENT','PENDING','PRIORITY','PROJECT','QUARTER','READY','RECURRING',
+    'SCHEDULED','TAGGED','TODAY','TOMORROW','UDA','UNBLOCKED','WEEK','YEAR',
+}
+
 # Accepts a UUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx) or a plain integer task ID
 _TASK_ID_RE = re.compile(
     r'^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\d+)$',
@@ -716,7 +723,7 @@ def get_projects():
     if active_only:
         names = sorted(counts.keys())
     else:
-        r2 = run_task_command(['task', '_projects'], readonly=True)
+        r2 = run_task_command(['task', 'rc.complete.all.projects=yes', '_projects'], readonly=True)
         all_names = sorted({p.strip() for p in r2['stdout'].split('\n') if p.strip()}) \
                     if r2['success'] else sorted(counts.keys())
         names = all_names
@@ -727,9 +734,20 @@ def get_projects():
 @app.route('/api/tags')
 def get_tags():
     """Get user-visible tags with pending-task counts.
-    Returns {tags: [...], counts: {tag: n}} sorted alphabetically.
+    ?all=1: all tags including completed/deleted (no counts, names only via rc.complete.all.tags).
+    Default: pending tags with counts derived from a pending export.
     Active-mode sidebar uses client-side counts from tw-tasks-loaded event instead.
     """
+    all_tags = request.args.get('all', '0') == '1'
+    if all_tags:
+        result = run_task_command(['task', 'rc.complete.all.tags=yes', '_tags'], readonly=True)
+        if result['success']:
+            tags = sorted({t.strip() for t in result['stdout'].split('\n')
+                           if t.strip() and t.strip() not in TW_VIRTUAL_TAGS})
+            counts = {t: 0 for t in tags}
+            return jsonify({'success': True, 'tags': tags, 'counts': counts})
+        return jsonify({'success': False, 'error': result['stderr']}), 500
+
     result = run_task_command(['task', 'status:pending', 'export'], readonly=True)
     if result['success']:
         try:
@@ -739,7 +757,7 @@ def get_tags():
         counts = {}
         for t in tasks:
             for tag in (t.get('tags') or []):
-                if tag and not tag.isupper():
+                if tag and tag not in TW_VIRTUAL_TAGS:
                     counts[tag] = counts.get(tag, 0) + 1
         tags = sorted(counts.keys())
         return jsonify({'success': True, 'tags': tags, 'counts': counts})
