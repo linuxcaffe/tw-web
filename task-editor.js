@@ -454,7 +454,12 @@ class TaskEditor {
         if (!banner) return;
 
         const status = task?.status;
-        if (status && status !== 'pending') {
+        const isNonPending = status && status !== 'pending';
+        const logBtn  = this.modal.querySelector('#task-editor-log');
+        const saveBtn = this.modal.querySelector('#task-editor-save');
+        if (logBtn)  logBtn.style.display  = isNonPending ? 'none' : '';
+        if (saveBtn) saveBtn.style.display = isNonPending ? 'none' : '';
+        if (isNonPending) {
             if (statusTxt) statusTxt.textContent = `Status: ${status}`;
             banner.style.display = '';
             if (revertBtn) {
@@ -485,9 +490,13 @@ class TaskEditor {
         const annList = this.modal.querySelector('#te-existing-annotations');
         if (annList) annList.innerHTML = '';
         this._hideAnnEditor();
-        // Hide status banner
+        // Hide status banner; restore Log/Save for new tasks
         const banner = this.modal.querySelector('#te-status-banner');
         if (banner) banner.style.display = 'none';
+        const logBtn2  = this.modal.querySelector('#task-editor-log');
+        const saveBtn2 = this.modal.querySelector('#task-editor-save');
+        if (logBtn2)  logBtn2.style.display  = '';
+        if (saveBtn2) saveBtn2.style.display = '';
         // Re-sync datetime styling
         this.modal.querySelectorAll('input[type="datetime-local"]').forEach(inp =>
             inp.classList.toggle('te-dt-empty', !inp.value)

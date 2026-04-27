@@ -168,6 +168,7 @@ class TaskCardManager {
         const metaHtml    = metaContent ? `<div class="card-meta">${metaContent}</div>` : '';
         if (anns.length) card.dataset.annotated = '1';
 
+        const nonPending = task.status === 'completed' || task.status === 'deleted';
         card.innerHTML =
             `<div class="card-main">` +
                 `<div class="card-desc">${dotHtml}<span class="card-desc-text">${this._e(task.description)}</span></div>` +
@@ -176,11 +177,11 @@ class TaskCardManager {
                 annHtml +
             `</div>` +
             `<div class="card-actions">` +
-                `<button class="ca-btn ca-stop"   data-task-action="stop"   data-task-uuid="${task.uuid}" ${active ? '' : 'style="display:none"'}>⏸</button>` +
-                `<button class="ca-btn ca-start"  data-task-action="start"  data-task-uuid="${task.uuid}" ${active ? 'style="display:none"' : ''}>▶</button>` +
+                (!nonPending ? `<button class="ca-btn ca-stop"   data-task-action="stop"   data-task-uuid="${task.uuid}" ${active ? '' : 'style="display:none"'}>⏸</button>` : '') +
+                (!nonPending ? `<button class="ca-btn ca-start"  data-task-action="start"  data-task-uuid="${task.uuid}" ${active ? 'style="display:none"' : ''}>▶</button>` : '') +
                 `<button class="ca-btn ca-edit"   data-task-action="edit"   data-task-uuid="${task.uuid}">✏</button>` +
-                `<button class="ca-btn ca-done"   data-task-action="done"   data-task-uuid="${task.uuid}">✓</button>` +
-                `<button class="ca-btn ca-delete" data-task-action="delete" data-task-uuid="${task.uuid}">✕</button>` +
+                (!nonPending ? `<button class="ca-btn ca-done"   data-task-action="done"   data-task-uuid="${task.uuid}">✓</button>` : '') +
+                (!nonPending ? `<button class="ca-btn ca-delete" data-task-action="delete" data-task-uuid="${task.uuid}">✕</button>` : '') +
             `</div>`;
 
         return card;
