@@ -148,6 +148,7 @@ function renderAgenda(scheduled, due) {
     });
 
     window.twNav?.setCount(filtered.length, grandTotal ?? total);
+    document.dispatchEvent(new CustomEvent('tw-tasks-loaded', { detail: { tasks: filtered } }));
 
     // If grand total isn't cached yet, fetch it in the background and update the counter
     if (grandTotal === null && window.twNav) {
