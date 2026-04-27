@@ -130,7 +130,7 @@ class TaskCardManager {
         });
     }
 
-    createTaskCard(task, { dep = false } = {}) {
+    createTaskCard(task, { dep = false, parentId = null } = {}) {
         const pri    = String(task.priority || '');
         const tags   = (task.tags || []).filter(t => !TaskCardManager.SYSTEM_TAGS.has(t));
         const active = !!task.start;
@@ -150,9 +150,9 @@ class TaskCardManager {
             ? `<div class="card-annotations">${anns.map(a => `<div class="card-ann">${this._e(a.description)}</div>`).join('')}</div>`
             : '';
 
-        const extrasStr  = this._extras(task);
+        const extrasBase = this._extras(task);
+        const extrasStr  = parentId ? `parent:${parentId}${extrasBase ? '  ' + extrasBase : ''}` : extrasBase;
         const extrasHtml = extrasStr ? `<div class="card-extras">${this._e(extrasStr)}</div>` : '';
-        const depCount   = !dep && task.depends && task.depends.length ? task.depends.length : 0;
 
         const card = document.createElement('div');
         card.className = 'task-card';
@@ -166,7 +166,6 @@ class TaskCardManager {
         else if (task.due)                   card.dataset.type = 'due';
 
         const dotHtml     = priClass ? `<span class="card-pri-dot ${priClass}"></span>` : '';
-        const depBadge    = depCount ? `<span class="card-dep-count">${depCount}</span>` : '';
         const metaContent = proj + dueHtml + schedHtml + durHtml + tagsHtml;
         const metaHtml    = metaContent ? `<div class="card-meta">${metaContent}</div>` : '';
         if (anns.length) card.dataset.annotated = '1';
@@ -174,19 +173,18 @@ class TaskCardManager {
         const nonPending = task.status === 'completed' || task.status === 'deleted';
         card.innerHTML =
             `<div class="card-main">` +
-                `<div class="card-desc">${dotHtml}${depBadge}<span class="card-desc-text">${this._e(task.description)}</span></div>` +
+                `<div class="card-desc">${dotHtml}<span class="card-desc-text">${this._e(task.description)}</span></div>` +
                 metaHtml +
                 extrasHtml +
                 annHtml +
             `</div>` +
-            (dep ? '' :
             `<div class="card-actions">` +
                 (!nonPending ? `<button class="ca-btn ca-stop"   data-task-action="stop"   data-task-uuid="${task.uuid}" ${active ? '' : 'style="display:none"'}>⏸</button>` : '') +
                 (!nonPending ? `<button class="ca-btn ca-start"  data-task-action="start"  data-task-uuid="${task.uuid}" ${active ? 'style="display:none"' : ''}>▶</button>` : '') +
                 `<button class="ca-btn ca-edit"   data-task-action="edit"   data-task-uuid="${task.uuid}">✏</button>` +
                 (!nonPending ? `<button class="ca-btn ca-done"   data-task-action="done"   data-task-uuid="${task.uuid}">✓</button>` : '') +
                 (!nonPending ? `<button class="ca-btn ca-delete" data-task-action="delete" data-task-uuid="${task.uuid}">✕</button>` : '') +
-            `</div>`);
+            `</div>`;
 
         return card;
     }

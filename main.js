@@ -531,7 +531,7 @@ class TaskWarriorUI {
             if (this.viewMode === 'list' && task.depends && task.depends.length) {
                 task.depends.forEach(uuid => {
                     const dep = allLookup.get(uuid);
-                    if (dep) container.appendChild(taskCardManager.createTaskCard(dep, { dep: true }));
+                    if (dep) container.appendChild(taskCardManager.createTaskCard(dep, { dep: true, parentId: task.id }));
                 });
             }
         });

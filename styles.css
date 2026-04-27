@@ -447,15 +447,6 @@ h2 {
 :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-extras,
 :is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded) .card-extras { display: none; }
 
-/* Dep count badge — bold N tight after priority dot */
-.card-dep-count {
-    font-weight: 700;
-    font-size: 0.78em;
-    color: rgba(255,255,255,0.55);
-    margin-right: 4px;
-    line-height: 1;
-}
-
 /* Tree-style dep cards in list view */
 .task-card.task-card-dep {
     margin-left: 24px;
