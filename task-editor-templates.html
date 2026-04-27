@@ -92,8 +92,8 @@
                 <button type="button" class="te-ann-add-btn" id="te-ann-add-btn">+ Add annotation</button>
             </div>
 
-            <!-- hidden submit so Enter key triggers form submit event -->
-            <button type="submit" style="display:none" aria-hidden="true"></button>
+            <!-- visually hidden submit so Enter key triggers form submit event -->
+            <button type="submit" style="position:absolute;width:0;height:0;padding:0;border:0;overflow:hidden;opacity:0" tabindex="-1" aria-hidden="true"></button>
 
             <div class="te-actions">
                 <button type="button" class="btn te-btn-muted btn-sm" id="task-editor-cancel">Cancel</button>
