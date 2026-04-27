@@ -340,8 +340,9 @@ class TaskWarriorUI {
                 try {
                     const c = JSON.parse(sessionStorage.getItem(cacheKey));
                     if (c && c.params === params && (Date.now() - c.ts) < 30_000) {
-                        this.tasks       = c.tasks;
-                        this.serverTotal = c.serverTotal;
+                        this.tasks         = c.tasks;
+                        window._twAllTasks = this.tasks;
+                        this.serverTotal   = c.serverTotal;
                         this.renderTasks();
                         this.showLoading(false);
                         return;
@@ -359,7 +360,8 @@ class TaskWarriorUI {
             const [tasksData, totalData, projectsData] = await Promise.all(fetches);
 
             if (tasksData.success) {
-                this.tasks       = tasksData.tasks;
+                this.tasks          = tasksData.tasks;
+                window._twAllTasks  = this.tasks;
                 this.serverTotal = totalData && totalData.success ? totalData.tasks.length : this.tasks.length;
                 window.twNav?.setGrandTotal(this.serverTotal, params);
                 try {
@@ -522,10 +524,16 @@ class TaskWarriorUI {
         // Vide le conteneur
         container.innerHTML = '';
         
-        // Crée et ajoute chaque carte de tâche
+        const allLookup = new Map((window._twAllTasks || []).map(t => [t.uuid, t]));
         filteredTasks.forEach(task => {
-            const taskCard = taskCardManager.createTaskCard(task);
-            container.appendChild(taskCard);
+            container.appendChild(taskCardManager.createTaskCard(task));
+            // Tree-style: dep cards indented immediately below parent
+            if (this.viewMode === 'list' && task.depends && task.depends.length) {
+                task.depends.forEach(uuid => {
+                    const dep = allLookup.get(uuid);
+                    if (dep) container.appendChild(taskCardManager.createTaskCard(dep, { dep: true }));
+                });
+            }
         });
     }
 
