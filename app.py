@@ -723,7 +723,7 @@ def get_projects():
     if active_only:
         names = sorted(counts.keys())
     else:
-        r2 = run_task_command(['task', 'rc.complete.all.projects=yes', '_projects'], readonly=True)
+        r2 = run_task_command(['task', 'rc.context=none', 'rc.complete.all.projects=yes', '_projects'], readonly=True)
         all_names = sorted({p.strip() for p in r2['stdout'].split('\n') if p.strip()}) \
                     if r2['success'] else sorted(counts.keys())
         names = all_names

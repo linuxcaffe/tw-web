@@ -1417,6 +1417,8 @@
                     const d = await fetch('/api/tags?all=1').then(r => r.json());
                     panelTagCounts = d.counts || {};
                 } catch { body.innerHTML = '<div class="tw-panel-error">Failed to load tags</div>'; return; }
+            } else {
+                if (window._twLastTasks) panelTagCounts = _countTagsFromTasks(window._twLastTasks);
             }
             // active mode: use latest tw-tasks-loaded payload
             renderPanel();
@@ -1534,7 +1536,8 @@
                     render();
                 } catch { container.innerHTML = '<div class="tw-panel-error">Failed to load</div>'; }
             } else {
-                // active mode: filter-sensitive, populated by tw-tasks-loaded event
+                // active mode: seed from last known filtered tasks
+                if (window._twLastTasks) tagCounts = _countTagsFromTasks(window._twLastTasks);
                 render();
             }
         }
