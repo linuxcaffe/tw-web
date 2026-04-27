@@ -781,7 +781,15 @@ h2 {
 @keyframes te-btn-pulse { 0%,100% { transform: scale(1); } 40% { transform: scale(0.91); } }
 .te-btn-clicked { animation: te-btn-pulse 0.22s ease; }
 
-/* State select: dim placeholder, match input appearance */
+/* State select: suppress OS chrome, use consistent arrow */
+#task-editor-state {
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.35)'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 24px !important;
+    cursor: pointer;
+}
 #task-editor-state option[value=""] { color: rgba(255,255,255,0.35); }
 #task-editor-state.te-state-empty   { color: rgba(255,255,255,0.35); }
 

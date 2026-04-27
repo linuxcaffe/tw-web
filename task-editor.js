@@ -369,7 +369,7 @@ class TaskEditor {
         if (!sel) return;
         try {
             if (!TaskEditor._stateColumns) {
-                const d = await fetch('/api/kanban-columns').then(r => r.json());
+                const d = await fetch('/api/kanban/columns').then(r => r.json());
                 TaskEditor._stateColumns = d.columns || [];
             }
             const current = sel.dataset.current || '';
@@ -377,8 +377,8 @@ class TaskEditor {
                 TaskEditor._stateColumns.map(c =>
                     `<option value="${c}">${c}</option>`
                 ).join('');
-            sel.value = current;
-            sel.classList.toggle('te-state-empty', !current);
+            sel.value = current || '';
+            sel.classList.toggle('te-state-empty', !sel.value);
         } catch {}
     }
 
