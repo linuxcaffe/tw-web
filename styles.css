@@ -447,23 +447,14 @@ h2 {
 :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-extras,
 :is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded) .card-extras { display: none; }
 
-/* Dependency section inside card */
-.card-deps { margin-top: 5px; border-left: 2px solid rgba(52,152,219,0.4); padding-left: 8px; }
-.card-dep-item {
-    display: flex; align-items: center; gap: 5px;
-    font-size: 0.82em; padding: 2px 0; cursor: pointer;
-    color: rgba(255,255,255,0.7);
+/* Dep count badge — bold N tight after priority dot */
+.card-dep-count {
+    font-weight: 700;
+    font-size: 0.78em;
+    color: rgba(255,255,255,0.55);
+    margin-right: 4px;
+    line-height: 1;
 }
-.card-dep-item:hover { color: #fff; }
-.card-dep-nodot { width: 8px; flex-shrink: 0; }
-.card-dep-desc { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card-dep-status {
-    font-size: 0.85em; padding: 1px 5px; border-radius: 3px;
-    background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); flex-shrink: 0;
-}
-.card-dep-status.completed { background: rgba(39,174,96,0.2); color: #27ae60; }
-.card-dep-status.deleted   { background: rgba(192,57,43,0.2);  color: #c0392b; }
-.card-dep-unknown { color: rgba(255,255,255,0.35); font-style: italic; }
 
 /* Tree-style dep cards in list view */
 .task-card.task-card-dep {

@@ -152,7 +152,7 @@ class TaskCardManager {
 
         const extrasStr  = this._extras(task);
         const extrasHtml = extrasStr ? `<div class="card-extras">${this._e(extrasStr)}</div>` : '';
-        const depsHtml   = dep ? '' : this._depsSection(task);
+        const depCount   = !dep && task.depends && task.depends.length ? task.depends.length : 0;
 
         const card = document.createElement('div');
         card.className = 'task-card';
@@ -166,6 +166,7 @@ class TaskCardManager {
         else if (task.due)                   card.dataset.type = 'due';
 
         const dotHtml     = priClass ? `<span class="card-pri-dot ${priClass}"></span>` : '';
+        const depBadge    = depCount ? `<span class="card-dep-count">${depCount}</span>` : '';
         const metaContent = proj + dueHtml + schedHtml + durHtml + tagsHtml;
         const metaHtml    = metaContent ? `<div class="card-meta">${metaContent}</div>` : '';
         if (anns.length) card.dataset.annotated = '1';
@@ -173,9 +174,8 @@ class TaskCardManager {
         const nonPending = task.status === 'completed' || task.status === 'deleted';
         card.innerHTML =
             `<div class="card-main">` +
-                `<div class="card-desc">${dotHtml}<span class="card-desc-text">${this._e(task.description)}</span></div>` +
+                `<div class="card-desc">${dotHtml}${depBadge}<span class="card-desc-text">${this._e(task.description)}</span></div>` +
                 metaHtml +
-                depsHtml +
                 extrasHtml +
                 annHtml +
             `</div>` +
@@ -189,26 +189,6 @@ class TaskCardManager {
             `</div>`);
 
         return card;
-    }
-
-    _depsSection(task) {
-        const uuids = task.depends;
-        if (!uuids || !uuids.length) return '';
-        const all = window._twAllTasks || [];
-        const lookup = new Map(all.map(t => [t.uuid, t]));
-        const rows = uuids.map(uuid => {
-            const d = lookup.get(uuid);
-            if (!d) return `<div class="card-dep-item card-dep-unknown">↳ <span class="card-dep-desc">${uuid.slice(0, 8)}…</span></div>`;
-            const pri = String(d.priority || '');
-            const priClass = ['1','2','H'].includes(pri) ? 'pri-high'
-                           : ['3','4','M'].includes(pri) ? 'pri-med'
-                           : ['5','6','L'].includes(pri) ? 'pri-low' : '';
-            const dot    = priClass ? `<span class="card-pri-dot ${priClass}"></span>` : '<span class="card-dep-nodot"></span>';
-            const status = d.status !== 'pending' ? `<span class="card-dep-status ${d.status}">${d.status}</span>` : '';
-            return `<div class="card-dep-item" data-task-action="edit" data-task-uuid="${d.uuid}">`
-                 + `${dot}<span class="card-dep-desc">${this._e(d.description)}</span>${status}</div>`;
-        }).join('');
-        return `<div class="card-deps">${rows}</div>`;
     }
 
     _extras(task) {
