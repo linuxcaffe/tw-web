@@ -915,6 +915,15 @@ def modify_task(task_id):
     if 'state' in data:
         modifications.append(f'state:{data["state"]}' if data['state'] else 'state:')
 
+    if 'depends' in data:
+        modifications.append(f'depends:{data["depends"]}' if data['depends'] else 'depends:')
+
+    if 'wait' in data:
+        modifications.append(f'wait:{data["wait"]}' if data['wait'] else 'wait:')
+
+    if 'until' in data:
+        modifications.append(f'until:{data["until"]}' if data['until'] else 'until:')
+
     if modifications:
         result = run_task_command(['task', task_id, 'modify'] + modifications)
 
@@ -1039,6 +1048,18 @@ def add_task():
 
     if data.get('due_duration'):
         args.append(f'due_duration:{data["due_duration"]}')
+
+    if data.get('state'):
+        args.append(f'state:{data["state"]}')
+
+    if data.get('depends'):
+        args.append(f'depends:{data["depends"]}')
+
+    if data.get('wait'):
+        args.append(f'wait:{data["wait"]}')
+
+    if data.get('until'):
+        args.append(f'until:{data["until"]}')
 
     create_result = run_task_command(args)
 

@@ -273,6 +273,9 @@ class TaskEditor {
             });
         });
 
+        // Populate state dropdown from kanban columns
+        this._loadStateOptions();
+
         // Save button (type=button to prevent native datetime-local validation/focus)
         const saveBtn = this.modal.querySelector('#task-editor-save');
         if (saveBtn) saveBtn.addEventListener('click', () => this.handleSave());
@@ -342,6 +345,18 @@ class TaskEditor {
         this.currentTask = null;
     }
     
+    async _loadStateOptions() {
+        const sel = this.modal.querySelector('#task-editor-state');
+        if (!sel) return;
+        try {
+            const d = await fetch('/api/kanban-columns').then(r => r.json());
+            const cols = d.columns || [];
+            const current = sel.dataset.current || '';
+            sel.innerHTML = `<option value="">— state —</option>` +
+                cols.map(c => `<option value="${c}"${c === current ? ' selected' : ''}>${c}</option>`).join('');
+        } catch {}
+    }
+
     populateForm(task) {
         const form = this.modal.querySelector('#task-editor-form');
         if (!form) return;
@@ -375,6 +390,25 @@ class TaskEditor {
 
             const schedDurField = form.querySelector('#task-editor-sched-duration');
             if (schedDurField) schedDurField.value = task.sched_duration || '';
+
+            const stateField = form.querySelector('#task-editor-state');
+            if (stateField) {
+                stateField.dataset.current = task.state || '';
+                stateField.value = task.state || '';
+            }
+
+            const depsField = form.querySelector('#task-editor-deps');
+            if (depsField) {
+                const deps = task.depends
+                    ? (Array.isArray(task.depends) ? task.depends : String(task.depends).split(',')).map(d => d.trim()).filter(Boolean)
+                    : [];
+                depsField.value = deps.join(', ');
+            }
+
+            const waitField  = form.querySelector('#task-editor-wait');
+            const untilField = form.querySelector('#task-editor-until');
+            if (waitField)  waitField.value  = this.formatDateForInput(task.wait);
+            if (untilField) untilField.value = this.formatDateForInput(task.until);
         }
 
         // Sync datetime-local empty-state styling after programmatic fill
@@ -450,6 +484,10 @@ class TaskEditor {
         const dueDurField   = form.querySelector('#task-editor-due-duration');
         const schedField    = form.querySelector('#task-editor-scheduled');
         const schedDurField = form.querySelector('#task-editor-sched-duration');
+        const stateField    = form.querySelector('#task-editor-state');
+        const depsField     = form.querySelector('#task-editor-deps');
+        const waitField     = form.querySelector('#task-editor-wait');
+        const untilField    = form.querySelector('#task-editor-until');
 
         if (tagsField) {
             const newTags = tagsField.value.split(',').map(t => t.trim()).filter(Boolean);
@@ -467,6 +505,10 @@ class TaskEditor {
         if (dueDurField)   taskData.due_duration   = dueDurField.value;
         if (schedField)    taskData.scheduled      = schedField.value;
         if (schedDurField) taskData.sched_duration = schedDurField.value;
+        if (stateField)    taskData.state          = stateField.value;
+        if (depsField)     taskData.depends        = depsField.value.split(',').map(s => s.trim()).filter(Boolean).join(',');
+        if (waitField)     taskData.wait           = waitField.value;
+        if (untilField)    taskData.until          = untilField.value;
         
         // Ajouter l'ID si on modifie une tâche existante
         if (this.currentTask) {
@@ -576,7 +618,14 @@ class TaskEditor {
         
         if (taskData.due_duration)   preparedData.due_duration   = taskData.due_duration;
         if (taskData.sched_duration) preparedData.sched_duration = taskData.sched_duration;
-        
+
+        if (taskData.state  !== undefined) preparedData.state  = taskData.state  || '';
+        if (taskData.depends !== undefined) preparedData.depends = taskData.depends || '';
+        if (taskData.wait  !== undefined)
+            preparedData.wait  = taskData.wait  ? this.formatDateForTask(taskData.wait)  : '';
+        if (taskData.until !== undefined)
+            preparedData.until = taskData.until ? this.formatDateForTask(taskData.until) : '';
+
         return preparedData;
     }
     
