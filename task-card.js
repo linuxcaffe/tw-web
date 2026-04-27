@@ -227,7 +227,16 @@ class TaskCardManager {
         pairs.sort((a, b) => a.key.localeCompare(b.key));
 
         const parts = [];
-        if (task.id) parts.push(`id:${task.id}`);
+        const nonPending = task.status === 'completed' || task.status === 'deleted';
+        if (nonPending && task.uuid) parts.push(`uuid:${task.uuid.slice(0, 8)}`);
+        if (nonPending && task.end) {
+            const m = task.end.match(/^(\d{4})(\d{2})(\d{2})/);
+            const lbl = m ? new Date(+m[1], +m[2]-1, +m[3])
+                                .toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+                          : task.end.slice(0, 8);
+            parts.push(`end:${lbl}`);
+        }
+        if (!nonPending && task.id) parts.push(`id:${task.id}`);
         pairs.forEach(p => parts.push(p.text));
 
         return parts.join(', ');

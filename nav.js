@@ -120,7 +120,7 @@
 
     let _ptyTerm = null;
 
-    async function openPty(cmd) {
+    async function openPty(cmd, { autoClose = true } = {}) {
         const out = document.getElementById('tw-cmd-output');
         if (!out) return;
 
@@ -185,29 +185,40 @@
         const proto = location.protocol === 'https:' ? 'wss' : 'ws';
         const ws = new WebSocket(`${proto}://${location.host}/ws/pty`);
 
+        let _sessionEnded = false;
+        function _closePty() {
+            out.classList.remove('pty-mode');
+            _hideCmdOutput();
+            if (_ptyTerm === term) { term.dispose(); _ptyTerm = null; }
+        }
+
         ws.onopen = () => ws.send(JSON.stringify({ cmd }));
         ws.onmessage = e => {
             if (e.data === '\r\n[done]\r\n') {
                 term.writeln('\r\n\x1b[32m[done]\x1b[0m');
                 document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: window.twNav.getState() }));
-                setTimeout(() => {
-                    out.classList.remove('pty-mode');
-                    _hideCmdOutput();
-                    if (_ptyTerm === term) { term.dispose(); _ptyTerm = null; }
-                }, 1200);
+                if (autoClose) {
+                    setTimeout(_closePty, 1200);
+                }
                 return;
             }
             term.write(e.data);
         };
         ws.onclose = () => {
             document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: window.twNav.getState() }));
-            out.classList.remove('pty-mode');
-            _hideCmdOutput();
-            if (_ptyTerm === term) { term.dispose(); _ptyTerm = null; }
+            if (autoClose) {
+                _closePty();
+            } else {
+                _sessionEnded = true;
+                term.writeln('\x1b[2m[any key to close]\x1b[0m');
+            }
         };
         ws.onerror = () => {};
 
-        term.onData(data => { if (ws.readyState === WebSocket.OPEN) ws.send(data); });
+        term.onData(data => {
+            if (_sessionEnded) { _closePty(); return; }
+            if (ws.readyState === WebSocket.OPEN) ws.send(data);
+        });
     }
 
     window.twNav = { getState, setState, stateToParams, setCount, setGrandTotal, getGrandTotal,
@@ -792,6 +803,10 @@
         'oldest','overdue','ready','recurring',
         'unblocked','waiting','blocked',
         'burndown','calendar','ghistory','history','summary','timesheet',
+        // diagnostic / info commands
+        'diag','columns','col','cols','show','info','ids','uuids','udas',
+        'projects','tags','stats','reports','contexts',
+        '_ids','_uuids','_projects','_tags','_urgency','_zshcomp','_aliases',
     ]);
     function _isFilterOnly(cmd) {
         const tokens = cmd.trim().split(/\s+/);
@@ -856,55 +871,9 @@
             return;
         }
 
-        const out = document.getElementById('tw-cmd-output');
-        function _showOut(html) {
-            if (!out) return;
-            out.innerHTML = `<button id="tw-cmd-output-close" title="Close">×</button>${html}`;
-            out.classList.add('active');
-            document.getElementById('tw-cmd-output-close')?.addEventListener('click', _hideCmdOutput);
-        }
-        _showOut('Running…');
-        try {
-            const res  = await fetch('/api/run', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cmd }),
-            });
-            const data = await res.json();
-
-            if (data.preflight) {
-                _showOut(
-                    `<span>This will <strong>${esc(data.verb)}</strong> <strong>${data.count}</strong> tasks` +
-                    ` matching <code>${esc(data.filter)}</code>. Proceed?</span>` +
-                    `<button class="tw-preflight-yes">Yes, do it</button>` +
-                    `<button class="tw-preflight-no">Cancel</button>`
-                );
-                out.querySelector('.tw-preflight-yes')?.addEventListener('click', async () => {
-                    _showOut('Running…');
-                    try {
-                        const r2   = await fetch('/api/run', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ cmd, confirmed: true }),
-                        });
-                        const d2   = await r2.json();
-                        const txt2 = [d2.stdout, d2.stderr].filter(Boolean).join('\n').trim()
-                                  || (d2.success ? 'Done.' : d2.error || 'Error (no output)');
-                        _showOut(`<span>${esc(txt2)}</span>`);
-                        document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
-                    } catch (e) { _showOut(`<span>Network error: ${esc(e.message)}</span>`); }
-                });
-                out.querySelector('.tw-preflight-no')?.addEventListener('click', _hideCmdOutput);
-                return;
-            }
-
-            const text = [data.stdout, data.stderr].filter(Boolean).join('\n').trim()
-                      || (data.success ? 'Done.' : data.error || 'Error (no output)');
-            _showOut(`<span>${esc(text)}</span>`);
-            document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
-        } catch (err) {
-            _showOut(`<span>Network error: ${esc(err.message)}</span>`);
-        }
+        // Command verb detected → run in PTY console so hooks/prompts work naturally
+        inp.value = '';
+        openPty(cmd, { autoClose: false });
     }
 
     // ── Side menu ─────────────────────────────────────────────────────────────

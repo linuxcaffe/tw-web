@@ -101,9 +101,11 @@ class TaskWarriorUI {
             onCancel: () => this.handleTaskCancel()
         });
         
-        this.viewMode    = localStorage.getItem('tw-view-mode')    || 'card';
-        this.sortField   = localStorage.getItem('tw-sort-field')   || 'urgency';
-        this.sortReverse = localStorage.getItem('tw-sort-reverse') === 'true';
+        this.viewMode      = localStorage.getItem('tw-view-mode')       || 'card';
+        this.sortField     = localStorage.getItem('tw-sort-field')     || 'urgency';
+        this.sortReverse   = localStorage.getItem('tw-sort-reverse')   === 'true';
+        this.sortFieldNP   = localStorage.getItem('tw-sort-field-np')  || 'end';
+        this.sortReverseNP = localStorage.getItem('tw-sort-reverse-np') !== 'false'; // default true
 
         // Wait for components to initialise before loading data
         setTimeout(() => {
@@ -114,6 +116,8 @@ class TaskWarriorUI {
 
         // Re-fetch on server-relevant changes; re-filter only for project/tags
         document.addEventListener('tw-filter-change', (e) => {
+            // Rebuild sort popup field list when status changes (pending ↔ non-pending)
+            this.updateSortBtn();
             if (e.detail && e.detail.clientOnly) {
                 this.renderTasks();
             } else {
@@ -142,7 +146,7 @@ class TaskWarriorUI {
 
     // ── Sort ─────────────────────────────────────────────────────────────────
 
-    static get SORT_FIELDS() {
+    static get SORT_FIELDS_PENDING() {
         return [
             { value: 'urgency',     label: 'Urgency (default)' },
             { value: 'priority',    label: 'Priority' },
@@ -159,9 +163,31 @@ class TaskWarriorUI {
         ];
     }
 
+    static get SORT_FIELDS_NP() {
+        return [
+            { value: 'end',         label: 'End date (default)' },
+            { value: 'description', label: 'Description' },
+            { value: 'project',     label: 'Project' },
+            { value: 'entry',       label: 'Created' },
+            { value: 'modified',    label: 'Modified' },
+            { value: 'priority',    label: 'Priority' },
+            { value: 'tags',        label: 'Tags' },
+        ];
+    }
+
+    // true when the current status view is completed or deleted
+    isNonPending() {
+        const state    = window.twNav ? window.twNav.getState() : {};
+        const statuses = state.statuses || ['pending'];
+        return statuses.length > 0 && statuses.every(s => s !== 'pending');
+    }
+
+    get activeSortField()   { return this.isNonPending() ? this.sortFieldNP   : this.sortField;   }
+    get activeSortReverse() { return this.isNonPending() ? this.sortReverseNP : this.sortReverse; }
+
     sortTasks(tasks) {
-        const field = this.sortField;
-        const rev   = this.sortReverse ? -1 : 1;
+        const field = this.activeSortField;
+        const rev   = this.activeSortReverse ? -1 : 1;
         if (field === 'urgency') return rev === 1 ? tasks : [...tasks].reverse();
 
         const PRI = { H: 3, M: 2, L: 1 };
@@ -169,7 +195,7 @@ class TaskWarriorUI {
             let av = a[field], bv = b[field];
             if (field === 'priority') { av = PRI[av] || 0; bv = PRI[bv] || 0; }
             else if (field === 'tags') { av = (av || []).join(','); bv = (bv || []).join(','); }
-            // Dates come as ISO strings — sort as strings (lexicographic = chronological)
+            // Dates: ISO strings sort lexicographically = chronologically
             av = av ?? '';
             bv = bv ?? '';
             if (av < bv) return -1 * rev;
@@ -181,10 +207,27 @@ class TaskWarriorUI {
     updateSortBtn() {
         const btn = document.getElementById('sort-btn');
         if (!btn) return;
-        const isDefault = this.sortField === 'urgency' && !this.sortReverse;
+        const np        = this.isNonPending();
+        const field     = this.activeSortField;
+        const reversed  = this.activeSortReverse;
+        const isDefault = np ? (field === 'end' && reversed) : (field === 'urgency' && !reversed);
         btn.classList.toggle('sort-active', !isDefault);
-        const label = TaskWarriorUI.SORT_FIELDS.find(f => f.value === this.sortField)?.label || this.sortField;
-        btn.title = isDefault ? 'Sort' : `Sort: ${label}${this.sortReverse ? ' ↑' : ' ↓'}`;
+        const fields = np ? TaskWarriorUI.SORT_FIELDS_NP : TaskWarriorUI.SORT_FIELDS_PENDING;
+        const label  = fields.find(f => f.value === field)?.label || field;
+        btn.title = isDefault ? 'Sort' : `Sort: ${label}${reversed ? ' ↑' : ' ↓'}`;
+    }
+
+    rebuildSortPopup() {
+        const fields = document.getElementById('sort-fields');
+        const revBox = document.getElementById('sort-reverse');
+        if (!fields || !revBox) return;
+        const np      = this.isNonPending();
+        const flist   = np ? TaskWarriorUI.SORT_FIELDS_NP : TaskWarriorUI.SORT_FIELDS_PENDING;
+        const current = this.activeSortField;
+        fields.innerHTML = flist.map(f =>
+            `<label><input type="radio" name="tw-sort" value="${f.value}"${f.value === current ? ' checked' : ''}> ${f.label}</label>`
+        ).join('');
+        revBox.checked = this.activeSortReverse;
     }
 
     initSortPopup() {
@@ -194,32 +237,39 @@ class TaskWarriorUI {
         const revBox  = document.getElementById('sort-reverse');
         if (!btn || !popup || !fields || !revBox) return;
 
-        // Build radio list
-        fields.innerHTML = TaskWarriorUI.SORT_FIELDS.map(f =>
-            `<label><input type="radio" name="tw-sort" value="${f.value}"${f.value === this.sortField ? ' checked' : ''}> ${f.label}</label>`
-        ).join('');
-        revBox.checked = this.sortReverse;
+        this.rebuildSortPopup();
 
-        // Toggle popup
+        // Toggle popup — rebuild field list each open so it matches current status
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
+            const opening = popup.style.display === 'none';
+            if (opening) this.rebuildSortPopup();
+            popup.style.display = opening ? 'block' : 'none';
         });
 
         // Field change
         fields.addEventListener('change', (e) => {
-            if (e.target.name === 'tw-sort') {
+            if (e.target.name !== 'tw-sort') return;
+            if (this.isNonPending()) {
+                this.sortFieldNP = e.target.value;
+                localStorage.setItem('tw-sort-field-np', this.sortFieldNP);
+            } else {
                 this.sortField = e.target.value;
                 localStorage.setItem('tw-sort-field', this.sortField);
-                this.updateSortBtn();
-                this.renderTasks();
             }
+            this.updateSortBtn();
+            this.renderTasks();
         });
 
         // Reverse toggle
         revBox.addEventListener('change', () => {
-            this.sortReverse = revBox.checked;
-            localStorage.setItem('tw-sort-reverse', this.sortReverse);
+            if (this.isNonPending()) {
+                this.sortReverseNP = revBox.checked;
+                localStorage.setItem('tw-sort-reverse-np', this.sortReverseNP);
+            } else {
+                this.sortReverse = revBox.checked;
+                localStorage.setItem('tw-sort-reverse', this.sortReverse);
+            }
             this.updateSortBtn();
             this.renderTasks();
         });
