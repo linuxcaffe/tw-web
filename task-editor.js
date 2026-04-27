@@ -276,14 +276,26 @@ class TaskEditor {
         // Populate state dropdown from kanban columns
         this._loadStateOptions();
 
-        // Save button (type=button to prevent native datetime-local validation/focus)
-        const saveBtn = this.modal.querySelector('#task-editor-save');
-        if (saveBtn) saveBtn.addEventListener('click', () => this.handleSave());
+        // State select: dim when placeholder selected
+        const stateSel = this.modal.querySelector('#task-editor-state');
+        if (stateSel) stateSel.addEventListener('change', () => {
+            stateSel.classList.toggle('te-state-empty', !stateSel.value);
+            stateSel.dataset.current = stateSel.value;
+        });
 
-        // Keep form submit as fallback for Enter key
+        // Save button — pulse animation + feedback
+        const saveBtn = this.modal.querySelector('#task-editor-save');
+        if (saveBtn) saveBtn.addEventListener('click', () => {
+            this._pulseBtn(saveBtn);
+            this.handleSave();
+        });
+
+        // Keep form submit as fallback for Enter key — pulse save button
         if (form) {
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
+                const sb = this.modal.querySelector('#task-editor-save');
+                if (sb) this._pulseBtn(sb);
                 this.handleSave();
             });
         }
@@ -345,15 +357,28 @@ class TaskEditor {
         this.currentTask = null;
     }
     
+    _pulseBtn(btn) {
+        btn.classList.remove('te-btn-clicked');
+        void btn.offsetWidth; // reflow to restart animation
+        btn.classList.add('te-btn-clicked');
+        btn.addEventListener('animationend', () => btn.classList.remove('te-btn-clicked'), { once: true });
+    }
+
     async _loadStateOptions() {
         const sel = this.modal.querySelector('#task-editor-state');
         if (!sel) return;
         try {
-            const d = await fetch('/api/kanban-columns').then(r => r.json());
-            const cols = d.columns || [];
+            if (!TaskEditor._stateColumns) {
+                const d = await fetch('/api/kanban-columns').then(r => r.json());
+                TaskEditor._stateColumns = d.columns || [];
+            }
             const current = sel.dataset.current || '';
-            sel.innerHTML = `<option value="">— state —</option>` +
-                cols.map(c => `<option value="${c}"${c === current ? ' selected' : ''}>${c}</option>`).join('');
+            sel.innerHTML = `<option value="">state</option>` +
+                TaskEditor._stateColumns.map(c =>
+                    `<option value="${c}">${c}</option>`
+                ).join('');
+            sel.value = current;
+            sel.classList.toggle('te-state-empty', !current);
         } catch {}
     }
 
@@ -394,7 +419,7 @@ class TaskEditor {
             const stateField = form.querySelector('#task-editor-state');
             if (stateField) {
                 stateField.dataset.current = task.state || '';
-                stateField.value = task.state || '';
+                this._loadStateOptions(); // rebuild options with correct selection
             }
 
             const depsField = form.querySelector('#task-editor-deps');
@@ -467,6 +492,9 @@ class TaskEditor {
         this.modal.querySelectorAll('input[type="datetime-local"]').forEach(inp =>
             inp.classList.toggle('te-dt-empty', !inp.value)
         );
+        // Reset state select to placeholder
+        const sel = this.modal.querySelector('#task-editor-state');
+        if (sel) { sel.dataset.current = ''; this._loadStateOptions(); }
     }
     
     handleSave() {
