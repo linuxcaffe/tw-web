@@ -330,7 +330,7 @@ class TaskWarriorUI {
             const params       = window.twNav ? window.twNav.stateToParams() : 'status=pending';
             const statusParams = new URLSearchParams();
             statusParams.set('status', (state.statuses || ['pending']).join(','));
-            const needTotal    = !!(state.context);
+            const needTotal    = true;
             const cacheKey     = 'tw-tasks-cache';
             const dirtyKey     = 'tw-tasks-dirty';
 
