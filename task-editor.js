@@ -783,7 +783,7 @@ class TaskEditor {
 
             const textEl = document.createElement('span');
             textEl.className = 'te-ann-text';
-            textEl.textContent = text;
+            textEl.innerHTML = typeof linkifyAnnotation === 'function' ? linkifyAnnotation(text) : text;
 
             const editBtn = document.createElement('button');
             editBtn.type = 'button';

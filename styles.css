@@ -464,6 +464,9 @@ h2 {
     white-space: pre-wrap;
 }
 
+a.ann-link { color: #5dade2; text-decoration: none; word-break: break-all; }
+a.ann-link:hover { text-decoration: underline; }
+
 /* Action column — right side */
 .card-actions {
     display: flex;

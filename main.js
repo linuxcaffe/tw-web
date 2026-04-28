@@ -308,6 +308,7 @@ class TaskWarriorUI {
         if (container) {
             container.addEventListener('click', (e) => {
                 if (e.target.closest('[data-task-action]')) return;
+                if (e.target.closest('.ann-link')) return;
                 const card = e.target.closest('.task-card');
                 if (!card) return;
                 if (this.viewMode === 'list') {

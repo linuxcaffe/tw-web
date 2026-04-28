@@ -147,7 +147,7 @@ class TaskCardManager {
 
         const anns = task.annotations || [];
         const annHtml = anns.length
-            ? `<div class="card-annotations">${anns.map(a => `<div class="card-ann">${this._e(a.description)}</div>`).join('')}</div>`
+            ? `<div class="card-annotations">${anns.map(a => `<div class="card-ann">${this._linkify(a.description)}</div>`).join('')}</div>`
             : '';
 
         const extrasBase = this._extras(task);
@@ -307,6 +307,8 @@ class TaskCardManager {
         return h && m ? `${h}h${m}m` : h ? `${h}h` : `${m}m`;
     }
 
+    _linkify(raw) { return linkifyAnnotation(raw); }
+
     _e(t) {
         const d = document.createElement('div');
         d.textContent = String(t ?? '');
@@ -314,4 +316,16 @@ class TaskCardManager {
     }
 }
 
-
+// Standalone linkify for use outside TaskCardManager (e.g. task-editor.js)
+function linkifyAnnotation(raw) {
+    const RE = /(?:https?|ftp|file):\/\/[^\s<>"']+|mailto:[^\s<>"']+/g;
+    const esc = s => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+    let out = '', last = 0, m;
+    while ((m = RE.exec(raw)) !== null) {
+        out += esc(raw.slice(last, m.index));
+        const url = m[0].replace(/"/g, '%22');
+        out += `<a href="${url}" target="_blank" rel="noopener noreferrer" class="ann-link">${esc(m[0])}</a>`;
+        last = m.index + m[0].length;
+    }
+    return out + esc(raw.slice(last));
+}
