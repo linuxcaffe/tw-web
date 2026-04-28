@@ -424,10 +424,16 @@ class TaskEditor {
 
             const depsField = form.querySelector('#task-editor-deps');
             if (depsField) {
-                const deps = task.depends
+                const uuids = task.depends
                     ? (Array.isArray(task.depends) ? task.depends : String(task.depends).split(',')).map(d => d.trim()).filter(Boolean)
                     : [];
-                depsField.value = deps.join(', ');
+                const allLookup = new Map((window._twAllTasks || []).map(t => [t.uuid, t]));
+                const depLabels = uuids.map(uuid => {
+                    const t = allLookup.get(uuid);
+                    if (!t) return uuid.slice(0, 8);           // unknown: uuid:8
+                    return t.id ? String(t.id) : uuid.slice(0, 8); // pending: ID, else uuid:8
+                });
+                depsField.value = depLabels.join(', ');
             }
 
             const waitField  = form.querySelector('#task-editor-wait');
