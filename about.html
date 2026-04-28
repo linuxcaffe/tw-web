@@ -59,6 +59,10 @@
         <h3>🦊 tw-web Bookmark</h3>
         <p>Bookmark any page into Taskwarrior with <strong>Alt+W</strong>. The URL goes into an annotation (clickable in tw-web). Also opens the Add task dialog directly.</p>
         <ol class="ext-steps">
+            <li>Install the native messaging host (one-time):
+                <br><code style="font-size:11px; background:rgba(0,0,0,0.25); padding:2px 6px; border-radius:3px;">
+                mkdir -p ~/.mozilla/native-messaging-hosts &amp;&amp; cp tw-web-native-host.json ~/.mozilla/native-messaging-hosts/tw_web_launcher.json</code>
+            </li>
             <li>Open <a href="about:debugging#/runtime/this-firefox" id="debugging-link">about:debugging</a> in Firefox</li>
             <li>Click <strong>This Firefox</strong> → <strong>Load Temporary Add-on…</strong></li>
             <li>Select the <code>manifest.json</code> below</li>

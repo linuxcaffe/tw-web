@@ -145,7 +145,11 @@ def log_command(args):
         f.write(f"[{timestamp}] {' '.join(args)}\n")
 
 app = Flask(__name__, static_folder='.', static_url_path='')
-CORS(app)
+CORS(app, origins=[
+    'http://localhost:5000',
+    'http://127.0.0.1:5000',
+    re.compile(r'moz-extension://.*'),
+])
 sock = Sock(app)
 
 # ── Hook prompt system ────────────────────────────────────────────────────────
@@ -768,6 +772,43 @@ def extension_info():
     """Return install path for the bundled Firefox extension."""
     manifest = Path(__file__).parent / 'firefox' / 'manifest.json'
     return jsonify({'manifest_path': str(manifest), 'exists': manifest.exists()})
+
+_START_TIME = time.time()
+
+@app.route('/api/health')
+def server_health():
+    """Return server uptime and basic TW stats."""
+    import signal as _signal
+    uptime = int(time.time() - _START_TIME)
+    tw = run_task_command(['task', 'status:pending', 'count'], readonly=True)
+    count = tw['stdout'].strip() if tw['success'] else '?'
+    ver   = run_task_command(['task', '_version'], readonly=True)
+    version = ver['stdout'].strip() if ver['success'] else '?'
+    return jsonify({
+        'uptime_seconds': uptime,
+        'pending_count': count,
+        'tw_version': version,
+    })
+
+@app.route('/api/server/stop', methods=['POST'])
+def server_stop():
+    """Shut down the Flask server. Kills the reloader parent via PID file."""
+    import signal as _signal
+    pid_file = Path('/tmp/tw-web.pid')
+    def _kill():
+        time.sleep(0.15)
+        if pid_file.exists():
+            try:
+                pid = int(pid_file.read_text().strip())
+                os.kill(pid, _signal.SIGTERM)
+                pid_file.unlink(missing_ok=True)
+                return
+            except (ValueError, ProcessLookupError):
+                pid_file.unlink(missing_ok=True)
+        # Fallback: kill process group so reloader parent dies too
+        os.killpg(os.getpgid(os.getpid()), _signal.SIGTERM)
+    threading.Thread(target=_kill, daemon=True).start()
+    return jsonify({'success': True})
 
 @app.route('/api/open', methods=['POST'])
 def open_file():
@@ -1466,4 +1507,4 @@ if __name__ == '__main__':
 
     print("Starting tw-web...")
     print("Access the interface at: http://localhost:5000")
-    app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)
+    app.run(host='127.0.0.1', port=5000, debug=True, threaded=True)

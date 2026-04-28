@@ -1,19 +1,22 @@
 {
   "manifest_version": 2,
   "name": "tw-web",
-  "version": "1.0",
-  "description": "Bookmark current page as a Taskwarrior task via tw-web",
+  "version": "1.1",
+  "description": "Add tasks and bookmarks to Taskwarrior via tw-web",
   "icons": { "48": "icon.png" },
+  "browser_specific_settings": {
+    "gecko": { "id": "tw-web@linuxcaffe" }
+  },
   "browser_action": {
     "default_icon": "icon.png",
-    "default_title": "Bookmark in Taskwarrior (Alt+W)",
+    "default_title": "tw-web (Alt+W)",
     "default_popup": "popup.html"
   },
   "commands": {
     "_execute_browser_action": {
       "suggested_key": { "default": "Alt+W" },
-      "description": "Open tw-web bookmark dialog"
+      "description": "Open tw-web popup"
     }
   },
-  "permissions": ["activeTab", "tabs"]
+  "permissions": ["activeTab", "tabs", "nativeMessaging"]
 }

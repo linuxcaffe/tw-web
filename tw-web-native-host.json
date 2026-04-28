@@ -1,0 +1,7 @@
+{
+  "name": "tw_web_launcher",
+  "description": "tw-web Flask server launcher",
+  "path": "/home/djp/dev/tw-web/tw-web-native-host.py",
+  "type": "stdio",
+  "allowed_extensions": ["tw-web@linuxcaffe"]
+}
