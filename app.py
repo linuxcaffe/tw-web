@@ -763,6 +763,12 @@ def get_tags():
         return jsonify({'success': True, 'tags': tags, 'counts': counts})
     return jsonify({'success': False, 'error': result['stderr']}), 500
 
+@app.route('/api/extension/info')
+def extension_info():
+    """Return install path for the bundled Firefox extension."""
+    manifest = Path(__file__).parent / 'firefox' / 'manifest.json'
+    return jsonify({'manifest_path': str(manifest), 'exists': manifest.exists()})
+
 @app.route('/api/open', methods=['POST'])
 def open_file():
     """Open a local file or directory with xdg-open (server-side, local machine only)."""

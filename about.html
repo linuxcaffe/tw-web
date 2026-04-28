@@ -19,6 +19,26 @@
         .about-container p  { margin-bottom: 12px; color: #555; line-height: 1.7; }
         .about-container ul { margin: 0 0 12px 20px; color: #555; line-height: 1.9; }
         .about-container a  { color: #3498db; }
+        .ext-box {
+            background: rgba(52,152,219,0.08); border: 1px solid rgba(52,152,219,0.25);
+            border-radius: 6px; padding: 14px 16px; margin-bottom: 12px;
+        }
+        .ext-box h3 { margin: 0 0 6px; font-size: 15px; }
+        .ext-box p  { margin-bottom: 8px; }
+        .ext-steps { margin: 0 0 10px 18px; }
+        .ext-path {
+            font-family: monospace; font-size: 12px;
+            background: rgba(0,0,0,0.25); border-radius: 4px;
+            padding: 6px 10px; word-break: break-all;
+            color: #aaa; display: block; margin-bottom: 8px;
+        }
+        #copy-btn {
+            background: #3498db; color: #fff; border: none;
+            padding: 5px 14px; border-radius: 4px; cursor: pointer; font-size: 13px;
+        }
+        #copy-btn:hover { background: #2980b9; }
+        #copy-ok { font-size: 12px; color: #27ae60; margin-left: 8px; opacity: 0; transition: opacity 0.3s; }
+        #copy-ok.show { opacity: 1; }
     </style>
     <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");</script>
 </head>
@@ -34,11 +54,39 @@
         <li><strong>Day Planner</strong> — drag tasks into hourly time blocks for daily scheduling</li>
         <li><strong>Calendar</strong> — week/month view of scheduled tasks</li>
     </ul>
+    <h2 style="margin: 20px 0 8px">Firefox Extension</h2>
+    <div class="ext-box">
+        <h3>🦊 tw-web Bookmark</h3>
+        <p>Bookmark any page into Taskwarrior with <strong>Alt+W</strong>. The URL goes into an annotation (clickable in tw-web). Also opens the Add task dialog directly.</p>
+        <ol class="ext-steps">
+            <li>Open <a href="about:debugging#/runtime/this-firefox" id="debugging-link">about:debugging</a> in Firefox</li>
+            <li>Click <strong>This Firefox</strong> → <strong>Load Temporary Add-on…</strong></li>
+            <li>Select the <code>manifest.json</code> below</li>
+        </ol>
+        <code class="ext-path" id="manifest-path">loading…</code>
+        <button id="copy-btn">Copy path</button>
+        <span id="copy-ok">✓ Copied</span>
+    </div>
+
     <h2 style="margin: 20px 0 8px">Required UDAs</h2>
     <ul>
         <li><code>uda.state.type=string</code> — kanban column assignment</li>
         <li><code>uda.priority.values=1,2,3,4,5,6,H,M,L</code> — numeric priority (need-priority hook)</li>
     </ul>
 </div>
+<script>
+fetch('/api/extension/info').then(r => r.json()).then(d => {
+    document.getElementById('manifest-path').textContent = d.manifest_path;
+    document.getElementById('copy-btn').addEventListener('click', () => {
+        navigator.clipboard.writeText(d.manifest_path).then(() => {
+            const ok = document.getElementById('copy-ok');
+            ok.classList.add('show');
+            setTimeout(() => ok.classList.remove('show'), 2000);
+        });
+    });
+}).catch(() => {
+    document.getElementById('manifest-path').textContent = 'Could not load path — is Flask running?';
+});
+</script>
 </body>
 </html>
