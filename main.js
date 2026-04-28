@@ -585,6 +585,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialiser taskCardManager avec le gestionnaire d'actions spécifique à main.js
     taskCardManager = new TaskCardManager(new ScriptTaskActionHandler());
     
+    // ?add=1 — open the Add dialog on load (e.g. from Firefox extension shortcut)
+    if (new URLSearchParams(window.location.search).get('add') === '1') {
+        history.replaceState({}, '', '/');
+        setTimeout(() => document.dispatchEvent(new CustomEvent('tw-open-add')), 300);
+    }
+
     // Initialiser taskEditor comme variable globale
     taskEditor = new TaskEditor({
         showAllFields: true,

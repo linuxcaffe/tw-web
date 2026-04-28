@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>tw-web bookmark</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 320px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: system-ui, sans-serif;
+    font-size: 13px;
+    padding: 12px;
+  }
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .header-title { font-weight: 600; font-size: 14px; color: #5dade2; }
+  .open-link {
+    font-size: 11px; color: rgba(255,255,255,0.4);
+    text-decoration: none; cursor: pointer;
+  }
+  .open-link:hover { color: #5dade2; }
+  .url-preview {
+    font-size: 11px; color: rgba(255,255,255,0.35);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 10px; padding: 4px 6px;
+    background: rgba(255,255,255,0.05); border-radius: 4px;
+  }
+  label { display: block; font-size: 11px; color: rgba(255,255,255,0.5); margin-bottom: 3px; }
+  input {
+    width: 100%; padding: 6px 8px; margin-bottom: 8px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px; color: #e0e0e0; font-size: 13px; outline: none;
+  }
+  input:focus { border-color: #5dade2; }
+  .row { display: flex; gap: 8px; }
+  .row > div { flex: 1; }
+  .actions { display: flex; gap: 8px; margin-top: 4px; }
+  button {
+    flex: 1; padding: 7px; border: none; border-radius: 5px;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+  #btn-save { background: #3498db; color: #fff; }
+  #btn-save:hover { background: #2980b9; }
+  #btn-save:disabled { background: #555; color: #888; cursor: default; }
+  #btn-add  { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); }
+  #btn-add:hover { background: rgba(255,255,255,0.15); }
+  #btn-open { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); flex: 0 0 auto; padding: 7px 12px; }
+  #btn-open:hover { background: rgba(255,255,255,0.15); }
+  #status {
+    margin-top: 8px; padding: 6px 8px; border-radius: 4px;
+    font-size: 12px; display: none;
+  }
+  #status.ok  { background: rgba(39,174,96,0.2);  color: #2ecc71; display: block; }
+  #status.err { background: rgba(192,57,43,0.2);  color: #e74c3c; display: block; }
+</style>
+</head>
+<body>
+<div class="header">
+  <span class="header-title">Bookmark in Taskwarrior</span>
+  <a class="open-link" id="open-twweb">open tw-web ↗</a>
+</div>
+<div class="url-preview" id="url-preview">…</div>
+
+<label for="title">Title</label>
+<input id="title" type="text" autocomplete="off" placeholder="Page title">
+
+<div class="row">
+  <div>
+    <label for="project">Project</label>
+    <input id="project" type="text" autocomplete="off" placeholder="optional">
+  </div>
+  <div>
+    <label for="tags">Extra tags</label>
+    <input id="tags" type="text" autocomplete="off" placeholder="+tag +tag">
+  </div>
+</div>
+
+<div class="actions">
+  <button id="btn-open">⊞</button>
+  <button id="btn-add">+ Add task</button>
+  <button id="btn-save">Bookmark</button>
+</div>
+<div id="status"></div>
+
+<script src="popup.js"></script>
+</body>
+</html>
