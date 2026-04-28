@@ -317,14 +317,21 @@ class TaskCardManager {
 }
 
 // Standalone linkify for use outside TaskCardManager (e.g. task-editor.js)
+// Handles: https?/ftp/file:// URIs, mailto:, and the "file: /path" annotation convention.
 function linkifyAnnotation(raw) {
-    const RE = /(?:https?|ftp|file):\/\/[^\s<>"']+|mailto:[^\s<>"']+/g;
+    const RE = /(?:https?|ftp|file):\/\/[^\s<>"']+|mailto:[^\s<>"']+|file:\s+\/[^\s<>"']+/g;
     const esc = s => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
     let out = '', last = 0, m;
     while ((m = RE.exec(raw)) !== null) {
         out += esc(raw.slice(last, m.index));
-        const url = m[0].replace(/"/g, '%22');
-        out += `<a href="${url}" target="_blank" rel="noopener noreferrer" class="ann-link">${esc(m[0])}</a>`;
+        let href, label = m[0];
+        if (/^file:\s+\//.test(m[0])) {
+            // Convention: "file: /abs/path" → file:///abs/path
+            href = 'file://' + m[0].replace(/^file:\s+/, '').replace(/"/g, '%22');
+        } else {
+            href = m[0].replace(/"/g, '%22');
+        }
+        out += `<a href="${href}" target="_blank" rel="noopener noreferrer" class="ann-link">${esc(label)}</a>`;
         last = m.index + m[0].length;
     }
     return out + esc(raw.slice(last));
