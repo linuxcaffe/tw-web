@@ -775,6 +775,39 @@ def open_file():
     subprocess.Popen(['xdg-open', path])
     return jsonify({'success': True})
 
+@app.route('/api/bookmark', methods=['POST'])
+def add_bookmark():
+    """Add a bookmark task: description=title, +bkmk tag, url annotated as 'url: <url>'."""
+    data = request.get_json(silent=True) or {}
+    title = data.get('title', '').strip()
+    url   = data.get('url',   '').strip()
+    if not title or not url:
+        return jsonify({'success': False, 'error': 'title and url are required'}), 400
+
+    args = ['task', 'add', title, '+bkmk']
+    if data.get('project'):
+        args.append(f'project:{data["project"].strip()}')
+    for tag in (data.get('tags') or '').split():
+        tag = tag.lstrip('+')
+        if tag:
+            args.append(f'+{tag}')
+
+    add_result = run_task_command(args)
+    if not add_result['success']:
+        return jsonify({'success': False, 'error': add_result['stderr']}), 500
+
+    # Annotate the newly created task with the URL
+    ann_result = run_task_command(['task', '+LATEST', 'annotate', f'url: {url}'])
+    if not ann_result['success']:
+        return jsonify({'success': False, 'error': ann_result['stderr']}), 500
+
+    export_result = run_task_command(['task', '+LATEST', 'export'], readonly=True)
+    try:
+        task = json.loads(export_result['stdout'])[0]
+        return jsonify({'success': True, 'task': task})
+    except Exception:
+        return jsonify({'success': True})
+
 @app.route('/api/stats')
 def get_stats():
     """Return the output of `task stats` for display in the UI"""
