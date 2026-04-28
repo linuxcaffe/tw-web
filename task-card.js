@@ -325,14 +325,30 @@ function linkifyAnnotation(raw) {
     while ((m = RE.exec(raw)) !== null) {
         out += esc(raw.slice(last, m.index));
         let href, label = m[0];
+        let openPath = null;
         if (/^file:\s+\//.test(m[0])) {
-            // Convention: "file: /abs/path" → file:///abs/path
-            href = 'file://' + m[0].replace(/^file:\s+/, '').replace(/"/g, '%22');
+            // Convention: "file: /abs/path" → xdg-open via /api/open (file:// blocked by browser)
+            openPath = m[0].replace(/^file:\s+/, '');
+            href = 'file://' + openPath.replace(/"/g, '%22');
         } else {
             href = m[0].replace(/"/g, '%22');
         }
-        out += `<a href="${href}" target="_blank" rel="noopener noreferrer" class="ann-link">${esc(label)}</a>`;
+        const dataAttr = openPath ? ` data-open-path="${esc(openPath)}"` : '';
+        out += `<a href="${href}"${dataAttr} target="_blank" rel="noopener noreferrer" class="ann-link">${esc(label)}</a>`;
         last = m.index + m[0].length;
     }
     return out + esc(raw.slice(last));
 }
+
+// Global handler: file: annotation links → xdg-open via /api/open (browser blocks file:// from http://)
+document.addEventListener('click', e => {
+    const link = e.target.closest('a.ann-link[data-open-path]');
+    if (!link) return;
+    e.preventDefault();
+    e.stopPropagation();
+    fetch('/api/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: link.dataset.openPath }),
+    });
+});

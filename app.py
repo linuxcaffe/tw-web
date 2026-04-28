@@ -763,6 +763,18 @@ def get_tags():
         return jsonify({'success': True, 'tags': tags, 'counts': counts})
     return jsonify({'success': False, 'error': result['stderr']}), 500
 
+@app.route('/api/open', methods=['POST'])
+def open_file():
+    """Open a local file or directory with xdg-open (server-side, local machine only)."""
+    data = request.get_json(silent=True) or {}
+    path = data.get('path', '').strip()
+    if not path.startswith('/'):
+        return jsonify({'success': False, 'error': 'Absolute path required'}), 400
+    if not os.path.exists(path):
+        return jsonify({'success': False, 'error': 'Path not found'}), 404
+    subprocess.Popen(['xdg-open', path])
+    return jsonify({'success': True})
+
 @app.route('/api/stats')
 def get_stats():
     """Return the output of `task stats` for display in the UI"""
