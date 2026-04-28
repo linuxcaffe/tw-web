@@ -749,11 +749,8 @@ function displayUnplannedTasks(tasks) {
         return;
     }
     container.innerHTML = '';
-    tasks.forEach(task => {
-        const card = taskCardManager.createTaskCard(task);
-        card.dataset.taskData = JSON.stringify(task);  // required by FullCalendar.Draggable
-        container.appendChild(card);
-    });
+    const allLookup = new Map((window._twAllTasks || unplannedTasks).map(t => [t.uuid, t]));
+    tasks.forEach(task => taskCardManager.appendWithDeps(container, task, allLookup));
 }
 
 // ── Sidebar sort ──────────────────────────────────────────────────────────────

@@ -148,6 +148,7 @@ function renderAgenda(scheduled, due) {
     });
 
     window.twNav?.setCount(filtered.length, grandTotal ?? total);
+    window._twAllTasks = items;  // seed dep lookup for agenda cards
     document.dispatchEvent(new CustomEvent('tw-tasks-loaded', { detail: { tasks: filtered } }));
 
     // If grand total isn't cached yet, fetch it in the background and update the counter
@@ -193,7 +194,8 @@ function renderAgenda(scheduled, due) {
         }
         container.appendChild(header);
 
-        tasks.forEach(task => container.appendChild(taskCardManager.createTaskCard(task)));
+        const allLookup = new Map((window._twAllTasks || []).map(t => [t.uuid, t]));
+        tasks.forEach(task => taskCardManager.appendWithDeps(container, task, allLookup));
     });
 }
 

@@ -189,6 +189,18 @@ class TaskCardManager {
         return card;
     }
 
+    // Append task card + indented dep cards to container.
+    // allLookup: Map<uuid, task> used to resolve dep UUIDs.
+    appendWithDeps(container, task, allLookup) {
+        container.appendChild(this.createTaskCard(task));
+        if (task.depends && task.depends.length) {
+            task.depends.forEach(uuid => {
+                const dep = allLookup.get(uuid);
+                if (dep) container.appendChild(this.createTaskCard(dep, { dep: true, parentId: task.id }));
+            });
+        }
+    }
+
     _extras(task) {
         // Fields rendered elsewhere — never appear in extras
         const CORE = new Set([

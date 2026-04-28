@@ -261,10 +261,8 @@ function _kbMakeCol(col, label, tasks, isUnassigned, colorIdx) {
     body.className = 'kb-col-body' + (view === 'list' ? ' list-view' : '');
     body.dataset.col = col;
     if (sorted.length) {
-        sorted.forEach(t => {
-            const card = kbCardManager.createTaskCard(t);
-            body.appendChild(card);
-        });
+        const allLookup = new Map(kbAllTasks.map(t => [t.uuid, t]));
+        sorted.forEach(t => kbCardManager.appendWithDeps(body, t, allLookup));
     } else {
         body.innerHTML = `<div class="kb-empty">${isUnassigned ? 'No unassigned tasks' : 'Empty'}</div>`;
     }
@@ -576,9 +574,8 @@ document.addEventListener('change', e => {
         ? kbNavFilter(kbUnassignedSrc.filter(t => !assigned.has(t.state || '')))
         : kbAllTasks.filter(t => (t.state || '') === col);
     body.innerHTML = '';
-    kbSort(src, col).forEach(t => {
-        body.appendChild(kbCardManager.createTaskCard(t));
-    });
+    const allLookup = new Map(kbAllTasks.map(t => [t.uuid, t]));
+    kbSort(src, col).forEach(t => kbCardManager.appendWithDeps(body, t, allLookup));
 });
 
 // Arrow keys: left/right = change focused column, up/down = scroll within it

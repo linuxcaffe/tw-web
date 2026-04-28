@@ -525,16 +525,7 @@ class TaskWarriorUI {
         container.innerHTML = '';
         
         const allLookup = new Map((window._twAllTasks || []).map(t => [t.uuid, t]));
-        filteredTasks.forEach(task => {
-            container.appendChild(taskCardManager.createTaskCard(task));
-            // Tree-style: dep cards indented immediately below parent
-            if (this.viewMode === 'list' && task.depends && task.depends.length) {
-                task.depends.forEach(uuid => {
-                    const dep = allLookup.get(uuid);
-                    if (dep) container.appendChild(taskCardManager.createTaskCard(dep, { dep: true, parentId: task.id }));
-                });
-            }
-        });
+        filteredTasks.forEach(task => taskCardManager.appendWithDeps(container, task, allLookup));
     }
 
 
