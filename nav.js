@@ -266,7 +266,7 @@
     flex-shrink: 0; display: flex; align-items: center;
 }
 .tw-logo-btn:hover { opacity: 0.8; }
-.tw-logo { height: 50px; width: 50px; display: block; }
+.tw-logo { height: 40px; width: 40px; display: block; }
 .tw-logo.sync-pending { filter: sepia(1) saturate(6) hue-rotate(5deg) brightness(1.15); }
 .tw-menu-item.sync-pending { color: #f0b429 !important; }
 
@@ -497,11 +497,14 @@
 }
 #tw-side-menu.open { left: 0; }
 .tw-menu-header {
-    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 18px 14px 14px;
     border-bottom: 1px solid rgba(255,255,255,0.1); background: #1a1a1a; flex-shrink: 0;
+    cursor: pointer;
 }
-.tw-menu-header img  { height: 34px; width: 34px; }
-.tw-menu-header span { color: #fff; font-size: 15px; font-weight: 600; }
+.tw-menu-header:hover { background: #222; }
+.tw-menu-header img  { height: 58px; width: 58px; }
+.tw-menu-header span { color: #fff; font-size: 15px; font-weight: 600; letter-spacing: 0.03em; }
 .tw-menu-items { flex: 1; padding: 8px 0; overflow-y: auto; }
 .tw-menu-item {
     display: block; width: 100%; text-align: left; padding: 11px 20px;
@@ -637,7 +640,7 @@
         return (
             `<div class="tw-bar-left">` +
                 `<button id="tw-logo-btn" class="tw-logo-btn" title="Menu">` +
-                    `<img src="/logo.svg" alt="Menu" class="tw-logo">` +
+                    `<img src="/tw-logo.png" alt="Menu" class="tw-logo">` +
                 `</button>` +
                 `<button id="tw-brand-refresh" title="Refresh">` +
                     `<span class="tw-name-full">Taskwarrior</span>` +
@@ -947,6 +950,7 @@
         // Logo → side menu
         document.getElementById('tw-logo-btn').addEventListener('click', openMenu);
         document.getElementById('tw-menu-backdrop').addEventListener('click', closeMenu);
+        document.querySelector('.tw-menu-header').addEventListener('click', closeMenu);
         document.getElementById('tw-side-menu').addEventListener('click', e => {
             if (e.target.closest('#tw-panel-back')) { closePanel(); return; }
             const item = e.target.closest('.tw-menu-item');
@@ -1038,8 +1042,8 @@
         sideMenu.id = 'tw-side-menu';
         sideMenu.innerHTML =
             `<div class="tw-menu-header">` +
-                `<img src="/logo.svg" alt="">` +
-                `<span>Taskwarrior</span>` +
+                `<img src="/logo-192.png" alt="tw-web">` +
+                `<span>tw-web</span>` +
             `</div>` +
             `<nav class="tw-menu-items" id="tw-menu-list">` +
                 MENU_ITEMS.map(item =>

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=tw-web
+Comment=Taskwarrior web interface
+Exec=/home/djp/dev/tw-web/tw-web-launch.sh
+Icon=/home/djp/dev/tw-web/logo-512.png
+Terminal=false
+Type=Application
+Categories=Office;ProjectManagement;
+Keywords=taskwarrior;tasks;todo;productivity;
+StartupNotify=true

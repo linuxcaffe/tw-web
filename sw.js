@@ -1,7 +1,7 @@
 // tw-web service worker — minimal shell cache for PWA installability
 // API calls always go to network; only app shell assets are cached.
 
-const CACHE = 'tw-web-v155';
+const CACHE = 'tw-web-v157';
 const SHELL = [
     '/', '/index.html', '/styles.css',
     '/nav.js', '/main.js', '/task-card.js', '/task-editor.js', '/task-editor-templates.html',
@@ -15,6 +15,7 @@ const SHELL = [
     '/xterm.js', '/xterm.css',
     '/codemirror-bundle.js',
     '/manifest.json', '/logo.svg', '/logo-192.png', '/logo-512.png',
+    '/favicon.png', '/taskwarrior.svg', '/tw-logo.png',
 ];
 
 self.addEventListener('install', e => {
