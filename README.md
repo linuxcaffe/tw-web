@@ -102,6 +102,43 @@ For Taskwarrior sync on Android, [Taskwarrior for Android](https://play.google.c
 
 ---
 
+## Firefox Extension
+
+A bundled browser extension lives in `firefox/`. It gives you fast access to tw-web from anywhere in Firefox without switching windows.
+
+### What it does
+
+| Tab | Action |
+|-----|--------|
+| **Add task** (default) | Type a description, optional project/priority/tags, press Enter — task added, popup closes |
+| **Bookmark** | Saves the current page as a `+bkmk` task; the URL goes into an annotation (clickable in tw-web) |
+| **tw-web** | Live server status (pending count, uptime, TW version); Stop/Start Flask without touching a terminal |
+
+**Alt+W** opens the popup from anywhere in Firefox.
+
+### Install
+
+**1. Native messaging host** (one-time — enables Start/Stop server from the popup):
+
+```bash
+mkdir -p ~/.mozilla/native-messaging-hosts
+cp tw-web-native-host.json ~/.mozilla/native-messaging-hosts/tw_web_launcher.json
+```
+
+**2. Load the extension:**
+
+- Open [`about:debugging`](about:debugging#/runtime/this-firefox) in Firefox
+- Click **This Firefox** → **Load Temporary Add-on…**
+- Select `firefox/manifest.json` (path shown on the tw-web About page)
+
+**3. Pin to toolbar** (optional but recommended):
+
+- Click the puzzle-piece Extensions icon → find tw-web → click the pin icon
+
+> The extension uses a stable ID (`tw-web@linuxcaffe`) so the native messaging host always finds it. It only talks to `localhost:5000` — no external network access.
+
+---
+
 ## Configuration
 
 Settings are stored in `settings.json` (auto-created, not committed). Edit via the **Settings** panel in the side menu, or directly:
