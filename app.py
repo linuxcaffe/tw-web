@@ -613,8 +613,12 @@ def _build_task_filter(statuses, filter_text):
         'completed': 'status:completed',
         'deleted':   'status:deleted',
         'recurring': RECURRING_FILTER,
+        'all':       'status.any:',
     }
-    parts = [STATUS_MAP[s] for s in statuses if s in STATUS_MAP]
+    if 'all' in statuses:
+        parts = ['status.any:']
+    else:
+        parts = [STATUS_MAP[s] for s in statuses if s in STATUS_MAP]
     if not parts:
         parts = ['status:pending']
 
