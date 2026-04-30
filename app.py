@@ -68,6 +68,8 @@ _SETTINGS_SCHEMA = {
                               'validate': lambda v: v in _CAL_VIEWS},
     'cal_slot_duration':    {'type': str,  'default': '00:15:00',
                               'validate': lambda v: v in _CAL_SLOT_DURS},
+    'annotation_launchers': {'type': None, 'default': {'file': 'xdg-open {value}', 'nb': 'nb browse {value} --gui'},
+                              'coerce': lambda v: {str(k).strip(): str(w).strip() for k, w in v.items()} if isinstance(v, dict) else {}},
 }
 
 def _load_settings():
@@ -821,6 +823,33 @@ def open_file():
         return jsonify({'success': False, 'error': 'Path not found'}), 404
     subprocess.Popen(['xdg-open', path])
     return jsonify({'success': True})
+
+@app.route('/api/launch', methods=['POST'])
+def launch_annotation():
+    """Dispatch an annotation label to a configured launcher command."""
+    data  = request.get_json(silent=True) or {}
+    label = data.get('label', '').strip().lower()
+    value = data.get('value', '').strip()
+
+    if not label or not value:
+        return jsonify({'success': False, 'error': 'label and value required'}), 400
+
+    # Reject shell metacharacters in value to prevent injection
+    if re.search(r'[;&|`$<>()\\\n]', value):
+        return jsonify({'success': False, 'error': 'Invalid characters in value'}), 400
+
+    launchers = _load_settings().get('annotation_launchers', {})
+    template  = launchers.get(label)
+    if not template:
+        return jsonify({'success': False, 'error': f'No launcher configured for label: {label}'}), 404
+
+    cmd_str = template.replace('{value}', value)
+    try:
+        import shlex as _shlex
+        subprocess.Popen(_shlex.split(cmd_str))
+        return jsonify({'success': True, 'cmd': cmd_str})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/bookmark', methods=['POST'])
 def add_bookmark():

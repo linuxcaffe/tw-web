@@ -1644,10 +1644,41 @@
                 `<button type="submit" class="tw-pick-item" style="width:auto;padding:6px 16px;border:1px solid rgba(255,255,255,0.2);border-radius:4px">Save</button>` +
             `</div>` +
             `</form>` +
+            `<div class="tw-settings-section-label">Annotation launchers</div>` +
+            `<div class="tw-settings-note" style="margin-bottom:8px">` +
+                `Label: value in annotations becomes a clickable link. ` +
+                `Command template — use <code>{value}</code> for substitution.` +
+            `</div>` +
+            `<div id="tws-launchers"></div>` +
+            `<button type="button" id="tws-add-launcher" class="tw-pick-item" ` +
+                `style="width:auto;padding:4px 12px;font-size:12px;margin-bottom:12px">+ Add launcher</button>` +
             `<div class="tw-about-section" style="margin-top:4px">` +
                 `<h3>Developer settings</h3>` +
                 `<p>Edit <code style="font-size:11px;color:rgba(255,255,255,0.55)">config.py</code> for DEVELOPER_MODE and DEBUG_FILE.</p>` +
             `</div>`;
+
+        // Populate launcher rows
+        function _launcherRow(label, cmd) {
+            const row = document.createElement('div');
+            row.className = 'tw-settings-row';
+            row.style.cssText = 'gap:6px;align-items:center;margin-bottom:6px;border:none';
+            row.innerHTML =
+                `<input class="tw-settings-input tws-launch-label" placeholder="label" ` +
+                    `value="${esc(label)}" style="width:80px;flex-shrink:0">` +
+                `<input class="tw-settings-input tws-launch-cmd" placeholder="command {value}" ` +
+                    `value="${esc(cmd)}" style="flex:1">` +
+                `<button type="button" class="tws-launch-del" title="Remove" ` +
+                    `style="background:none;border:none;color:rgba(255,255,255,0.35);cursor:pointer;font-size:16px;padding:0 4px">✕</button>`;
+            row.querySelector('.tws-launch-del').addEventListener('click', () => row.remove());
+            return row;
+        }
+        const launchersEl = body.querySelector('#tws-launchers');
+        for (const [k, v] of Object.entries(cfg.annotation_launchers || {}))
+            launchersEl.appendChild(_launcherRow(k, v));
+        body.querySelector('#tws-add-launcher').addEventListener('click', () => {
+            launchersEl.appendChild(_launcherRow('', ''));
+            launchersEl.lastElementChild.querySelector('.tws-launch-label').focus();
+        });
 
         body.querySelector('#tw-settings-form').addEventListener('submit', async e => {
             e.preventDefault();
@@ -1659,6 +1690,13 @@
             const calScroll = body.querySelector('#tws-cal-scroll').value;
             const calView   = body.querySelector('#tws-cal-view').value;
             const calSlot   = body.querySelector('#tws-cal-slot').value;
+            // Collect launchers
+            const launchers = {};
+            launchersEl.querySelectorAll('.tw-settings-row').forEach(row => {
+                const lbl = row.querySelector('.tws-launch-label')?.value.trim().toLowerCase();
+                const cmd = row.querySelector('.tws-launch-cmd')?.value.trim();
+                if (lbl && cmd) launchers[lbl] = cmd;
+            });
             if (isNaN(notifVal) || notifVal < 0) { status.textContent = 'Invalid timeout'; return; }
             status.textContent = 'Saving…';
             try {
@@ -1673,11 +1711,13 @@
                         cal_scroll_time:      calScroll,
                         cal_default_view:     calView,
                         cal_slot_duration:    calSlot,
+                        annotation_launchers: launchers,
                     }),
                 });
                 const d = await r.json();
                 if (d.success) {
                     window.twNotifTimeout = notifVal;
+                    if (typeof resetLaunchersCache === 'function') resetLaunchersCache();
                     status.textContent = 'Saved';
                     setTimeout(() => { status.textContent = ''; }, 2000);
                 } else {

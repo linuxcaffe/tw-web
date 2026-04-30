@@ -316,39 +316,93 @@ class TaskCardManager {
     }
 }
 
-// Standalone linkify for use outside TaskCardManager (e.g. task-editor.js)
-// Handles: https?/ftp/file:// URIs, mailto:, and the "file: /path" annotation convention.
+// ── Annotation launchers ──────────────────────────────────────────────────────
+// Fetched once from /api/config; keys are lowercase label names e.g. {nb, file, man}
+let _annLaunchers = null;
+function resetLaunchersCache() { _annLaunchers = null; _getLaunchers(); }
+async function _getLaunchers() {
+    if (_annLaunchers) return _annLaunchers;
+    try {
+        const r = await fetch('/api/config');
+        const d = await r.json();
+        _annLaunchers = {};
+        for (const [k, v] of Object.entries(d.annotation_launchers || {}))
+            _annLaunchers[k.toLowerCase()] = v;
+    } catch { _annLaunchers = {}; }
+    return _annLaunchers;
+}
+// Pre-warm so launchers are ready before first annotation render
+_getLaunchers();
+
+// Linkify annotation text: handles https?/ftp/file:// URIs, mailto:,
+// and "label: value" annotation conventions dispatched via /api/launch.
 function linkifyAnnotation(raw) {
-    const RE = /(?:https?|ftp|file):\/\/[^\s<>"']+|mailto:[^\s<>"']+|file:\s+\/[^\s<>"']+/g;
     const esc = s => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
-    let out = '', last = 0, m;
-    while ((m = RE.exec(raw)) !== null) {
-        out += esc(raw.slice(last, m.index));
-        let href, label = m[0];
-        let openPath = null;
-        if (/^file:\s+\//.test(m[0])) {
-            // Convention: "file: /abs/path" → xdg-open via /api/open (file:// blocked by browser)
-            openPath = m[0].replace(/^file:\s+/, '');
-            href = 'file://' + openPath.replace(/"/g, '%22');
+    // URL pattern
+    const URL_RE = /(?:https?|ftp|file):\/\/[^\s<>"']+|mailto:[^\s<>"']+/g;
+    // Label pattern: word chars, colon, space, non-empty value (not a URL scheme)
+    const LABEL_RE = /\b([a-z][a-z0-9_-]*):\s+([^\s<>"'][^\n<>"']*?)(?=\s*$|\s{2,}|$)/gi;
+
+    // Build a unified match list sorted by index
+    const matches = [];
+    let m;
+    const urlRe = new RegExp(URL_RE.source, 'g');
+    while ((m = urlRe.exec(raw)) !== null) matches.push({ index: m.index, raw: m[0], type: 'url' });
+    const labelRe = new RegExp(LABEL_RE.source, 'gi');
+    while ((m = labelRe.exec(raw)) !== null)
+        matches.push({ index: m.index, raw: m[0], label: m[1].toLowerCase(), value: m[2].trim(), type: 'label' });
+    matches.sort((a, b) => a.index - b.index);
+
+    // Remove overlapping matches (keep first)
+    const kept = [];
+    let cursor = 0;
+    for (const hit of matches) {
+        if (hit.index < cursor) continue;
+        kept.push(hit);
+        cursor = hit.index + hit.raw.length;
+    }
+
+    let out = '', last = 0;
+    for (const hit of kept) {
+        out += esc(raw.slice(last, hit.index));
+        if (hit.type === 'url') {
+            out += `<a href="${hit.raw.replace(/"/g,'%22')}" target="_blank" rel="noopener noreferrer" class="ann-link">${esc(hit.raw)}</a>`;
+        } else if (_annLaunchers && _annLaunchers[hit.label]) {
+            // Only render as clickable if this label has a configured launcher
+            out += `<a href="#" class="ann-link ann-launch" data-label="${esc(hit.label)}" data-value="${esc(hit.value)}">${esc(hit.raw)}</a>`;
         } else {
-            href = m[0].replace(/"/g, '%22');
+            out += esc(hit.raw);
         }
-        const dataAttr = openPath ? ` data-open-path="${esc(openPath)}"` : '';
-        out += `<a href="${href}"${dataAttr} target="_blank" rel="noopener noreferrer" class="ann-link">${esc(label)}</a>`;
-        last = m.index + m[0].length;
+        last = hit.index + hit.raw.length;
     }
     return out + esc(raw.slice(last));
 }
 
-// Global handler: file: annotation links → xdg-open via /api/open (browser blocks file:// from http://)
-document.addEventListener('click', e => {
-    const link = e.target.closest('a.ann-link[data-open-path]');
+// Global delegated handler for launcher links and legacy file: links
+document.addEventListener('click', async e => {
+    const link = e.target.closest('a.ann-link');
     if (!link) return;
-    e.preventDefault();
-    e.stopPropagation();
-    fetch('/api/open', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: link.dataset.openPath }),
-    });
+
+    if (link.classList.contains('ann-launch')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const label = link.dataset.label;
+        const value = link.dataset.value;
+        const launchers = await _getLaunchers();
+        if (!launchers[label]) return; // no launcher — let default href=#  do nothing
+        fetch('/api/launch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ label, value }),
+        });
+    } else if (link.dataset.openPath) {
+        // Legacy file: /path links
+        e.preventDefault();
+        e.stopPropagation();
+        fetch('/api/open', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: link.dataset.openPath }),
+        });
+    }
 });
