@@ -41,7 +41,6 @@
         { id: 'waiting',   label: 'Waiting'   },
         { id: 'completed', label: 'Completed' },
         { id: 'deleted',   label: 'Deleted'   },
-        { id: 'all',       label: 'All'       },
     ];
 
     const MENU_ITEMS = ['About', 'Projects', 'Tags', 'Stats', 'Settings', 'Sync', 'Terminal', 'Help'];
