@@ -141,20 +141,27 @@
             if (_ptyTerm) { _ptyTerm.dispose(); _ptyTerm = null; }
         });
 
+        // Load terminal settings (height default, cwd, init script)
+        let _ptyCfg = {};
+        try { const r = await fetch('/api/config'); _ptyCfg = await r.json(); } catch {}
+        const _cfgHeight = Math.max(60, parseInt(_ptyCfg.pty_height || 240));
+
         const term = new window.Terminal({ rows: 10, cols: 80, fontSize: 12, fontFamily: 'monospace', theme: { background: '#0a0a0a', foreground: '#d4d4d8' }, convertEol: true, scrollback: 200 });
         _ptyTerm = term;
         const container = document.getElementById('tw-pty-container');
         term.open(container);
         term.focus();
 
-        // Restore saved height and apply to terminal rows
+        // Apply height: saved drag height takes priority, then settings default
         const _PTY_H_KEY = 'tw-pty-height';
         const savedH = parseInt(localStorage.getItem(_PTY_H_KEY) || '0');
-        if (savedH >= 60) {
-            container.style.height = savedH + 'px';
+        const initH = savedH >= 60 ? savedH : _cfgHeight;
+        container.style.height = initH + 'px';
+        // Defer resize so xterm has a rendered DOM to measure cell dimensions from
+        setTimeout(() => {
             const cellH = term._core?._renderService?.dimensions?.css?.cell?.height || 17;
-            term.resize(80, Math.max(3, Math.floor(savedH / cellH)));
-        }
+            term.resize(80, Math.max(3, Math.floor(initH / cellH)));
+        }, 50);
 
         // Mouse-wheel: scroll xterm, don't propagate to page
         container.addEventListener('wheel', e => { e.preventDefault(); }, { passive: false });
@@ -192,7 +199,11 @@
             if (_ptyTerm === term) { term.dispose(); _ptyTerm = null; }
         }
 
-        ws.onopen = () => ws.send(JSON.stringify({ cmd }));
+        ws.onopen = () => ws.send(JSON.stringify({
+            cmd,
+            cwd:  _ptyCfg.pty_cwd  || '',
+            init: _ptyCfg.pty_init || '',
+        }));
         ws.onmessage = e => {
             if (e.data === '\r\n[done]\r\n') {
                 term.writeln('\r\n\x1b[32m[done]\x1b[0m');
@@ -339,7 +350,12 @@
 #tw-cmd-output.active { display: block; }
 #tw-cmd-output.pty-mode { padding: 0; max-height: none; overflow: visible; }
 #tw-pty-resize-handle {
-    height: 6px; cursor: ns-resize; background: rgba(255,255,255,0.04);
+    height: 12px; cursor: ns-resize; background: rgba(255,255,255,0.06);
+    display: flex; align-items: center; justify-content: center;
+}
+#tw-pty-resize-handle::before {
+    content: '⋯'; color: rgba(255,255,255,0.25); font-size: 14px; letter-spacing: 3px;
+    pointer-events: none;
     border-top: 1px solid rgba(255,255,255,0.1);
 }
 #tw-pty-resize-handle:hover, #tw-pty-resize-handle.dragging { background: rgba(100,160,255,0.18); }
@@ -589,7 +605,19 @@
     background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
     border-radius: 4px; color: #ecf0f1; font-size: 12px; padding: 4px 6px;
 }
+textarea.tw-settings-input { display: block; width: 100%; box-sizing: border-box; }
+select.tw-settings-input { background: #2a3a4a; color: #ecf0f1; }
+select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 .tw-settings-input:focus { outline: none; border-color: #3498db; background: rgba(255,255,255,0.12); }
+.tws-section { border-bottom: 1px solid rgba(255,255,255,0.06); }
+.tws-section-hdr {
+    display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 16px;
+    background: none; border: none; color: rgba(255,255,255,0.6);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
+    cursor: pointer; text-align: left;
+}
+.tws-section-hdr:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.85); }
+.tws-section-arrow { font-size: 9px; transition: transform 0.15s ease; display: inline-block; color: rgba(255,255,255,0.35); }
 
 /* notification toast */
 .notification {
@@ -971,6 +999,7 @@
 
         // Arrow-key navigation inside the side menu
         document.getElementById('tw-side-menu').addEventListener('keydown', e => {
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
             if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Escape') return;
             e.preventDefault();
             if (e.key === 'Escape') { closeMenu(); return; }
@@ -1592,105 +1621,177 @@
             cfg = await r.json();
         } catch { body.innerHTML = '<div class="tw-panel-error">Failed to load settings</div>'; return; }
 
-        body.innerHTML =
-            `<form id="tw-settings-form" autocomplete="off">` +
-            `<div class="tw-settings-row stack">` +
-                `<div class="tw-settings-label">Notification timeout</div>` +
-                `<input id="tws-notif" type="number" min="0" step="500" value="${cfg.notification_timeout ?? 3000}" ` +
-                    `class="tw-settings-input" style="width:90px">` +
-                `<div class="tw-settings-note">ms — 0 = manual dismiss only</div>` +
-            `</div>` +
-            `<div class="tw-settings-row stack">` +
-                `<div class="tw-settings-label">Kanban columns</div>` +
-                `<input id="tws-kanban" type="text" value="${esc((cfg.kanban_columns || []).join(', '))}" ` +
-                    `class="tw-settings-input">` +
-                `<div class="tw-settings-note">Comma-separated, in order</div>` +
-            `</div>` +
-            `<div class="tw-settings-section-label">Calendar</div>` +
-            `<div class="tw-settings-row stack">` +
-                `<div class="tw-settings-label">Day start / end</div>` +
-                `<div style="display:flex;gap:6px;align-items:center">` +
-                    `<input id="tws-cal-start" type="time" value="${esc((cfg.cal_day_start  || '06:00').slice(0,5))}" class="tw-settings-input" style="width:90px">` +
-                    `<span style="color:rgba(255,255,255,0.3)">–</span>` +
-                    `<input id="tws-cal-end"   type="time" value="${esc((cfg.cal_day_end    || '23:00').slice(0,5))}" class="tw-settings-input" style="width:90px">` +
-                `</div>` +
-                `<div class="tw-settings-note">Visible hour range (HH:MM)</div>` +
-            `</div>` +
-            `<div class="tw-settings-row stack">` +
-                `<div class="tw-settings-label">Scroll to (on open)</div>` +
-                `<input id="tws-cal-scroll" type="time" value="${esc((cfg.cal_scroll_time || '08:00').slice(0,5))}" class="tw-settings-input" style="width:90px">` +
-                `<div class="tw-settings-note">Time shown at top of calendar</div>` +
-            `</div>` +
-            `<div class="tw-settings-row stack">` +
-                `<div class="tw-settings-label">Default view</div>` +
-                `<select id="tws-cal-view" class="tw-settings-input">` +
-                    `<option value="timeGridWeek"${cfg.cal_default_view === 'timeGridWeek'  ? ' selected' : ''}>Week</option>` +
-                    `<option value="timeGridDay"${cfg.cal_default_view  === 'timeGridDay'   ? ' selected' : ''}>Day</option>` +
-                    `<option value="dayGridMonth"${cfg.cal_default_view === 'dayGridMonth'  ? ' selected' : ''}>Month</option>` +
-                `</select>` +
-                `<div class="tw-settings-note">Opening view for Calendar page</div>` +
-            `</div>` +
-            `<div class="tw-settings-row stack">` +
-                `<div class="tw-settings-label">Time grid slot</div>` +
-                `<select id="tws-cal-slot" class="tw-settings-input">` +
-                    `<option value="00:15:00"${(cfg.cal_slot_duration || '00:15:00') === '00:15:00' ? ' selected' : ''}>15 min</option>` +
-                    `<option value="00:30:00"${cfg.cal_slot_duration === '00:30:00' ? ' selected' : ''}>30 min</option>` +
-                    `<option value="01:00:00"${cfg.cal_slot_duration === '01:00:00' ? ' selected' : ''}>60 min</option>` +
-                `</select>` +
-                `<div class="tw-settings-note">Row height / snap interval</div>` +
-            `</div>` +
-            `<div class="tw-settings-row" style="border:none;justify-content:flex-end;gap:8px">` +
-                `<span id="tws-status" style="font-size:12px;color:rgba(255,255,255,0.45)"></span>` +
-                `<button type="submit" class="tw-pick-item" style="width:auto;padding:6px 16px;border:1px solid rgba(255,255,255,0.2);border-radius:4px">Save</button>` +
-            `</div>` +
-            `</form>` +
-            `<div class="tw-settings-section-label">Annotation launchers</div>` +
-            `<div class="tw-settings-note" style="margin-bottom:8px">` +
-                `Label: value in annotations becomes a clickable link. ` +
-                `Command template — use <code>{value}</code> for substitution.` +
-            `</div>` +
-            `<div id="tws-launchers"></div>` +
-            `<button type="button" id="tws-add-launcher" class="tw-pick-item" ` +
-                `style="width:auto;padding:4px 12px;font-size:12px;margin-bottom:12px">+ Add launcher</button>` +
-            `<div class="tw-about-section" style="margin-top:4px">` +
-                `<h3>Developer settings</h3>` +
-                `<p>Edit <code style="font-size:11px;color:rgba(255,255,255,0.55)">config.py</code> for DEVELOPER_MODE and DEBUG_FILE.</p>` +
-            `</div>`;
+        // Which sections are expanded (persisted in localStorage)
+        const OPEN_KEY = 'tw-settings-open';
+        const openSections = new Set(JSON.parse(localStorage.getItem(OPEN_KEY) || '["general","terminal"]'));
 
-        // Populate launcher rows
-        function _launcherRow(label, cmd) {
-            const row = document.createElement('div');
-            row.className = 'tw-settings-row';
-            row.style.cssText = 'gap:6px;align-items:center;margin-bottom:6px;border:none';
-            row.innerHTML =
-                `<input class="tw-settings-input tws-launch-label" placeholder="label" ` +
-                    `value="${esc(label)}" style="width:80px;flex-shrink:0">` +
-                `<input class="tw-settings-input tws-launch-cmd" placeholder="command {value}" ` +
-                    `value="${esc(cmd)}" style="flex:1">` +
-                `<button type="button" class="tws-launch-del" title="Remove" ` +
-                    `style="background:none;border:none;color:rgba(255,255,255,0.35);cursor:pointer;font-size:16px;padding:0 4px">✕</button>`;
-            row.querySelector('.tws-launch-del').addEventListener('click', () => row.remove());
+        // ── DOM helpers ───────────────────────────────────────────────────────
+        function _mk(tag, props = {}) {
+            const el = document.createElement(tag);
+            Object.entries(props).forEach(([k, v]) => {
+                if (k === 'cls')   el.className  = v;
+                else if (k === 'css')   el.style.cssText = v;
+                else if (k === 'text')  el.textContent   = v;
+                else                    el[k]            = v;
+            });
+            return el;
+        }
+        function _note(text) { return _mk('div', { cls: 'tw-settings-note', text }); }
+        function _row(label, ...children) {
+            const row = _mk('div', { cls: 'tw-settings-row stack' });
+            row.appendChild(_mk('div', { cls: 'tw-settings-label', text: label }));
+            children.forEach(c => row.appendChild(c));
             return row;
         }
-        const launchersEl = body.querySelector('#tws-launchers');
-        for (const [k, v] of Object.entries(cfg.annotation_launchers || {}))
-            launchersEl.appendChild(_launcherRow(k, v));
-        body.querySelector('#tws-add-launcher').addEventListener('click', () => {
-            launchersEl.appendChild(_launcherRow('', ''));
-            launchersEl.lastElementChild.querySelector('.tws-launch-label').focus();
-        });
+        function _inp(id, type, props = {}) {
+            const el = _mk('input', { ...props, id, type, cls: 'tw-settings-input' + (props.cls ? ' ' + props.cls : '') });
+            return el;
+        }
+        function _sel(id, options, selected) {
+            const el = _mk('select', { id, cls: 'tw-settings-input' });
+            options.forEach(([val, label]) => {
+                const opt = _mk('option', { value: val, text: label });
+                if (val === selected) opt.selected = true;
+                el.appendChild(opt);
+            });
+            return el;
+        }
 
-        body.querySelector('#tw-settings-form').addEventListener('submit', async e => {
+        // ── Collapsible section builder ───────────────────────────────────────
+        function _section(key, title, buildFn) {
+            const wrap  = _mk('div', { cls: 'tws-section' });
+            const hdr   = _mk('button', { type: 'button', cls: 'tws-section-hdr' });
+            const arrow = _mk('span',   { cls: 'tws-section-arrow', text: '▶' });
+            const bd    = _mk('div');
+            const isOpen = openSections.has(key);
+            arrow.style.transform = isOpen ? 'rotate(90deg)' : '';
+            bd.style.display      = isOpen ? '' : 'none';
+            hdr.appendChild(arrow);
+            hdr.appendChild(_mk('span', { text: title }));
+            hdr.addEventListener('click', () => {
+                const nowOpen = bd.style.display !== 'none';
+                bd.style.display      = nowOpen ? 'none' : '';
+                arrow.style.transform = nowOpen ? '' : 'rotate(90deg)';
+                nowOpen ? openSections.delete(key) : openSections.add(key);
+                try { localStorage.setItem(OPEN_KEY, JSON.stringify([...openSections])); } catch {}
+            });
+            buildFn(bd);
+            wrap.appendChild(hdr);
+            wrap.appendChild(bd);
+            return wrap;
+        }
+
+        // ── Launcher row (fully DOM-built) ────────────────────────────────────
+        function _launcherRow(label, cmd) {
+            const row    = _mk('div', { cls: 'tw-settings-row', css: 'gap:6px;align-items:center;margin-bottom:6px;border:none' });
+            const lInp   = _inp('', 'text', { cls: 'tws-launch-label', placeholder: 'label', value: label, css: 'width:80px;flex-shrink:0' });
+            const cInp   = _inp('', 'text', { cls: 'tws-launch-cmd',   placeholder: 'command {value}', value: cmd, css: 'flex:1' });
+            const delBtn = _mk('button', { type: 'button', cls: 'tws-launch-del', title: 'Remove',
+                css: 'background:none;border:none;color:rgba(255,255,255,0.35);cursor:pointer;font-size:16px;padding:0 4px', text: '✕' });
+            delBtn.addEventListener('click', () => row.remove());
+            row.appendChild(lInp); row.appendChild(cInp); row.appendChild(delBtn);
+            return row;
+        }
+
+        // ── Build form ────────────────────────────────────────────────────────
+        body.textContent = '';
+        const form = _mk('form', { id: 'tw-settings-form', autocomplete: 'off' });
+
+        // General
+        form.appendChild(_section('general', 'General', bd => {
+            const notif = _inp('tws-notif', 'number', { min: 0, step: 500, value: cfg.notification_timeout ?? 3000, css: 'width:90px' });
+            bd.appendChild(_row('Notification timeout', notif, _note('ms — 0 = manual dismiss only')));
+            const kanban = _inp('tws-kanban', 'text', { value: (cfg.kanban_columns || []).join(', ') });
+            bd.appendChild(_row('Kanban columns', kanban, _note('Comma-separated, in order')));
+        }));
+
+        // Calendar
+        form.appendChild(_section('calendar', 'Calendar', bd => {
+            const calStart = _inp('tws-cal-start', 'time', { value: (cfg.cal_day_start || '06:00').slice(0,5), css: 'width:90px' });
+            const calEnd   = _inp('tws-cal-end',   'time', { value: (cfg.cal_day_end   || '23:00').slice(0,5), css: 'width:90px' });
+            const pair = _mk('div', { css: 'display:flex;gap:6px;align-items:center' });
+            pair.appendChild(calStart);
+            pair.appendChild(_mk('span', { css: 'color:rgba(255,255,255,0.3)', text: '–' }));
+            pair.appendChild(calEnd);
+            const dayRow = _mk('div', { cls: 'tw-settings-row stack' });
+            dayRow.appendChild(_mk('div', { cls: 'tw-settings-label', text: 'Day start / end' }));
+            dayRow.appendChild(pair);
+            dayRow.appendChild(_note('Visible hour range'));
+            bd.appendChild(dayRow);
+
+            const calScroll = _inp('tws-cal-scroll', 'time', { value: (cfg.cal_scroll_time || '08:00').slice(0,5), css: 'width:90px' });
+            bd.appendChild(_row('Scroll to (on open)', calScroll, _note('Time shown at top of calendar')));
+            bd.appendChild(_row('Default view',
+                _sel('tws-cal-view', [['timeGridWeek','Week'],['timeGridDay','Day'],['dayGridMonth','Month']], cfg.cal_default_view || 'timeGridWeek'),
+                _note('Opening view for Calendar page')));
+            bd.appendChild(_row('Time grid slot',
+                _sel('tws-cal-slot', [['00:15:00','15 min'],['00:30:00','30 min'],['01:00:00','60 min']], cfg.cal_slot_duration || '00:15:00'),
+                _note('Row height / snap interval')));
+        }));
+
+        // Terminal
+        form.appendChild(_section('terminal', 'Terminal', bd => {
+            bd.appendChild(_row('Default height',
+                _inp('tws-pty-height', 'number', { min: 60, max: 1200, step: 20, value: cfg.pty_height ?? 240, css: 'width:90px' }),
+                _note('px — overridden by drag; reset by clearing browser storage')));
+
+            const ptyCwd = _inp('tws-pty-cwd', 'text', { value: cfg.pty_cwd || '', placeholder: '~/dev/tw-web' });
+            bd.appendChild(_row('Starting directory', ptyCwd, _note("Leave blank to use Flask's working directory")));
+
+            const ptyInit = _mk('textarea', { id: 'tws-pty-init', cls: 'tw-settings-input',
+                rows: 3, placeholder: 'echo hello\ntimer status',
+                css: 'font-family:monospace;font-size:12px;resize:vertical' });
+            ptyInit.value = cfg.pty_init || '';
+            bd.appendChild(_row('Init script', ptyInit, _note('Commands run on every shell open (one per line)')));
+        }));
+
+        // Annotation launchers
+        let launchersEl;
+        form.appendChild(_section('launchers', 'Annotation launchers', bd => {
+            const note = _mk('div', { cls: 'tw-settings-note', css: 'margin-bottom:8px' });
+            note.innerHTML = 'Label: value in annotations becomes a clickable link. Use <code>{value}</code> in the command.';
+            bd.appendChild(note);
+            launchersEl = _mk('div', { id: 'tws-launchers' });
+            bd.appendChild(launchersEl);
+            const addBtn = _mk('button', { type: 'button', id: 'tws-add-launcher', cls: 'tw-pick-item',
+                css: 'width:auto;padding:4px 12px;font-size:12px;margin-bottom:12px', text: '+ Add launcher' });
+            addBtn.addEventListener('click', () => {
+                launchersEl.appendChild(_launcherRow('', ''));
+                launchersEl.lastElementChild.querySelector('.tws-launch-label').focus();
+            });
+            bd.appendChild(addBtn);
+            for (const [k, v] of Object.entries(cfg.annotation_launchers || {}))
+                launchersEl.appendChild(_launcherRow(k, v));
+        }));
+
+        // Developer note (static, not a section)
+        const devNote = _mk('div', { cls: 'tw-about-section', css: 'margin-top:4px' });
+        devNote.innerHTML = '<h3>Developer settings</h3><p>Edit <code style="font-size:11px;color:rgba(255,255,255,0.55)">config.py</code> for DEVELOPER_MODE and DEBUG_FILE.</p>';
+        form.appendChild(devNote);
+
+        // Save row
+        const saveRow = _mk('div', { cls: 'tw-settings-row', css: 'border:none;justify-content:flex-end;gap:8px;padding-top:12px;padding-bottom:16px' });
+        const status  = _mk('span', { id: 'tws-status', css: 'font-size:12px;color:rgba(255,255,255,0.45)' });
+        const saveBtn = _mk('button', { type: 'submit', cls: 'tw-pick-item',
+            css: 'width:auto;padding:6px 16px;border:1px solid rgba(255,255,255,0.2);border-radius:4px', text: 'Save' });
+        saveRow.appendChild(status); saveRow.appendChild(saveBtn);
+        form.appendChild(saveRow);
+
+        body.appendChild(form);
+
+        // ── Form submit ───────────────────────────────────────────────────────
+        form.addEventListener('submit', async e => {
             e.preventDefault();
-            const status    = body.querySelector('#tws-status');
-            const notifVal  = parseInt(body.querySelector('#tws-notif').value, 10);
-            const kanbanVal = body.querySelector('#tws-kanban').value;
-            const calStart  = body.querySelector('#tws-cal-start').value;
-            const calEnd    = body.querySelector('#tws-cal-end').value;
-            const calScroll = body.querySelector('#tws-cal-scroll').value;
-            const calView   = body.querySelector('#tws-cal-view').value;
-            const calSlot   = body.querySelector('#tws-cal-slot').value;
-            // Collect launchers
+            const notifVal  = parseInt(form.querySelector('#tws-notif').value, 10);
+            const kanbanVal = form.querySelector('#tws-kanban').value;
+            const calStart  = form.querySelector('#tws-cal-start').value;
+            const calEnd    = form.querySelector('#tws-cal-end').value;
+            const calScroll = form.querySelector('#tws-cal-scroll').value;
+            const calView   = form.querySelector('#tws-cal-view').value;
+            const calSlot   = form.querySelector('#tws-cal-slot').value;
+            const ptyHeight = parseInt(form.querySelector('#tws-pty-height').value, 10);
+            const ptyCwd    = form.querySelector('#tws-pty-cwd').value.trim();
+            const ptyInit   = form.querySelector('#tws-pty-init').value.trim();
             const launchers = {};
             launchersEl.querySelectorAll('.tw-settings-row').forEach(row => {
                 const lbl = row.querySelector('.tws-launch-label')?.value.trim().toLowerCase();
@@ -1711,6 +1812,9 @@
                         cal_scroll_time:      calScroll,
                         cal_default_view:     calView,
                         cal_slot_duration:    calSlot,
+                        pty_height:           isNaN(ptyHeight) ? 240 : ptyHeight,
+                        pty_cwd:              ptyCwd,
+                        pty_init:             ptyInit,
                         annotation_launchers: launchers,
                     }),
                 });
@@ -1720,9 +1824,7 @@
                     if (typeof resetLaunchersCache === 'function') resetLaunchersCache();
                     status.textContent = 'Saved';
                     setTimeout(() => { status.textContent = ''; }, 2000);
-                } else {
-                    status.textContent = d.error || 'Error';
-                }
+                } else { status.textContent = d.error || 'Error'; }
             } catch { status.textContent = 'Network error'; }
         });
     }

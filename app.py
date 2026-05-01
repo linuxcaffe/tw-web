@@ -68,6 +68,12 @@ _SETTINGS_SCHEMA = {
                               'validate': lambda v: v in _CAL_VIEWS},
     'cal_slot_duration':    {'type': str,  'default': '00:15:00',
                               'validate': lambda v: v in _CAL_SLOT_DURS},
+    'pty_height':           {'type': int,  'default': 240,
+                              'validate': lambda v: 60 <= v <= 1200},
+    'pty_cwd':              {'type': str,  'default': '',
+                              'coerce': lambda v: str(v).strip()},
+    'pty_init':             {'type': str,  'default': '',
+                              'coerce': lambda v: str(v).strip()},
     'annotation_launchers': {'type': None, 'default': {'file': 'xdg-open {value}', 'nb': 'nb browse {value} --gui'},
                               'coerce': lambda v: {str(k).strip(): str(w).strip() for k, w in v.items()} if isinstance(v, dict) else {}},
 }
@@ -452,9 +458,12 @@ def ws_pty(ws):
         return
     try:
         payload = json.loads(first)
-        cmd_str = payload.get('cmd', '').strip()
+        cmd_str  = payload.get('cmd',  '').strip()
+        cwd_str  = payload.get('cwd',  '').strip()
+        init_str = payload.get('init', '').strip()
     except (json.JSONDecodeError, AttributeError):
         cmd_str = first.strip()
+        cwd_str = init_str = ''
 
     try:
         args = shlex.split(cmd_str) if cmd_str else []
@@ -462,7 +471,13 @@ def ws_pty(ws):
         ws.send(f'\r\n[pty] Parse error: {e}\r\n')
         return
 
-    # Empty cmd → open tw shell
+    # Resolve cwd — fall back to home dir if path doesn't exist
+    cwd = None
+    if cwd_str:
+        cwd_path = Path(cwd_str).expanduser()
+        cwd = str(cwd_path) if cwd_path.is_dir() else None
+
+    # Empty cmd → open shell
     shell_mode = not args
     master_fd, slave_fd = pty.openpty()
 
@@ -483,13 +498,23 @@ def ws_pty(ws):
         proc = subprocess.Popen(
             cmd_argv,
             stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
-            close_fds=True, env=env,
+            close_fds=True, env=env, cwd=cwd,
             preexec_fn=_pty_preexec,
         )
     except Exception as e:
         os.close(master_fd); os.close(slave_fd)
         ws.send(f'\r\n[pty] Failed to start: {e}\r\n')
         return
+
+    # Send init script line-by-line after a brief settle
+    if shell_mode and init_str:
+        time.sleep(0.15)
+        for line in init_str.splitlines():
+            line = line.strip()
+            if line:
+                os.write(master_fd, (line + '\n').encode())
+                time.sleep(0.05)
+
 
     os.close(slave_fd)
 
