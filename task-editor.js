@@ -549,17 +549,31 @@ class TaskEditor {
         if (schedField)    taskData.scheduled      = schedField.value;
         if (schedDurField) taskData.sched_duration = schedDurField.value;
         if (stateField)    taskData.state          = stateField.value;
-        if (depsField)     taskData.depends        = depsField.value.split(',').map(s => s.trim()).filter(Boolean).join(',');
+        if (depsField) {
+            const tokens = depsField.value.split(',').map(s => s.trim()).filter(Boolean);
+            const parents = tokens.filter(s => s.startsWith('-'));
+            const normal  = tokens.filter(s => !s.startsWith('-'));
+
+            if (parents.length > 1) {
+                this.onSaveError('Only one parent (−ID) allowed in deps');
+                return;
+            }
+            if (parents.length === 1) {
+                const pid = parseInt(parents[0].slice(1), 10);
+                if (!pid || pid < 1) { this.onSaveError('Invalid parent ID: ' + parents[0]); return; }
+                // Only meaningful when adding — silently ignore on edits
+                if (!this.currentTask) taskData.parent_id = pid;
+            }
+            taskData.depends = normal.join(',');
+        }
         if (waitField)     taskData.wait           = waitField.value;
         if (untilField)    taskData.until          = untilField.value;
-        
-        // Ajouter l'ID si on modifie une tâche existante
+
         if (this.currentTask) {
             taskData.id = this.currentTask.id;
             taskData.uuid = this.currentTask.uuid;
         }
-        
-        // Appeler la nouvelle méthode de sauvegarde
+
         this.saveTask(taskData, this.currentTask !== null);
     }
     

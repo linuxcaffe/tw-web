@@ -1188,6 +1188,27 @@ def add_task():
     if not data.get('description'):
         return jsonify({'success': False, 'error': 'Description is required'}), 400
 
+    # Validate parent_id before creating the task
+    parent_id = data.get('parent_id')
+    if parent_id:
+        try:
+            parent_id = int(parent_id)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': f'Invalid parent ID: {parent_id}'}), 400
+        pr = run_task_command(['task', str(parent_id), 'export'], readonly=True)
+        if not pr['success'] or not pr['stdout'].strip():
+            return jsonify({'success': False, 'error': f'Parent task {parent_id} not found'}), 400
+        try:
+            ptasks = json.loads(pr['stdout'])
+            if not ptasks:
+                return jsonify({'success': False, 'error': f'Parent task {parent_id} not found'}), 400
+            pstatus = ptasks[0].get('status', '')
+            if pstatus not in ('pending', 'waiting'):
+                return jsonify({'success': False,
+                    'error': f'Parent task {parent_id} is {pstatus} — cannot add deps to it'}), 400
+        except (json.JSONDecodeError, IndexError):
+            return jsonify({'success': False, 'error': f'Could not verify parent task {parent_id}'}), 400
+
     args = ['task', 'add', data['description']]
 
     if data.get('tags'):
@@ -1234,8 +1255,20 @@ def add_task():
             try:
                 task = json.loads(export_result['stdout'])
                 if task:
+                    new_uuid = task[0]['uuid']
+                    warnings = _warnings(create_result)
+
+                    # Wire parent dep: make the new task a prerequisite of parent_id
+                    if parent_id:
+                        mod = run_task_command(['task', str(parent_id), 'modify',
+                                                f'depends+:{new_uuid}'])
+                        if not mod['success']:
+                            warnings = (warnings or []) + [
+                                f'Task created but could not link to parent {parent_id}: '
+                                + mod.get('stderr', '').strip()]
+
                     resp = {'success': True, 'message': 'Task created successfully',
-                            'task': task[0], 'warnings': _warnings(create_result)}
+                            'task': task[0], 'warnings': warnings}
                     if dc: resp['deferred_cmd'] = dc
                     return jsonify(resp)
             except (json.JSONDecodeError, IndexError) as e:
