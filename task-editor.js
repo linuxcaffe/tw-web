@@ -676,8 +676,9 @@ class TaskEditor {
         if (taskData.due_duration)   preparedData.due_duration   = taskData.due_duration;
         if (taskData.sched_duration) preparedData.sched_duration = taskData.sched_duration;
 
-        if (taskData.state  !== undefined) preparedData.state  = taskData.state  || '';
-        if (taskData.depends !== undefined) preparedData.depends = taskData.depends || '';
+        if (taskData.state    !== undefined) preparedData.state     = taskData.state    || '';
+        if (taskData.depends  !== undefined) preparedData.depends   = taskData.depends  || '';
+        if (taskData.parent_id !== undefined) preparedData.parent_id = taskData.parent_id;
         if (taskData.wait  !== undefined)
             preparedData.wait  = taskData.wait  ? this.formatDateForTask(taskData.wait)  : '';
         if (taskData.until !== undefined)

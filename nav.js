@@ -521,6 +521,7 @@
 .tw-menu-header:hover { background: #222; }
 .tw-menu-header img  { height: 58px; width: 58px; }
 .tw-menu-header span { color: #fff; font-size: 15px; font-weight: 600; letter-spacing: 0.03em; }
+#tw-cache-ver { font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.04em; margin-top: -2px; }
 .tw-menu-items { flex: 1; padding: 8px 0; overflow-y: auto; }
 .tw-menu-item {
     display: block; width: 100%; text-align: left; padding: 11px 20px;
@@ -1073,6 +1074,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             `<div class="tw-menu-header">` +
                 `<img src="/logo-192.png" alt="tw-web">` +
                 `<span>tw-web</span>` +
+                `<span id="tw-cache-ver"></span>` +
             `</div>` +
             `<nav class="tw-menu-items" id="tw-menu-list">` +
                 MENU_ITEMS.map(item =>
@@ -1086,6 +1088,15 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 `</div>` +
                 `<div id="tw-panel-body" class="tw-panel-body"></div>` +
             `</div>`;
+
+        // Show active SW cache version under the menu logo (dev aid)
+        if ('caches' in window) {
+            caches.keys().then(keys => {
+                const v = keys.find(k => k.startsWith('tw-web-v'));
+                const el = document.getElementById('tw-cache-ver');
+                if (el) el.textContent = v ? v.replace('tw-web-', '') : '';
+            }).catch(() => {});
+        }
 
         const backdrop = document.createElement('div');
         backdrop.id = 'tw-menu-backdrop';
@@ -1213,6 +1224,9 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     function closePanel() {
         document.getElementById('tw-menu-list').style.display  = '';
         document.getElementById('tw-menu-panel').classList.remove('open');
+        // Clear panel body so unsubmitted forms don't trigger browser reload warnings
+        const pb = document.getElementById('tw-panel-body');
+        if (pb) pb.textContent = '';
     }
     function panelBody() { return document.getElementById('tw-panel-body'); }
 

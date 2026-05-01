@@ -1188,8 +1188,9 @@ def add_task():
     if not data.get('description'):
         return jsonify({'success': False, 'error': 'Description is required'}), 400
 
-    # Validate parent_id before creating the task
+    # Validate parent_id before creating the task; capture existing deps for later merge
     parent_id = data.get('parent_id')
+    parent_existing_deps = []
     if parent_id:
         try:
             parent_id = int(parent_id)
@@ -1206,6 +1207,8 @@ def add_task():
             if pstatus not in ('pending', 'waiting'):
                 return jsonify({'success': False,
                     'error': f'Parent task {parent_id} is {pstatus} — cannot add deps to it'}), 400
+            raw = ptasks[0].get('depends', [])
+            parent_existing_deps = raw if isinstance(raw, list) else [u.strip() for u in raw.split(',') if u.strip()]
         except (json.JSONDecodeError, IndexError):
             return jsonify({'success': False, 'error': f'Could not verify parent task {parent_id}'}), 400
 
@@ -1260,8 +1263,9 @@ def add_task():
 
                     # Wire parent dep: make the new task a prerequisite of parent_id
                     if parent_id:
+                        all_deps = ','.join(parent_existing_deps + [new_uuid])
                         mod = run_task_command(['task', str(parent_id), 'modify',
-                                                f'depends+:{new_uuid}'])
+                                                f'depends:{all_deps}'])
                         if not mod['success']:
                             warnings = (warnings or []) + [
                                 f'Task created but could not link to parent {parent_id}: '
