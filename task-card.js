@@ -215,7 +215,12 @@ class TaskCardManager {
         if (task.depends) {
             const deps = Array.isArray(task.depends) ? task.depends
                        : String(task.depends).split(',').map(s => s.trim());
-            pairs.push({ key: 'dep', text: 'dep:' + deps.map(u => u.slice(0, 8)).join(',') });
+            const lookup = new Map((window._twAllTasks || []).map(t => [t.uuid, t]));
+            const labels = deps.map(u => {
+                const t = lookup.get(u);
+                return t ? (t.id ? String(t.id) : u.slice(0, 8)) : u.slice(0, 8);
+            });
+            pairs.push({ key: 'dep', text: 'dep:' + labels.join(',') });
         }
 
         if (task.recur) pairs.push({ key: 'recur', text: `recur:${task.recur}` });
