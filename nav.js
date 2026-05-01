@@ -277,6 +277,7 @@
     flex-shrink: 0; display: flex; align-items: center;
 }
 .tw-logo-btn:hover { opacity: 0.8; }
+.tw-logo-btn:focus-visible { opacity: 0.8; outline: 2px solid #3498db; outline-offset: 3px; border-radius: 4px; }
 .tw-logo { height: 40px; width: 40px; display: block; }
 .tw-logo.sync-pending { filter: sepia(1) saturate(6) hue-rotate(5deg) brightness(1.15); }
 .tw-menu-item.sync-pending { color: #f0b429 !important; }
@@ -528,7 +529,9 @@
     background: none; border: none; border-left: 3px solid transparent;
     color: rgba(255,255,255,0.7); font-size: 15px; cursor: pointer;
 }
-.tw-menu-item:hover { background: rgba(255,255,255,0.07); color: #fff; border-left-color: #3498db; }
+.tw-menu-item:hover,
+.tw-menu-item:focus-visible { background: rgba(255,255,255,0.07); color: #fff; border-left-color: #3498db; }
+.tw-menu-item:focus { outline: none; }
 #tw-menu-backdrop {
     display: none; position: fixed; inset: 0;
     background: rgba(0,0,0,0.4); z-index: 19999;
@@ -607,7 +610,7 @@
     border-radius: 4px; color: #ecf0f1; font-size: 12px; padding: 4px 6px;
 }
 textarea.tw-settings-input { display: block; width: 100%; box-sizing: border-box; }
-select.tw-settings-input { background: #2a3a4a; color: #ecf0f1; }
+select.tw-settings-input { background: #2a3a4a; color: #ecf0f1; color-scheme: dark; }
 select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 .tw-settings-input:focus { outline: none; border-color: #3498db; background: rgba(255,255,255,0.12); }
 .tws-section { border-bottom: 1px solid rgba(255,255,255,0.06); }
