@@ -1714,6 +1714,22 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         body.textContent = '';
         const form = _mk('form', { id: 'tw-settings-form', autocomplete: 'off' });
 
+        // Appearance
+        form.appendChild(_section('appearance', 'Appearance', bd => {
+            const cur = document.documentElement.getAttribute('data-theme') || '';
+            const btn = _mk('button', { type: 'button', cls: 'tw-settings-input',
+                text: cur === 'dark' ? '☀ Switch to light mode' : '☾ Switch to dark mode',
+                css: 'cursor:pointer;text-align:left;width:auto' });
+            btn.addEventListener('click', () => {
+                const next = document.documentElement.getAttribute('data-theme') === 'dark' ? '' : 'dark';
+                if (next) document.documentElement.setAttribute('data-theme', 'dark');
+                else document.documentElement.removeAttribute('data-theme');
+                localStorage.setItem('tw-theme', next);
+                btn.textContent = next === 'dark' ? '☀ Switch to light mode' : '☾ Switch to dark mode';
+            });
+            bd.appendChild(_row('Page theme', btn));
+        }));
+
         // General
         form.appendChild(_section('general', 'General', bd => {
             const notif = _inp('tws-notif', 'number', { min: 0, step: 500, value: cfg.notification_timeout ?? 3000, css: 'width:90px' });

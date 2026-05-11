@@ -1,6 +1,103 @@
 /* tw-web styles */
 
 /* Nav styles are self-contained in nav.js */
+
+/* ── Theme variables ─────────────────────────────────────────────────────────
+   Light-mode defaults (matching nb-web naming for future shared theming).
+   Dark-mode overrides in [data-theme="dark"] below.                          */
+:root {
+    --bg:             #f5f5f5;   /* page / outer background */
+    --bg2:            #ffffff;   /* card / panel surface */
+    --bg3:            #f0f0f0;   /* chip / button-hover / elevated surface */
+    --border:         #e4e4e4;
+    --text:           #333333;
+    --text-muted:     #777777;
+    --text-dim:       #aaaaaa;
+    --accent:         #3498db;
+    --accent-dim:     rgba(52,152,219,0.10);
+    --accent-hov:     #2980b9;
+    --green:          #27ae60;
+    --red:            #e74c3c;
+    --yellow:         #f39c12;
+
+    /* tw-web-specific extensions */
+    --tw-text-strong: #222222;
+    --tw-text-label:  #555555;
+    --tw-text-head:   #444444;
+    --tw-border-card: #e8e8e8;
+    --tw-border-sub:  #eeeeee;
+    --tw-surface-alt: #fafafa;   /* card-actions, minor panels */
+    --tw-surface-hov: #f8f8f8;   /* card hover in list / collapsed view */
+
+    /* fills vars already referenced in agenda / calendar sections */
+    --border-color:   #e0e0e0;
+}
+
+[data-theme="dark"] {
+    --bg:             #1a1e24;
+    --bg2:            #22272e;
+    --bg3:            #2b3038;
+    --border:         rgba(255,255,255,0.08);
+    --text:           #cdd9e5;
+    --text-muted:     rgba(205,217,229,0.50);
+    --text-dim:       rgba(205,217,229,0.30);
+    --accent:         #5b9bd5;
+    --accent-dim:     rgba(91,155,213,0.18);
+    --accent-hov:     #4a8ec9;
+
+    --tw-text-strong: #e2ecf6;
+    --tw-text-label:  rgba(205,217,229,0.60);
+    --tw-text-head:   #b8cad8;
+    --tw-border-card: rgba(255,255,255,0.10);
+    --tw-border-sub:  rgba(255,255,255,0.05);
+    --tw-surface-alt: #22272e;
+    --tw-surface-hov: #2b3038;
+
+    --border-color:   rgba(255,255,255,0.08);
+}
+
+/* ── Dark-mode targeted overrides ───────────────────────────────────────────
+   Elements whose base style can't be expressed with a single var swap.       */
+
+/* Inputs/selects need an explicit dark background */
+[data-theme="dark"] .form-group input,
+[data-theme="dark"] .form-group select,
+[data-theme="dark"] .filters-container input[type="text"] {
+    background: var(--bg3);
+    color: var(--text);
+    color-scheme: dark;
+}
+
+/* Started tasks: keep yellow signal, dimmed for dark bg */
+[data-theme="dark"] .task-card.task-started {
+    background-color: rgba(249,168,37,0.10);
+    border-color: rgba(249,168,37,0.45);
+}
+
+/* Project pill: accent-tinted in dark mode */
+[data-theme="dark"] .card-proj {
+    color: var(--accent);
+    background: var(--accent-dim);
+}
+
+/* Error banner */
+[data-theme="dark"] .error-message {
+    background: rgba(231,76,60,0.12);
+    color: var(--red);
+    border-color: rgba(231,76,60,0.30);
+}
+
+/* Spinner: don't invert on dark bg */
+[data-theme="dark"] .tw-spinner { filter: opacity(0.45); }
+
+/* Panels: a touch more depth on dark bg */
+[data-theme="dark"] header,
+[data-theme="dark"] .add-task-section,
+[data-theme="dark"] .filters-section,
+[data-theme="dark"] .tasks-section { box-shadow: 0 2px 8px rgba(0,0,0,0.30); }
+
+[data-theme="dark"] .sort-popup { box-shadow: 0 4px 16px rgba(0,0,0,0.50); }
+
 * {
     margin: 0;
     padding: 0;
@@ -10,8 +107,8 @@
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     line-height: 1.6;
-    color: #333;
-    background-color: #f5f5f5;
+    color: var(--text);
+    background-color: var(--bg);
 }
 
 .container {
@@ -35,8 +132,8 @@ body {
 .list-sidebar {
     width: 180px;
     flex-shrink: 0;
-    background: #fff;
-    border-right: 1px solid #e4e4e4;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
     position: sticky;
     top: 100px;          /* below nav+btn bars */
     max-height: calc(100vh - 100px);
@@ -45,26 +142,26 @@ body {
 }
 .list-tags-sidebar {
     border-right: none;
-    border-left: 1px solid #e4e4e4;
+    border-left: 1px solid var(--border);
 }
 /* sidebar section label */
 .tw-sb-label {
     padding: 10px 12px 4px;
     font-size: 0.68rem; font-weight: 700; letter-spacing: 0.07em;
-    text-transform: uppercase; color: #999;
+    text-transform: uppercase; color: var(--text-dim);
 }
-/* light-theme overrides for sidebar pick items */
-.list-sidebar .tw-toggle-bar  { background: transparent; border-bottom: 1px solid #eee; padding: 4px 8px; }
-.list-sidebar .tw-toggle-btn  { background: #f0f0f0; border-color: #ddd; color: #555; font-size: 11px; }
-.list-sidebar .tw-toggle-btn.active { background: #3498db; border-color: #3498db; color: #fff; }
-.list-sidebar .tw-proj-total  { color: #aaa; }
-.list-sidebar .tw-pick-item   { color: #444; background: transparent; border-left-color: transparent; font-size: 12.5px; padding: 5px 10px 5px 14px; }
-.list-sidebar .tw-pick-item:hover  { background: #f5f5f5; color: #222; border-left-color: #bbb; }
-.list-sidebar .tw-pick-item.active { color: #2980b9; background: rgba(52,152,219,0.08); border-left-color: #3498db; }
-.list-sidebar .tw-proj-count  { color: #bbb; }
-.list-sidebar .tw-proj-arrow  { color: #bbb; }
-.list-sidebar .tw-pick-section-label { color: #aaa; font-size: 10px; padding: 6px 12px 2px; }
-.list-sidebar .tw-panel-error { color: #c0392b; padding: 10px 12px; font-size: 12px; }
+/* sidebar pick item styles */
+.list-sidebar .tw-toggle-bar  { background: transparent; border-bottom: 1px solid var(--border); padding: 4px 8px; }
+.list-sidebar .tw-toggle-btn  { background: var(--bg3); border-color: var(--border); color: var(--text-muted); font-size: 11px; }
+.list-sidebar .tw-toggle-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.list-sidebar .tw-proj-total  { color: var(--text-dim); }
+.list-sidebar .tw-pick-item   { color: var(--text); background: transparent; border-left-color: transparent; font-size: 12.5px; padding: 5px 10px 5px 14px; }
+.list-sidebar .tw-pick-item:hover  { background: var(--tw-surface-hov); color: var(--tw-text-strong); border-left-color: var(--text-dim); }
+.list-sidebar .tw-pick-item.active { color: var(--accent); background: var(--accent-dim); border-left-color: var(--accent); }
+.list-sidebar .tw-proj-count  { color: var(--text-dim); }
+.list-sidebar .tw-proj-arrow  { color: var(--text-dim); }
+.list-sidebar .tw-pick-section-label { color: var(--text-dim); font-size: 10px; padding: 6px 12px 2px; }
+.list-sidebar .tw-panel-error { color: var(--red); padding: 10px 12px; font-size: 12px; }
 
 /* Responsive: tags hide first, then projects */
 @media (max-width: 860px)  { .list-tags-sidebar  { display: none; } }
@@ -80,7 +177,7 @@ body {
 .list-header h2 {
     font-size: 1.05em;
     font-weight: 600;
-    color: #444;
+    color: var(--tw-text-head);
 }
 .list-header-right {
     display: flex;
@@ -89,8 +186,8 @@ body {
 }
 .filter-badge {
     font-size: 0.78em;
-    color: #555;
-    background: #e8f0fe;
+    color: var(--tw-text-label);
+    background: var(--accent-dim);
     border-radius: 10px;
     padding: 2px 9px;
     display: none;
@@ -98,22 +195,22 @@ body {
 .filter-badge.visible { display: inline-block; }
 .view-btn {
     background: none;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border);
     border-radius: 4px;
     padding: 2px 7px;
     cursor: pointer;
     font-size: 1.1em;
-    color: #888;
+    color: var(--text-muted);
     line-height: 1.4;
 }
-.view-btn.active { background: #3498db; border-color: #3498db; color: #fff; }
-.view-btn:hover:not(.active) { background: #f0f0f0; }
+.view-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.view-btn:hover:not(.active) { background: var(--bg3); }
 .view-btn.sort-active { border-color: #f0b429; color: #f0b429; }
 
 .sort-wrap { position: relative; }
 .sort-popup {
     position: absolute; right: 0; top: calc(100% + 4px);
-    background: #fff; border: 1px solid #ccc; border-radius: 6px;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000;
     padding: 8px 0 6px; min-width: 180px;
 }
@@ -123,12 +220,12 @@ body {
     padding: 4px 14px; font-size: 0.9em; cursor: pointer;
     white-space: nowrap;
 }
-.sort-fields label:hover { background: #f5f5f5; }
-.sort-fields input[type="radio"] { accent-color: #3498db; }
+.sort-fields label:hover { background: var(--bg3); }
+.sort-fields input[type="radio"] { accent-color: var(--accent); }
 .sort-reverse-label {
     display: flex; align-items: center; gap: 8px;
     padding: 6px 14px 2px; font-size: 0.9em; cursor: pointer;
-    border-top: 1px solid #eee; margin-top: 4px;
+    border-top: 1px solid var(--tw-border-sub); margin-top: 4px;
 }
 
 .header-content {
@@ -143,7 +240,7 @@ header {
     align-items: flex-start;
     margin-bottom: 30px;
     padding: 20px;
-    background: white;
+    background: var(--bg2);
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
@@ -162,7 +259,7 @@ header {
 
 .context-label {
     font-weight: 500;
-    color: #34495e;
+    color: var(--text);
 }
 
 .context-options {
@@ -172,31 +269,31 @@ header {
 
 .context-option {
     padding: 6px 12px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border);
     border-radius: 4px;
-    background: #f8f9fa;
+    background: var(--bg3);
     cursor: pointer;
     font-size: 14px;
     transition: all 0.2s ease;
 }
 
 .context-option:hover {
-    background: #e9ecef;
+    background: var(--tw-surface-hov);
 }
 
 .context-option.active {
-    background: #3498db;
+    background: var(--accent);
     color: white;
-    border-color: #3498db;
+    border-color: var(--accent);
 }
 
 h1 {
-    color: #2c3e50;
+    color: var(--text);
     font-size: 2rem;
 }
 
 h2 {
-    color: #34495e;
+    color: var(--text);
     margin-bottom: 20px;
     font-size: 1.5rem;
 }
@@ -221,12 +318,12 @@ h2 {
 }
 
 .btn-primary {
-    background: #3498db;
+    background: var(--accent);
     color: white;
 }
 
 .btn-primary:hover {
-    background: #2980b9;
+    background: var(--accent-hov);
 }
 
 .btn-success {
@@ -273,7 +370,7 @@ h2 {
 /* Forms */
 .add-task-section,
 .filters-section {
-    background: white;
+    background: var(--bg2);
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -296,15 +393,17 @@ h2 {
     display: block;
     margin-bottom: 5px;
     font-weight: 500;
-    color: #34495e;
+    color: var(--text);
 }
 
 .filters-container input[type="text"] {
     width: 100%;
     padding: 10px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border);
     border-radius: 4px;
     font-size: 14px;
+    background: var(--bg2);
+    color: var(--text);
 }
 
 #apply-filters,
@@ -337,28 +436,30 @@ h2 {
     display: block;
     margin-bottom: 5px;
     font-weight: 500;
-    color: #555;
+    color: var(--tw-text-label);
 }
 
 .form-group input,
 .form-group select {
     width: 100%;
     padding: 12px;
-    border: 2px solid #ddd;
+    border: 2px solid var(--border);
     border-radius: 6px;
     font-size: 14px;
+    background: var(--bg2);
+    color: var(--text);
     transition: border-color 0.3s ease;
 }
 
 .form-group input:focus,
 .form-group select:focus {
     outline: none;
-    border-color: #3498db;
+    border-color: var(--accent);
 }
 
 /* Tasks Section */
 .tasks-section {
-    background: white;
+    background: var(--bg2);
     padding: 25px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -368,8 +469,8 @@ h2 {
 .task-card {
     display: flex;
     align-items: stretch;
-    background: #fff;
-    border: 1px solid #e8e8e8;
+    background: var(--bg2);
+    border: 1px solid var(--tw-border-card);
     border-left:  3px solid transparent;   /* due/sched type — matches calendar colors */
     border-right: 3px solid transparent;   /* priority */
     border-radius: 6px;
@@ -382,7 +483,7 @@ h2 {
 .task-card.task-started { background-color: #fffde7; border-color: #f9a825; }
 
 /* Right border — gray stripe signals task has annotations */
-.task-card[data-annotated] { border-right-color: #bbb; }
+.task-card[data-annotated] { border-right-color: var(--text-dim); }
 
 /* Left border — due/scheduled type, colours match calendar event palette */
 .task-card[data-type="due"]       { border-left-color: #e74c3c; }   /* calendar 'due' red */
@@ -396,7 +497,7 @@ h2 {
 }
 .card-desc {
     font-size: 0.92em;
-    color: #222;
+    color: var(--tw-text-strong);
     margin-bottom: 4px;
     display: flex;
     align-items: flex-start;
@@ -429,16 +530,16 @@ h2 {
 }
 
 .card-proj { font-size: 0.78em; color: #1565c0; background: #e8f4fd; padding: 1px 6px; border-radius: 10px; }
-.card-due  { font-size: 0.78em; color: #888; }
+.card-due  { font-size: 0.78em; color: var(--text-muted); }
 .card-due.overdue  { color: #b71c1c; font-weight: 600; }
 .card-due.due-soon { color: #e65100; }
 .card-sched { font-size: 0.78em; color: #4a90e2; }
-.card-dur  { font-size: 0.78em; color: #999; }
-.card-tag  { font-size: 0.75em; color: #555; background: #f5f5f5; padding: 1px 5px; border-radius: 8px; }
+.card-dur  { font-size: 0.78em; color: var(--text-muted); }
+.card-tag  { font-size: 0.75em; color: var(--tw-text-label); background: var(--bg3); padding: 1px 5px; border-radius: 8px; }
 
 .card-extras {
     font-size: 0.74em;
-    color: #999;
+    color: var(--text-muted);
     margin-top: 3px;
     word-break: break-word;
     clear: both;
@@ -457,9 +558,9 @@ h2 {
 .card-annotations { margin-top: 5px; }
 .card-ann {
     font-size: 0.8em;
-    color: #666;
+    color: var(--text-muted);
     padding: 2px 0 2px 10px;
-    border-left: 2px solid #d0d0d0;
+    border-left: 2px solid var(--border);
     margin-top: 3px;
     white-space: pre-wrap;
 }
@@ -474,8 +575,8 @@ a.ann-link:hover { text-decoration: underline; }
     justify-content: center;
     gap: 2px;
     padding: 5px 7px;
-    border-left: 1px solid #f0f0f0;
-    background: #fafafa;
+    border-left: 1px solid var(--tw-border-sub);
+    background: var(--tw-surface-alt);
     flex-shrink: 0;
 }
 .ca-btn {
@@ -485,10 +586,10 @@ a.ann-link:hover { text-decoration: underline; }
     font-size: 0.88em;
     padding: 3px 5px;
     border-radius: 3px;
-    color: #aaa;
+    color: var(--text-dim);
     line-height: 1;
 }
-.ca-btn:hover        { background: #eee; color: #333; }
+.ca-btn:hover        { background: var(--bg3); color: var(--text); }
 .ca-start:hover      { color: #27ae60; }
 .ca-stop:hover       { color: #e67e22; }
 .ca-done:hover       { color: #27ae60; }
@@ -507,7 +608,7 @@ a.ann-link:hover { text-decoration: underline; }
     font-size: 1.2rem;
     padding: 8px 14px;
     border-radius: 6px;
-    color: #888;
+    color: var(--text-muted);
 }
 
 /* ── List view ───────────────────────────────────────────────── */
@@ -545,7 +646,7 @@ a.ann-link:hover { text-decoration: underline; }
 :is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-meta .card-dur { display: none; }
 :is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-actions { display: none; }
 :is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded) .card-annotations { display: none; }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:hover { box-shadow: none; background: #f8f8f8; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:hover { box-shadow: none; background: var(--tw-surface-hov); }
 
 /* ── Collapsed card within card view ────────────────────────── */
 :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed {
@@ -573,7 +674,7 @@ a.ann-link:hover { text-decoration: underline; }
 :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-meta .card-dur { display: none; }
 :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-actions { display: none; }
 :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-annotations { display: none; }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed:hover { box-shadow: none; background: #f8f8f8; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed:hover { box-shadow: none; background: var(--tw-surface-hov); }
 
 /* ── Expanded card within list view ─────────────────────────── */
 :is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded {
@@ -593,7 +694,7 @@ a.ann-link:hover { text-decoration: underline; }
 :is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-meta .card-due,
 :is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-meta .card-dur { display: inline; }
 :is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-actions { display: flex; }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded:hover { box-shadow: 0 3px 8px rgba(0,0,0,0.1); background: #fff; }
+:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded:hover { box-shadow: 0 3px 8px rgba(0,0,0,0.1); background: var(--bg2); }
 
 /* Modal */
 .modal {
@@ -608,7 +709,7 @@ a.ann-link:hover { text-decoration: underline; }
 }
 
 .modal-content {
-    background-color: white;
+    background-color: var(--bg2);
     margin: 5% auto;
     padding: 0;
     border-radius: 8px;
@@ -623,23 +724,23 @@ a.ann-link:hover { text-decoration: underline; }
     justify-content: space-between;
     align-items: center;
     padding: 20px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--tw-border-sub);
 }
 
 .modal-header h3 {
     margin: 0;
-    color: #2c3e50;
+    color: var(--text);
 }
 
 .close {
     font-size: 28px;
     font-weight: bold;
     cursor: pointer;
-    color: #aaa;
+    color: var(--text-dim);
 }
 
 .close:hover {
-    color: #333;
+    color: var(--text);
 }
 
 .modal form {
@@ -1021,30 +1122,30 @@ a.ann-link:hover { text-decoration: underline; }
     .container {
         padding: 15px;
     }
-    
+
     header {
         flex-direction: column;
         gap: 15px;
         text-align: center;
     }
-    
+
     h1 {
         font-size: 1.5rem;
     }
-    
+
     .form-row {
         flex-direction: column;
     }
-    
+
     .modal-content {
         margin: 10% auto;
         width: 95%;
     }
-    
+
     .modal-actions {
         flex-direction: column;
     }
-    
+
     .btn {
         justify-content: center;
     }
