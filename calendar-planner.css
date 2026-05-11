@@ -470,3 +470,61 @@ body.cal-page .app-container {
 .fc-scroller::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
 .tasks-container::-webkit-scrollbar-thumb:hover,
 .fc-scroller::-webkit-scrollbar-thumb:hover { background: var(--secondary-color); }
+
+/* ===================================
+   Dark mode
+   =================================== */
+[data-theme="dark"] {
+    /* Local vars */
+    --light-bg:        #22272e;
+    --dark-text:       #cdd9e5;
+    --border-color:    rgba(255,255,255,0.08);
+    --secondary-color: #768390;
+    --shadow:          0 2px 8px rgba(0,0,0,0.4);
+    --shadow-hover:    0 4px 12px rgba(0,0,0,0.5);
+
+    /* FullCalendar v5 CSS vars */
+    --fc-border-color:       rgba(255,255,255,0.08);
+    --fc-page-bg-color:      #22272e;
+    --fc-today-bg-color:     rgba(91,155,213,0.08);
+    --fc-non-business-color: rgba(0,0,0,0.2);
+    --fc-highlight-color:    rgba(91,155,213,0.2);
+    --fc-more-link-bg-color: #2b3038;
+    --fc-more-link-text-color: #cdd9e5;
+}
+
+[data-theme="dark"] .main-content    { background-color: #1a1e24; }
+[data-theme="dark"] .calendar-column { background: #22272e; }
+[data-theme="dark"] .tasks-column    { background: #22272e; }
+[data-theme="dark"] .tasks-controls  { background: #2b3038; }
+
+/* FullCalendar — column headers and time labels */
+[data-theme="dark"] .fc .fc-col-header-cell              { background: #2b3038; }
+[data-theme="dark"] .fc .fc-col-header-cell-cushion       { color: #cdd9e5; text-decoration: none; }
+[data-theme="dark"] .fc .fc-col-header-cell.fc-day-today  { background: rgba(91,155,213,0.15); }
+[data-theme="dark"] .fc .fc-timegrid-slot-label           { color: #768390; }
+
+/* Unscheduled sidebar task cards */
+[data-theme="dark"] .tasks-column .task-card             { background: #2b3038; border-color: rgba(255,255,255,0.08); }
+[data-theme="dark"] .tasks-column .task-card:hover        { border-color: var(--primary-color); }
+[data-theme="dark"] .tasks-column .task-card.selected     { background-color: rgba(91,155,213,0.12); }
+[data-theme="dark"] .task-description                     { color: var(--dark-text); }
+[data-theme="dark"] .task-priority.high   { background-color: rgba(220,53,69,0.2); }
+[data-theme="dark"] .task-priority.medium { background-color: rgba(255,193,7,0.15); color: #e6b800; }
+[data-theme="dark"] .task-priority.low    { background-color: rgba(40,167,69,0.15); }
+
+/* Modal */
+[data-theme="dark"] .modal-content               { background-color: #22272e; color: #cdd9e5; }
+[data-theme="dark"] .modal-header                 { border-color: rgba(255,255,255,0.08); }
+[data-theme="dark"] .modal-header h3              { color: #cdd9e5; }
+[data-theme="dark"] .modal-footer                 { background: #2b3038; border-color: rgba(255,255,255,0.08); }
+[data-theme="dark"] .modal-close                  { color: #768390; }
+[data-theme="dark"] .modal-close:hover            { color: #cdd9e5; }
+[data-theme="dark"] .task-detail-table th         { color: #768390; }
+[data-theme="dark"] .task-detail-table td         { color: #cdd9e5; }
+
+/* Scrollbars */
+[data-theme="dark"] .tasks-container::-webkit-scrollbar-track,
+[data-theme="dark"] .fc-scroller::-webkit-scrollbar-track  { background: #22272e; }
+[data-theme="dark"] .tasks-container::-webkit-scrollbar-thumb,
+[data-theme="dark"] .fc-scroller::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.15); }
