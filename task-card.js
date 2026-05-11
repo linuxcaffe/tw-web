@@ -399,8 +399,11 @@ document.addEventListener('click', async e => {
         e.stopPropagation();
         const label = link.dataset.label;
         const value = link.dataset.value;
-        const launchers = await _getLaunchers();
-        if (!launchers[label]) return; // no launcher — let default href=#  do nothing
+        // Use cache directly (pre-warmed at load) to keep window.open inside the
+        // user-gesture — awaiting _getLaunchers() would break the gesture chain
+        // and cause browsers to open a new tab on every click.
+        const launchers = _annLaunchers || await _getLaunchers();
+        if (!launchers[label]) return;
         const tmpl = launchers[label];
         const resolved = tmpl.replace('{value}', encodeURIComponent(value));
         if (/^https?:\/\//.test(resolved)) {
