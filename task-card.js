@@ -358,11 +358,17 @@ function linkifyAnnotation(raw) {
         matches.push({ index: m.index, raw: m[0], label: m[1].toLowerCase(), value: m[2].trim(), type: 'label' });
     matches.sort((a, b) => a.index - b.index);
 
-    // Remove overlapping matches (keep first)
+    // Remove overlapping matches; URLs take priority over labels when a URL
+    // falls inside a label's span (e.g. "url: https://..." → plain prefix + link).
+    const urlSpans = matches.filter(m => m.type === 'url').map(m => [m.index, m.index + m.raw.length]);
     const kept = [];
     let cursor = 0;
     for (const hit of matches) {
         if (hit.index < cursor) continue;
+        if (hit.type === 'label') {
+            const end = hit.index + hit.raw.length;
+            if (urlSpans.some(([s]) => s >= hit.index && s < end)) continue;
+        }
         kept.push(hit);
         cursor = hit.index + hit.raw.length;
     }

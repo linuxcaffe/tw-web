@@ -878,7 +878,7 @@ def launch_annotation():
 
 @app.route('/api/bookmark', methods=['POST'])
 def add_bookmark():
-    """Add a bookmark task: description=title, +bkmk tag, url annotated as 'url: <url>'."""
+    """Add a bookmark task: description=title, +bkmk tag, url annotated as bare URL."""
     data = request.get_json(silent=True) or {}
     title = data.get('title', '').strip()
     url   = data.get('url',   '').strip()
@@ -898,7 +898,7 @@ def add_bookmark():
         return jsonify({'success': False, 'error': add_result['stderr']}), 500
 
     # Annotate the newly created task with the URL
-    ann_result = run_task_command(['task', '+LATEST', 'annotate', f'url: {url}'])
+    ann_result = run_task_command(['task', '+LATEST', 'annotate', url])
     if not ann_result['success']:
         return jsonify({'success': False, 'error': ann_result['stderr']}), 500
 
