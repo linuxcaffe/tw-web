@@ -404,7 +404,7 @@ document.addEventListener('click', async e => {
         const tmpl = launchers[label];
         const resolved = tmpl.replace('{value}', encodeURIComponent(value));
         if (/^https?:\/\//.test(resolved)) {
-            window.open(resolved, '_blank');
+            window.open(resolved, 'nb-web');
         } else {
             fetch('/api/launch', {
                 method: 'POST',
