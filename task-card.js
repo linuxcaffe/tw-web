@@ -401,11 +401,17 @@ document.addEventListener('click', async e => {
         const value = link.dataset.value;
         const launchers = await _getLaunchers();
         if (!launchers[label]) return; // no launcher — let default href=#  do nothing
-        fetch('/api/launch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ label, value }),
-        });
+        const tmpl = launchers[label];
+        const resolved = tmpl.replace('{value}', encodeURIComponent(value));
+        if (/^https?:\/\//.test(resolved)) {
+            window.open(resolved, '_blank');
+        } else {
+            fetch('/api/launch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ label, value }),
+            });
+        }
     } else if (link.dataset.openPath) {
         // Legacy file: /path links
         e.preventDefault();

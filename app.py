@@ -74,7 +74,7 @@ _SETTINGS_SCHEMA = {
                               'coerce': lambda v: str(v).strip()},
     'pty_init':             {'type': str,  'default': '',
                               'coerce': lambda v: str(v).strip()},
-    'annotation_launchers': {'type': None, 'default': {'file': 'xdg-open {value}', 'nb': 'nb browse {value} --gui'},
+    'annotation_launchers': {'type': None, 'default': {'file': 'xdg-open {value}', 'nb': 'http://localhost:5001/{value}'},
                               'coerce': lambda v: {str(k).strip(): str(w).strip() for k, w in v.items()} if isinstance(v, dict) else {}},
 }
 
