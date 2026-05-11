@@ -71,34 +71,68 @@ To install as a PWA on Linux, open `http://localhost:5000` in Chrome or a Chromi
 
 **Epiphany (GNOME Web)** makes an excellent PWA host — it installs cleanly to the GNOME application launcher and opens without browser chrome.
 
-### Android + Termux
+### Android / Termux
 
 tw-web runs entirely inside Termux — no root, no external server required.
 
+#### Termux prerequisites
+
+Install Termux from [F-Droid](https://f-droid.org/packages/com.termux/) (recommended over the Play Store build), then:
+
 ```bash
-# 1. Install Termux from F-Droid (recommended over Play Store)
-#    https://f-droid.org/packages/com.termux/
-
-# 2. Inside Termux, install dependencies
-pkg update && pkg install python git taskwarrior
-
-# 3. Clone and install
-git clone https://github.com/linuxcaffe/tw-web.git
-cd tw-web
-pip install -r requirements.txt
-
-# 4. Start the server (runs on localhost:5000)
-python3 app.py &
-
-# 5. Open in a browser
-#    http://localhost:5000
+pkg update && pkg upgrade -y
+pkg install python git openssh
+pip install flask flask-cors flask-sock tabulate
 ```
 
-To use tw-web as a PWA on Android, open `http://localhost:5000` in Firefox or a Chromium-based browser, then "Add to Home Screen" from the browser menu. **Epiphany for Android** (GNOME Web) is the recommended PWA host — it hides browser chrome and feels native.
+> **Taskwarrior version:** The Termux package manager provides TW3 (`pkg install taskwarrior`), which tw-web does not support. tw-web requires **Taskwarrior 2.6.x** — install it manually. A pre-built `aarch64` `.deb` for Termux is included in the [gittw repo](https://github.com/linuxcaffe/gittw).
 
-For Taskwarrior sync on Android, [Taskwarrior for Android](https://play.google.com/store/apps/details?id=kvj.taskw) or a git-based sync via Termux work well alongside tw-web.
+#### Clone and start
 
-> **Tip:** To keep the server running while you use other apps, start it in a Termux session and use `Ctrl-Z` + `bg`, or run it inside `tmux`.
+```bash
+git clone https://github.com/linuxcaffe/tw-web.git ~/dev/tw-web
+cd ~/dev/tw-web
+python3 app.py
+# → Running on http://127.0.0.1:5000
+```
+
+Open `http://localhost:5000` in your phone's browser.
+
+#### Install as a PWA
+
+In Chrome / Chromium: **⋮ → Add to Home Screen.**
+In Firefox: **⋮ → Install.**
+
+[**Epiphany (GNOME Web) for Android**](https://f-droid.org/packages/org.gnome.Epiphany/) makes the best PWA host — it strips all browser chrome and the app feels fully native.
+
+#### Keep the server running
+
+Termux can be backgrounded, but processes may be killed when switching apps. Two options:
+
+**tmux** (recommended):
+```bash
+pkg install tmux
+tmux new -s tw-web
+cd ~/dev/tw-web && python3 app.py
+# Ctrl-B D to detach — server stays alive
+```
+
+**Termux:Boot** — auto-start on reboot. Requires the [Termux:Boot](https://f-droid.org/packages/com.termux.boot/) add-on:
+```bash
+mkdir -p ~/.termux/boot
+cat > ~/.termux/boot/start-tw-web.sh << 'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+cd ~/dev/tw-web
+python3 app.py &
+EOF
+chmod +x ~/.termux/boot/start-tw-web.sh
+```
+
+#### Sync tasks with gittw
+
+[gittw](https://github.com/linuxcaffe/gittw) provides git-based Taskwarrior sync — the same tool that powers the tw-web **Sync** button. See the gittw README for the full Termux setup, including how to clone your existing task data and add your phone's SSH key to GitHub without needing the web interface.
+
+Once gittw is installed and your `~/.task/` is cloned from your remote, the tw-web Sync button works out of the box with no further configuration.
 
 ---
 
