@@ -37,8 +37,8 @@
 
     const STATUS_BTNS = [
         { id: 'pending',   label: 'Pending'   },
-        { id: 'recurring', label: 'Recurring' },
-        { id: 'waiting',   label: 'Waiting'   },
+        { id: 'recurring', label: 'Recur' },
+        { id: 'waiting',   label: 'Wait'  },
         { id: 'completed', label: 'Completed' },
         { id: 'deleted',   label: 'Deleted'   },
     ];
@@ -294,7 +294,7 @@
 
 /* nav links */
 .tw-nav-link {
-    padding: 3px 9px; border-radius: 4px; text-decoration: none;
+    padding: 3px 8px; border-radius: 4px; text-decoration: none;
     color: rgba(255,255,255,0.75); font-size: 14px; white-space: nowrap;
 }
 .tw-nav-link:hover  { background: rgba(255,255,255,0.12); color: #fff; }
@@ -657,8 +657,10 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     }
     .tw-bar-left  { flex-wrap: wrap; width: 100%; justify-content: flex-start; }
     .tw-bar-right { flex-wrap: wrap; width: 100%; justify-content: flex-end; }
-    #tw-filter-input, #tw-project-input, #tw-tags-input { width: 55px; min-width: 22px; }
-    #tw-pri-input { width: 22px; min-width: 14px; }
+    #tw-filter-input, #tw-project-input { width: 55px; min-width: 22px; }
+    #tw-tags-input    { width: 44px; min-width: 16px; }
+    #tw-pri-input     { width: 18px; min-width: 12px; }
+    .tw-count         { font-size: 14px; min-width: 24px; }
     .tw-name-full  { display: none; }
     .tw-name-short { display: inline; }
 }
