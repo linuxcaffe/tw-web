@@ -66,7 +66,7 @@ if curl -s "$FLASK_URL" > /dev/null 2>&1; then
 else
     echo "tw-web-launch: starting Flask server..."
     cd "$FLASK_DIR" || { echo "ERROR: $FLASK_DIR not found"; exit 1; }
-    python3 app.py > "$FLASK_LOG" 2>&1 &
+    TW_WEB_HOST=0.0.0.0 python3 app.py > "$FLASK_LOG" 2>&1 &
     FLASK_PID=$!
     echo "$FLASK_PID" > "$FLASK_PID_FILE"
 

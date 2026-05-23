@@ -1597,5 +1597,7 @@ if __name__ == '__main__':
         print("TaskWarrior found:", check_result['stdout'].split('\n')[0])
 
     print("Starting tw-web...")
-    print("Access the interface at: http://localhost:5000")
-    app.run(host='127.0.0.1', port=5000, debug=True, threaded=True)
+    host = os.environ.get('TW_WEB_HOST', '127.0.0.1')
+    port = int(os.environ.get('TW_WEB_PORT', 5000))
+    print(f"Access the interface at: http://{host}:{port}")
+    app.run(host=host, port=port, debug=True, threaded=True)
