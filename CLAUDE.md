@@ -67,11 +67,9 @@ taskutil web probe --port 5000              # live attack-surface check (~/dev/t
   route that launches something: `/api/open`, `/api/launch`, `/api/terminal`. Never call `/api/server/stop`
   from a test: its PID file can point at the live server. To test what a route would send to `task`,
   monkeypatch `run_task_command` (see the `captured` fixture).
-- **Checking a change on a real server:** from the worktree, start
-  `TASKRC=… TASKDATA=… XDG_RUNTIME_DIR=… TW_WEB_PORT=<free port> python3 app.py` against a throwaway
-  database. Get a free port from the OS, never a fixed one: 5099 is nb-web's e2e port. Then run
-  `taskutil web probe --port <port>`. For a real browser, nb-web-tests' Playwright works:
-  `require('/home/djp/dev/nb-web-tests/e2e/node_modules/playwright')`.
+- **Checking a change on a real server:** follow the **`verify` skill** (`.claude/skills/verify/`).
+  `.tools/scratch-server.sh up|env|probe|down` runs the worktree's `app.py` against a throwaway database
+  on a free port and stops exactly that server. It also covers the headless-browser check.
 - **Stopping processes:** never `pkill`/`pgrep` a bare `"python3 app.py"`. nb-web runs one too, and the
   pattern also matches your own shell's command line. Use the anchored pattern
   `pgrep -f '^(/usr/bin/)?python3 app\.py$'` and kill only PIDs whose `/proc/<pid>/cwd` is your folder.
