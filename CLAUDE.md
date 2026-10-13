@@ -58,7 +58,13 @@ save can take the server down.
 ```bash
 python3 -m pytest -q tests/                 # ~1 s; never touches ~/.task
 taskutil web probe --port 5000              # live attack-surface check (~/dev/tw-taskutil)
+python3 .tools/check-guards.py              # every identifier in .guards still exists
+python3 .tools/check-refs.py                # each page's scripts define what they use, in order
 ```
+
+The pre-commit hook (`.tools/pre-commit`) runs all three local checks and blocks a red commit; bypass a
+deliberate work-in-progress commit with `--no-verify`. Install it once per clone:
+`ln -sf ../../.tools/pre-commit .git/hooks/pre-commit` (worktrees share it).
 
 - `tests/conftest.py` points `TASKRC`, `TASKDATA` and `XDG_RUNTIME_DIR` at a temp dir *before* importing
   `app`, which runs `task` at import time. Never import `app` in a test any other way.
@@ -67,6 +73,13 @@ taskutil web probe --port 5000              # live attack-surface check (~/dev/t
   route that launches something: `/api/open`, `/api/launch`, `/api/terminal`. Never call `/api/server/stop`
   from a test: its PID file can point at the live server. To test what a route would send to `task`,
   monkeypatch `run_task_command` (see the `captured` fixture).
+- **`.guards`** lists load-bearing identifiers: the security functions, the `TW_*` contract, the runtime
+  paths and what the views share. When you write something others depend on, add a line. When the
+  hook names a missing one, restore it, or (if the removal is deliberate) update `.guards` in the same commit.
+- **`check-refs.py`** knows the pages share globals with no modules: a top-level use must load after its
+  definer (`kanban.js` builds a `TaskCardManager` while loading), a call-time use must be on the page
+  unless guarded with `typeof`, and two scripts on one page can't both `let`/`const`/`class` one name.
+  A cross-page use that is fine by design goes in its `ALLOWED` table with the reason.
 - **Checking a change on a real server:** follow the **`verify` skill** (`.claude/skills/verify/`).
   `.tools/scratch-server.sh up|env|probe|down` runs the worktree's `app.py` against a throwaway database
   on a free port and stops exactly that server. It also covers the headless-browser check.
@@ -99,8 +112,8 @@ taskutil web probe --port 5000              # live attack-surface check (~/dev/t
 10. **The `TW_*` env/signal contract is shared with fleet hooks:** `TW_NOINTERACT`, `TW_CLIENT`,
     `TW_SPOOL_DIR`, `TW_PREFLIGHT_*`, `tw_needs_pty`, `tw_preflight`, `TW_INTERACTIVE_REQUIRED`.
     Don't rename or repurpose them; the table is in the plan note.
-11. **Service-worker cache:** an unversioned `.git/hooks/pre-commit` bumps `sw.js` `CACHE` whenever a
-    shell asset is staged. Don't bump it by hand. In a fresh clone the hook is missing, so bump it manually.
+11. **Service-worker cache:** the pre-commit hook bumps `sw.js` `CACHE` whenever a shell asset is staged.
+    Don't bump it by hand. If the hook isn't installed (fresh clone), install it (see Testing).
 
 ## Fleet tools
 

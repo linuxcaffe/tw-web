@@ -1,0 +1,53 @@
+# tw-web — load-bearing identifiers. `.tools/check-guards.py` fails the commit if one goes missing.
+# Format: file:identifier (matched on word boundaries). Add a line when you write something
+# that other files, the fleet's hooks or the security model depend on.
+# Wiring between the JS files (who defines what, in which order) is .tools/check-refs.py's job.
+
+# ── Security (S1–S11): the request guard and what it calls ────────────────────
+app.py:def _guard_request
+app.py:@app.before_request
+app.py:def _origin_allowed
+app.py:def _allowed_hosts
+app.py:def _server_options
+app.py:_EXTENSION_ROUTES
+app.py:static_folder=None
+app.py:def _is_asset
+app.py:def _open_allowed
+app.py:def _launch_argv
+app.py:def _runtime_dir
+app.py:def _private_dir
+
+# ── The one path to `task` (timeout, rc.confirmation=no, readonly → rc.hooks=off) ──
+app.py:def run_task_command
+app.py:readonly=True
+
+# ── Fleet contract shared with hooks (names must not change) ─────────────────
+app.py:TW_NOINTERACT
+app.py:TW_SPOOL_DIR
+app.py:TW_CLIENT
+app.py:TW_INTERACTIVE_REQUIRED
+app.py:tw_needs_pty
+app.py:tw_preflight
+
+# ── Runtime paths: computed in three places, kept in step (S9) ──────────────────
+tw-web-launch.sh:RUN_DIR
+tw-web-launch.sh:stop_tw_web_procs
+tw-web-native-host.py:RUN_DIR
+tw-web-native-host.py:def stop_tw_web_procs
+
+# ── Shared chrome every page calls (nav.js) ───────────────────────────────────
+nav.js:window.twNav
+nav.js:window.twTerminal
+nav.js:stateToParams
+nav.js:initProjectsSidebar
+nav.js:initTagsSidebar
+nav.js:offerTerminal
+
+# ── Classes and methods the four views share ─────────────────────────────────
+task-card.js:class TaskActionHandler
+task-card.js:class TaskCardManager
+task-card.js:appendWithDeps
+task-card.js:_e
+task-editor.js:class TaskEditor
+task-editor.js:showForTask
+calendar-planner.js:function escHtml

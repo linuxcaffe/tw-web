@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# tw-web pre-commit hook. Install once per clone (worktrees share it):
+#   ln -sf ../../.tools/pre-commit .git/hooks/pre-commit
+#
+# 1. Bump the service-worker cache when a shell asset is staged.
+# 2. Block the commit if a load-bearing identifier is gone (.guards), the pages' scripts
+#    are mis-wired (check-refs), or the test suite is red (~1 s, never touches ~/.task).
+# Bypass for a deliberate work-in-progress commit: git commit --no-verify
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+SHELL_ASSETS=(
+    index.html styles.css sw.js
+    nav.js main.js task-card.js task-editor.js task-editor-templates.html
+    agenda.html agenda.js
+    calendar-planner.html calendar-planner.js calendar-planner.css
+    kanban.html add.html about.html help.html
+)
+
+staged=$(git diff --cached --name-only)
+
+for f in "${SHELL_ASSETS[@]}"; do
+    if echo "$staged" | grep -qx "$f"; then
+        current=$(grep -o 'tw-web-v[0-9]*' sw.js | grep -o '[0-9]*$')
+        new=$((current + 1))
+        sed -i "s/tw-web-v${current}/tw-web-v${new}/" sw.js
+        git add sw.js
+        echo "sw.js cache bumped: v${current} → v${new}"
+        break
+    fi
+done
+
+STATUS=0
+python3 .tools/check-guards.py || STATUS=1
+python3 .tools/check-refs.py >/dev/null || { python3 .tools/check-refs.py; STATUS=1; }
+log=$(mktemp)
+python3 -m pytest -q -x tests/ >"$log" 2>&1 || { tail -20 "$log"; STATUS=1; }
+rm -f "$log"
+[[ $STATUS -eq 0 ]] || echo "pre-commit: blocked (git commit --no-verify to override)" >&2
+exit $STATUS

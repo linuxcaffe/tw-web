@@ -18,6 +18,7 @@ cd ~/dev/tw-web-<topic>
 
 # 2. Red test first, then fix, then green (~1 s, throwaway TASKRC/TASKDATA/XDG_RUNTIME_DIR)
 python3 -m pytest -q tests/
+python3 .tools/check-guards.py && python3 .tools/check-refs.py   # the hook runs these too
 
 # 3. Real server from the worktree, against a throwaway database, on a free port
 .tools/scratch-server.sh up            # prints http://localhost:<port>
@@ -71,7 +72,8 @@ Seed whatever the page needs first: a calendar event needs `scheduled:today+10h`
   there regardless. Only the live probe (step 4) proves the real `.git/` folder is hidden.
 - **`$!` after `cd … &&` in a subshell** is the subshell, not Python. `scratch-server.sh` uses `exec` so
   the PID is the server.
-- **The pre-commit hook bumps `sw.js`.** Don't bump `CACHE` by hand (see CLAUDE.md invariant 11).
+- **The pre-commit hook bumps `sw.js`** and blocks on a failing guard, reference check or test. Don't
+  bump `CACHE` by hand (CLAUDE.md invariant 11), and don't `--no-verify` past a check you haven't read.
 
 ## When to update this skill
 
