@@ -109,9 +109,11 @@ deliberate work-in-progress commit with `--no-verify`. Install it once per clone
    bind (S3).
 9. **Escape task text before `innerHTML`** (`escHtml` in `calendar-planner.js`, `_e` in `task-card.js`),
    or use `textContent` (S6). Task text can come from hooks, bookmarks and sync.
-10. **The `TW_*` env/signal contract is shared with fleet hooks:** `TW_NOINTERACT`, `TW_CLIENT`,
-    `TW_SPOOL_DIR`, `TW_PREFLIGHT_*`, `tw_needs_pty`, `tw_preflight`, `TW_INTERACTIVE_REQUIRED`.
-    Don't rename or repurpose them; the table is in the plan note.
+10. **The `TW_*` env/signal contract is shared with fleet hooks:** `TW_NOINTERACT`, `TW_CLIENT`, `TW_WEB`,
+    `TW_SPOOL_DIR`, `TW_PREFLIGHT_*`, `tw_needs_pty`, `tw_preflight`, `TW_INTERACTIVE_REQUIRED`. The reference
+    is `~/dev/awesome-taskwarrior/CONVENTIONS.md`; `tests/test_contract.py` pins tw-web's side with the
+    document's examples. Don't rename or repurpose them. The terminal console (`_pty_env`) clears
+    `TW_NOINTERACT`, `TW_WEB`, `TW_SPOOL_DIR` and `TW_PREFLIGHT_*` so hooks can prompt there.
 11. **Service-worker cache:** the pre-commit hook bumps `sw.js` `CACHE` whenever a shell asset is staged.
     Don't bump it by hand. If the hook isn't installed (fresh clone), install it (see Testing).
 

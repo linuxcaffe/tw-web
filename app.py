@@ -352,6 +352,17 @@ _TW_ENV = {
     'TW_SPOOL_DIR':  str(_SPOOL_DIR),
 }
 
+# A real terminal (the /ws/pty console) can prompt, so none of the "no terminal here"
+# variables may reach it: TW_SPOOL_DIR would make a hook queue a command instead of running it.
+_NONINTERACTIVE_VARS = ('TW_NOINTERACT', 'TW_WEB', 'TW_SPOOL_DIR')
+
+
+def _pty_env():
+    env = {k: v for k, v in _TW_ENV.items()
+           if k not in _NONINTERACTIVE_VARS and not k.startswith('TW_PREFLIGHT_')}
+    env['TERM'] = 'xterm-256color'
+    return env
+
 # Timeout (seconds) for any single task command.
 # Prevents a hung interactive hook from deadlocking the Flask request.
 TASK_TIMEOUT = 15
@@ -580,8 +591,7 @@ def ws_pty(ws):
     winsize = struct.pack('HHHH', 24, 80, 0, 0)
     fcntl.ioctl(slave_fd, termios.TIOCSWINSZ, winsize)
 
-    env = {k: v for k, v in _TW_ENV.items() if k != 'TW_NOINTERACT'}
-    env['TERM'] = 'xterm-256color'
+    env = _pty_env()
 
     def _pty_preexec():
         os.setsid()
