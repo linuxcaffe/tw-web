@@ -7,8 +7,23 @@
 #   tw-web-launch.sh --stop    stop the Flask server
 
 FLASK_DIR="$HOME/dev/tw-web"
-FLASK_LOG="/tmp/tw-web.log"
-FLASK_PID_FILE="/tmp/tw-web.pid"
+# Private runtime dir — same path app.py computes (security review S9)
+RUN_DIR="${XDG_RUNTIME_DIR:-$HOME/.cache}/tw-web"
+mkdir -p -m 700 "$RUN_DIR"
+FLASK_LOG="$RUN_DIR/tw-web.log"
+FLASK_PID_FILE="$RUN_DIR/tw-web.pid"
+
+# Fallback when there's no PID file: stop only the app.py running from
+# $FLASK_DIR — never every "python3 app.py" (nb-web runs one too).
+stop_tw_web_procs() {
+    local found=1
+    for p in $(pgrep -f '^(/usr/bin/)?python3 app\.py$'); do
+        if [ "$(readlink "/proc/$p/cwd")" = "$FLASK_DIR" ]; then
+            kill "$p" 2>/dev/null && found=0
+        fi
+    done
+    return $found
+}
 FLASK_URL="http://localhost:5000/"
 EPIPHANY_PROFILE="$HOME/.local/share/org.gnome.Epiphany.WebApp-tw-web-3f978691d368f37d5f7c65c7aefa29341f2c5068"
 SW_DIR="$EPIPHANY_PROFILE/serviceworkers"
@@ -23,7 +38,7 @@ if [ "$1" = "--stop" ]; then
         kill "$PID" 2>/dev/null && echo "tw-web-launch: stopped Flask (pid $PID)"
         rm -f "$FLASK_PID_FILE"
     else
-        pkill -f "python3 app.py" 2>/dev/null && echo "tw-web-launch: stopped Flask" || echo "tw-web-launch: server not running"
+        stop_tw_web_procs && echo "tw-web-launch: stopped Flask" || echo "tw-web-launch: server not running"
     fi
     exit 0
 fi
@@ -54,7 +69,7 @@ if [ "$1" = "--clean" ]; then
         rm -f "$FLASK_PID_FILE"
         sleep 0.5
     else
-        pkill -f "python3 app.py" 2>/dev/null \
+        stop_tw_web_procs \
             && echo "tw-web-launch: restarting Flask..." \
             && sleep 0.5
     fi

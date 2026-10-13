@@ -155,11 +155,14 @@ def log_command(args):
 # No Flask static folder: static_files() below is the only file route, so the
 # asset rule there can't be bypassed (security review S7).
 app = Flask(__name__, static_folder=None)
-CORS(app, origins=[
-    'http://localhost:5000',
-    'http://127.0.0.1:5000',
-    re.compile(r'moz-extension://.*'),
-])
+# The Firefox popup (firefox/popup.js) is the only cross-origin client, and it
+# needs only these routes. Any installed extension can claim a moz-extension://
+# origin, so nothing else is open to them (security review S8). Same-origin
+# pages need no CORS.
+_EXTENSION_ROUTES = ('/api/health', '/api/server/stop', '/api/task/add', '/api/bookmark')
+CORS(app, resources={
+    r'^/api/(health|server/stop|task/add|bookmark)$': {'origins': [re.compile(r'^moz-extension://.*')]},
+})
 sock = Sock(app)
 
 # ── Network exposure guard (security review S1–S5, tw:docs/tw-web-dev-infra-plan.md) ──
@@ -216,10 +219,10 @@ def _split_host(netloc):
         return netloc[1:].split(']', 1)[0]
     return netloc.rsplit(':', 1)[0] if netloc.count(':') == 1 else netloc
 
-def _origin_allowed(origin, host):
-    """Same-origin as the (already allowlisted) Host, or a Firefox extension."""
+def _origin_allowed(origin, host, path):
+    """Same-origin as the (already allowlisted) Host, or a Firefox extension on its own routes."""
     if origin.startswith('moz-extension://'):
-        return True
+        return path in _EXTENSION_ROUTES
     from urllib.parse import urlsplit
     try:
         return urlsplit(origin).netloc.lower() == host.lower()
@@ -235,19 +238,33 @@ def _guard_request():
         return jsonify({'success': False, 'error': 'Host not allowed'}), 400
     origin = request.headers.get('Origin')
     if origin is not None and (request.method not in _SAFE_METHODS or request.path == '/ws/pty'):
-        if not _origin_allowed(origin, request.host):
+        if not _origin_allowed(origin, request.host, request.path):
             return jsonify({'success': False, 'error': 'Cross-origin request refused'}), 403
 
 # ── Hook prompt system ────────────────────────────────────────────────────────
-_PROMPT_DIR = Path('/tmp/tw-web-prompts')
-_PROMPT_DIR.mkdir(exist_ok=True)
+# ── Runtime files: hook prompts, spool, PID ─────────────────────────────────
+# A private 0700 dir under $XDG_RUNTIME_DIR (Termux etc.: ~/.cache/tw-web),
+# never world-writable /tmp, where another user could plant prompts or
+# spooled commands (security review S9). tw-web-launch.sh and
+# tw-web-native-host.py compute the same path.
+def _runtime_dir(env):
+    base = env.get('XDG_RUNTIME_DIR')
+    return Path(base) / 'tw-web' if base else Path.home() / '.cache' / 'tw-web'
+
+def _private_dir(path):
+    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(path, 0o700)
+    return path
+
+_RUN_DIR = _private_dir(_runtime_dir(os.environ))
+_PID_FILE = _RUN_DIR / 'tw-web.pid'
+_PROMPT_DIR = _private_dir(_RUN_DIR / 'prompts')
 
 # ── Hook spool (deferred interactive commands) ────────────────────────────────
 # Hooks that cannot run interactively write a shell command to this directory.
 # Flask drains it after every write command and returns deferred_cmd to the UI,
 # which offers an "Open in terminal" banner so the user can run it manually.
-_SPOOL_DIR = Path('/tmp/tw-web-spool')
-_SPOOL_DIR.mkdir(exist_ok=True)
+_SPOOL_DIR = _private_dir(_RUN_DIR / 'spool')
 
 def _drain_spool():
     """Read and delete all *.cmd files from the spool dir; return list of command strings."""
@@ -913,7 +930,7 @@ def server_health():
 def server_stop():
     """Shut down the Flask server. Kills the reloader parent via PID file."""
     import signal as _signal
-    pid_file = Path('/tmp/tw-web.pid')
+    pid_file = _PID_FILE
     def _kill():
         time.sleep(0.15)
         if pid_file.exists():
@@ -929,6 +946,17 @@ def server_stop():
     threading.Thread(target=_kill, daemon=True).start()
     return jsonify({'success': True})
 
+def _open_allowed(path, home):
+    """Only real paths under $HOME (symlinks resolved), never .desktop launchers (S10)."""
+    try:
+        real = Path(path).resolve(strict=True)
+    except OSError:
+        return False
+    home = Path(home).resolve()
+    if real != home and home not in real.parents:
+        return False
+    return real.suffix.lower() != '.desktop'
+
 @app.route('/api/open', methods=['POST'])
 def open_file():
     """Open a local file or directory with xdg-open (server-side, local machine only)."""
@@ -938,8 +966,17 @@ def open_file():
         return jsonify({'success': False, 'error': 'Absolute path required'}), 400
     if not os.path.exists(path):
         return jsonify({'success': False, 'error': 'Path not found'}), 404
+    if not _open_allowed(path, Path.home()):
+        return jsonify({'success': False, 'error': 'Only files under your home directory can be opened'}), 403
     subprocess.Popen(['xdg-open', path])
     return jsonify({'success': True})
+
+def _launch_argv(template, value):
+    """Split the launcher template first, then substitute: the value is always ONE argument (S10)."""
+    tokens = shlex.split(template)
+    if not any('{value}' in t for t in tokens):
+        tokens.append('{value}')
+    return [t.replace('{value}', value) for t in tokens]
 
 @app.route('/api/launch', methods=['POST'])
 def launch_annotation():
@@ -951,8 +988,9 @@ def launch_annotation():
     if not label or not value:
         return jsonify({'success': False, 'error': 'label and value required'}), 400
 
-    # Reject shell metacharacters in value to prevent injection
-    if re.search(r'[;&|`$<>()\\\n]', value):
+    # Reject shell metacharacters (belt and braces: no shell is involved) and
+    # values that would read as an option to the launcher program.
+    if value.startswith('-') or re.search(r'[;&|`$<>()\\\n]', value):
         return jsonify({'success': False, 'error': 'Invalid characters in value'}), 400
 
     launchers = _load_settings().get('annotation_launchers', {})
@@ -960,11 +998,10 @@ def launch_annotation():
     if not template:
         return jsonify({'success': False, 'error': f'No launcher configured for label: {label}'}), 404
 
-    cmd_str = template.replace('{value}', value)
     try:
-        import shlex as _shlex
-        subprocess.Popen(_shlex.split(cmd_str))
-        return jsonify({'success': True, 'cmd': cmd_str})
+        argv = _launch_argv(template, value)
+        subprocess.Popen(argv)
+        return jsonify({'success': True, 'cmd': shlex.join(argv)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -977,7 +1014,7 @@ def add_bookmark():
     if not title or not url:
         return jsonify({'success': False, 'error': 'title and url are required'}), 400
 
-    args = ['task', 'add', title, '+bkmk']
+    args = ['task', 'add', '+bkmk']
     if data.get('project'):
         args.append(f'project:{data["project"].strip()}')
     for tag in (data.get('tags') or '').split():
@@ -985,12 +1022,13 @@ def add_bookmark():
         if tag:
             args.append(f'+{tag}')
 
+    args += ['--', title]   # free text last, after `--` (S11)
     add_result = run_task_command(args)
     if not add_result['success']:
         return jsonify({'success': False, 'error': add_result['stderr']}), 500
 
     # Annotate the newly created task with the URL
-    ann_result = run_task_command(['task', '+LATEST', 'annotate', url])
+    ann_result = run_task_command(['task', '+LATEST', 'annotate', '--', url])
     if not ann_result['success']:
         return jsonify({'success': False, 'error': ann_result['stderr']}), 500
 
@@ -1304,7 +1342,7 @@ def add_task():
         except (json.JSONDecodeError, IndexError):
             return jsonify({'success': False, 'error': f'Could not verify parent task {parent_id}'}), 400
 
-    args = ['task', 'add', data['description']]
+    args = ['task', 'add']
 
     if data.get('tags'):
         if isinstance(data['tags'], list):
@@ -1341,6 +1379,7 @@ def add_task():
     if data.get('until'):
         args.append(f'until:{data["until"]}')
 
+    args += ['--', data['description']]   # free text last, after `--` (S11)
     create_result = run_task_command(args)
 
     dc = _deferred_cmd(create_result)
@@ -1384,7 +1423,7 @@ def log_task():
     if not data.get('description'):
         return jsonify({'success': False, 'error': 'Description is required'}), 400
 
-    args = ['task', 'log', data['description']]
+    args = ['task', 'log']
 
     if data.get('tags'):
         if isinstance(data['tags'], list):
@@ -1403,6 +1442,7 @@ def log_task():
     if data.get('due_duration'):
         args.append(f'due_duration:{data["due_duration"]}')
 
+    args += ['--', data['description']]   # free text last, after `--` (S11)
     result = run_task_command(args)
     resp = {'success': result['success'],
             'error':   result.get('stderr', '') if not result['success'] else None,
@@ -1420,7 +1460,7 @@ def annotate_task(task_id):
     text = (data.get('annotation') or '').strip()
     if not text:
         return jsonify({'success': False, 'error': 'Annotation text is required'}), 400
-    result = run_task_command(['task', task_id, 'annotate', text])
+    result = run_task_command(['task', task_id, 'annotate', '--', text])
     resp = {'success': result['success'],
             'error':   result['stderr'] if not result['success'] else None}
     dc = _deferred_cmd(result)
@@ -1436,7 +1476,7 @@ def delete_annotation(task_id):
     text = (data.get('annotation') or '').strip()
     if not text:
         return jsonify({'success': False, 'error': 'Annotation text is required'}), 400
-    result = run_task_command(['task', task_id, 'denotate', text])
+    result = run_task_command(['task', task_id, 'denotate', '--', text])
     return jsonify({
         'success': result['success'],
         'error':   result['stderr'] if not result['success'] else None,
@@ -1452,10 +1492,10 @@ def edit_annotation(task_id):
     new_text = (data.get('new_annotation') or '').strip()
     if not old_text or not new_text:
         return jsonify({'success': False, 'error': 'old_annotation and new_annotation are required'}), 400
-    denotate = run_task_command(['task', task_id, 'denotate', old_text])
+    denotate = run_task_command(['task', task_id, 'denotate', '--', old_text])
     if not denotate['success']:
         return jsonify({'success': False, 'error': denotate['stderr']})
-    annotate = run_task_command(['task', task_id, 'annotate', new_text])
+    annotate = run_task_command(['task', task_id, 'annotate', '--', new_text])
     return jsonify({
         'success': annotate['success'],
         'error':   annotate['stderr'] if not annotate['success'] else None,

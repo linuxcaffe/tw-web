@@ -63,7 +63,7 @@ def test_null_origin_rejected(client):
     assert r.status_code == 403
 
 
-@pytest.mark.parametrize('origin', [None, 'http://localhost:5000', 'moz-extension://0d1e2f'])
+@pytest.mark.parametrize('origin', [None, 'http://localhost:5000'])
 def test_trusted_or_absent_origin_allowed(client, origin):
     headers = dict(LOCAL)
     if origin:
@@ -84,10 +84,10 @@ def test_ws_foreign_origin_rejected(client):
 
 
 def test_ws_origin_rules(app_module):
-    assert app_module._origin_allowed('http://localhost:5000', 'localhost:5000')
-    assert app_module._origin_allowed('http://yoga:5000', 'yoga:5000')
-    assert not app_module._origin_allowed('http://localhost:5000', 'yoga:5000')
-    assert not app_module._origin_allowed(EVIL, 'localhost:5000')
+    assert app_module._origin_allowed('http://localhost:5000', 'localhost:5000', '/ws/pty')
+    assert app_module._origin_allowed('http://yoga:5000', 'yoga:5000', '/ws/pty')
+    assert not app_module._origin_allowed('http://localhost:5000', 'yoga:5000', '/ws/pty')
+    assert not app_module._origin_allowed(EVIL, 'localhost:5000', '/ws/pty')
 
 
 # ── S2 / S3: binding and debugger ─────────────────────────────────────────────

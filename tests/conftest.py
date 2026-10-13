@@ -26,6 +26,9 @@ _tmp = Path(tempfile.mkdtemp(prefix='tw-web-test-'))
 )
 os.environ['TASKRC'] = str(_tmp / 'taskrc')
 os.environ['TASKDATA'] = str(_tmp / 'data')
+# Private runtime dir (hook prompts, spool, PID) — never the live server's.
+(_tmp / 'run').mkdir(mode=0o700)
+os.environ['XDG_RUNTIME_DIR'] = str(_tmp / 'run')
 # Network settings under test are passed explicitly; don't inherit the shell's.
 for _k in ('TW_WEB_HOST', 'TW_WEB_TAILSCALE', 'TW_WEB_DEBUG', 'TW_WEB_ALLOWED_HOSTS'):
     os.environ.pop(_k, None)

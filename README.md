@@ -86,6 +86,8 @@ tw-web has no login, and its terminal pane is a real shell — so it only listen
 
 Whatever the binding, the server refuses requests for unknown hostnames (DNS rebinding) and refuses writes and terminal connections from other websites.
 
+Runtime files (log, PID, hook prompts, spool) live in a private folder: `$XDG_RUNTIME_DIR/tw-web/` (usually `/run/user/<uid>/tw-web/`), or `~/.cache/tw-web/` where that isn't set. The server log is `tw-web.log` there.
+
 ### Android / Termux
 
 tw-web runs entirely inside Termux — no root, no external server required.
