@@ -119,3 +119,24 @@ def test_debug_refused_with_tailscale(app_module):
 def test_debug_refused_with_wildcard(app_module):
     opts = app_module._server_options({'TW_WEB_DEBUG': '1', 'TW_WEB_HOST': '0.0.0.0'}, None)
     assert opts['debug'] is False
+
+
+# ── S7: only app assets are served, never repo internals ─────────────────────
+
+@pytest.mark.parametrize('path', [
+    '/', '/index.html', '/nav.js', '/styles.css', '/manifest.json', '/sw.js',
+    '/logo-192.png', '/logo.svg', '/calendar-planner.html', '/xterm.css',
+])
+def test_app_assets_served(client, path):
+    assert client.get(path, headers=LOCAL).status_code == 200
+
+
+@pytest.mark.parametrize('path', [
+    '/.git/config', '/.gitignore', '/settings.json', '/command.debug', '/app.py',
+    '/config.py', '/package.json', '/package-lock.json', '/tw-web-launch.sh',
+    '/tw-web-native-host.py', '/tw-web-native-host.json', '/requirements.txt',
+    '/README.md', '/tests/conftest.py', '/firefox/manifest.json', '/docs/fix_port_5000_in_use.md',
+    '/rollup.cm.config.js', '/playwright.config.js', '/codemirror-entry.js',
+])
+def test_repo_internals_not_served(client, path):
+    assert client.get(path, headers=LOCAL).status_code == 404

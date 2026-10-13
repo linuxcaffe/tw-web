@@ -152,7 +152,9 @@ def log_command(args):
     with open(DEBUG_FILE, 'a') as f:
         f.write(f"[{timestamp}] {' '.join(args)}\n")
 
-app = Flask(__name__, static_folder='.', static_url_path='')
+# No Flask static folder: static_files() below is the only file route, so the
+# asset rule there can't be bypassed (security review S7).
+app = Flask(__name__, static_folder=None)
 CORS(app, origins=[
     'http://localhost:5000',
     'http://127.0.0.1:5000',
@@ -649,9 +651,23 @@ def index():
     """Serve the main HTML page"""
     return send_from_directory('.', 'index.html')
 
+# Only top-level app assets are served — never subfolders, dotfiles, source,
+# settings or logs (security review S7). A new asset of these types needs no
+# change here.
+_ASSET_EXTS = {'.html', '.js', '.css', '.png', '.svg', '.ico', '.woff', '.woff2', '.webmanifest'}
+_ASSET_NAMES = {'manifest.json'}
+_NOT_ASSETS = {'rollup.cm.config.js', 'playwright.config.js', 'codemirror-entry.js'}  # build/dev files
+
+def _is_asset(filename):
+    if '/' in filename or '\\' in filename or filename.startswith('.') or filename in _NOT_ASSETS:
+        return False
+    return filename in _ASSET_NAMES or Path(filename).suffix.lower() in _ASSET_EXTS
+
 @app.route('/<path:filename>')
 def static_files(filename):
-    """Serve static files (CSS, JS, etc.)"""
+    """Serve app assets (HTML, JS, CSS, images) from the repo root."""
+    if not _is_asset(filename):
+        return jsonify({'success': False, 'error': 'Not found'}), 404
     return send_from_directory('.', filename)
 
 @app.route('/api/tasks/due')
