@@ -71,6 +71,21 @@ To install as a PWA on Linux, open `http://localhost:5000` in Chrome or a Chromi
 
 **Epiphany (GNOME Web)** makes an excellent PWA host — it installs cleanly to the GNOME application launcher and opens without browser chrome.
 
+### Network access
+
+tw-web has no login, and its terminal pane is a real shell — so it only listens where you can trust everyone who can reach it.
+
+| Setting | Effect |
+|---|---|
+| *(default)* | Listens on `127.0.0.1` only |
+| `TW_WEB_TAILSCALE=1` | Also listens on this machine's [Tailscale](https://tailscale.com) addresses, and accepts its Tailscale names (`yoga`, `yoga.<tailnet>.ts.net`). `tw-web-launch.sh` sets this. |
+| `TW_WEB_ALLOWED_HOSTS=a,b` | Extra hostnames to accept (e.g. behind a reverse proxy) |
+| `TW_WEB_PORT=N` | Port (default 5000) |
+| `TW_WEB_DEBUG=1` | Werkzeug debugger — refused unless listening on localhost only |
+| `TW_WEB_HOST=0.0.0.0` | Every network, including café Wi-Fi. Prints a warning; not recommended. |
+
+Whatever the binding, the server refuses requests for unknown hostnames (DNS rebinding) and refuses writes and terminal connections from other websites.
+
 ### Android / Termux
 
 tw-web runs entirely inside Termux — no root, no external server required.

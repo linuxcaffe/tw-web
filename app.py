@@ -160,6 +160,82 @@ CORS(app, origins=[
 ])
 sock = Sock(app)
 
+# ── Network exposure guard (security review S1–S5, tw:docs/tw-web-dev-infra-plan.md) ──
+# Binding: localhost, plus the Tailscale addresses when TW_WEB_TAILSCALE=1.
+# Host allowlist blocks DNS rebinding; the Origin check blocks cross-site
+# writes and cross-site WebSocket hijacking of /ws/pty. Requests without an
+# Origin header (curl, scripts, the Firefox native host) are not browser
+# attacks and pass.
+_LOCAL_HOSTS = {'localhost', '127.0.0.1', '::1'}
+_WILDCARD_HOSTS = {'0.0.0.0', '::', ''}
+_SAFE_METHODS = {'GET', 'HEAD', 'OPTIONS'}
+
+def _tailscale_info():
+    """Return {'ips': [...], 'names': [...]} for this node, or None if Tailscale is unavailable."""
+    try:
+        r = subprocess.run(['tailscale', 'status', '--json'],
+                           capture_output=True, text=True, timeout=5)
+        me = json.loads(r.stdout)['Self']
+    except Exception:
+        return None
+    names = [n for n in (me.get('HostName', ''), me.get('DNSName', '').rstrip('.')) if n]
+    return {'ips': list(me.get('TailscaleIPs') or []), 'names': names}
+
+def _allowed_hosts(env, ts):
+    """Hostnames (no port) this server answers to."""
+    hosts = set(_LOCAL_HOSTS)
+    host = env.get('TW_WEB_HOST', '127.0.0.1')
+    if host not in _WILDCARD_HOSTS:
+        hosts.add(host)
+    if ts:
+        hosts.update(ts['ips'])
+        hosts.update(n.lower() for n in ts['names'])
+    hosts.update(h.strip().lower() for h in env.get('TW_WEB_ALLOWED_HOSTS', '').split(',') if h.strip())
+    return hosts
+
+def _server_options(env, ts):
+    """Addresses to bind and whether the Werkzeug debugger may run."""
+    host = env.get('TW_WEB_HOST', '127.0.0.1')
+    binds = [host]
+    if env.get('TW_WEB_TAILSCALE') == '1' and ts:
+        binds += [ip for ip in ts['ips'] if ip not in binds]
+    local_only = all(b in _LOCAL_HOSTS for b in binds)
+    return {
+        'binds': binds,
+        # The debugger console runs arbitrary Python; never expose it beyond localhost.
+        'debug': env.get('TW_WEB_DEBUG') == '1' and local_only,
+        'use_reloader': True,
+    }
+
+def _split_host(netloc):
+    """'[::1]:5000' → '::1', 'Yoga:5000' → 'yoga'."""
+    netloc = netloc.strip().lower()
+    if netloc.startswith('['):
+        return netloc[1:].split(']', 1)[0]
+    return netloc.rsplit(':', 1)[0] if netloc.count(':') == 1 else netloc
+
+def _origin_allowed(origin, host):
+    """Same-origin as the (already allowlisted) Host, or a Firefox extension."""
+    if origin.startswith('moz-extension://'):
+        return True
+    from urllib.parse import urlsplit
+    try:
+        return urlsplit(origin).netloc.lower() == host.lower()
+    except ValueError:
+        return False
+
+_TS_INFO = _tailscale_info() if os.environ.get('TW_WEB_TAILSCALE') == '1' else None
+_ALLOWED_HOSTS = _allowed_hosts(os.environ, _TS_INFO)
+
+@app.before_request
+def _guard_request():
+    if _split_host(request.host) not in _ALLOWED_HOSTS:
+        return jsonify({'success': False, 'error': 'Host not allowed'}), 400
+    origin = request.headers.get('Origin')
+    if origin is not None and (request.method not in _SAFE_METHODS or request.path == '/ws/pty'):
+        if not _origin_allowed(origin, request.host):
+            return jsonify({'success': False, 'error': 'Cross-origin request refused'}), 403
+
 # ── Hook prompt system ────────────────────────────────────────────────────────
 _PROMPT_DIR = Path('/tmp/tw-web-prompts')
 _PROMPT_DIR.mkdir(exist_ok=True)
@@ -1596,8 +1672,25 @@ if __name__ == '__main__':
     else:
         print("TaskWarrior found:", check_result['stdout'].split('\n')[0])
 
+    from werkzeug.serving import make_server, is_running_from_reloader
     print("Starting tw-web...")
-    host = os.environ.get('TW_WEB_HOST', '127.0.0.1')
+    opts = _server_options(os.environ, _TS_INFO)
     port = int(os.environ.get('TW_WEB_PORT', 5000))
-    print(f"Access the interface at: http://{host}:{port}")
-    app.run(host=host, port=port, debug=True, threaded=True)
+    if opts['binds'][0] in _WILDCARD_HOSTS:
+        print("WARNING: TW_WEB_HOST is a wildcard — tw-web is reachable from every network "
+              "this machine joins, with no login. Prefer TW_WEB_TAILSCALE=1.")
+    if os.environ.get('TW_WEB_TAILSCALE') == '1' and not _TS_INFO:
+        print("WARNING: TW_WEB_TAILSCALE=1 but Tailscale is unavailable — serving localhost only.")
+    if os.environ.get('TW_WEB_DEBUG') == '1' and not opts['debug']:
+        print("WARNING: TW_WEB_DEBUG refused — the debugger is only allowed on a localhost-only bind.")
+    # Extra binds (Tailscale) run as plain threads in the serving process; the
+    # reloader's parent only holds the first bind. On reload the child exits
+    # and releases them.
+    if not opts['use_reloader'] or is_running_from_reloader():
+        for extra in opts['binds'][1:]:
+            srv = make_server(extra, port, app, threaded=True)
+            threading.Thread(target=srv.serve_forever, daemon=True, name=f'serve-{extra}').start()
+    for b in opts['binds']:
+        print(f"Access the interface at: http://{'[' + b + ']' if ':' in b else b}:{port}")
+    app.run(host=opts['binds'][0], port=port, debug=opts['debug'],
+            use_reloader=opts['use_reloader'], threaded=True)

@@ -1,0 +1,50 @@
+"""
+pytest fixtures for tw-web.
+
+app.py runs `task` at import time and captures os.environ into _TW_ENV, so the
+throwaway task database must be in place BEFORE app is imported. Every test
+session gets its own TASKRC / data.location in a temp directory, with hooks
+off. The real ~/.task is never touched; the guard below fails the run if it
+would be.
+"""
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+import pytest
+
+REPO = Path(__file__).resolve().parent.parent
+
+_tmp = Path(tempfile.mkdtemp(prefix='tw-web-test-'))
+(_tmp / 'data').mkdir()
+(_tmp / 'taskrc').write_text(
+    f'data.location={_tmp / "data"}\n'
+    'hooks=off\n'
+    'confirmation=no\n'
+    'verbose=nothing\n'
+)
+os.environ['TASKRC'] = str(_tmp / 'taskrc')
+os.environ['TASKDATA'] = str(_tmp / 'data')
+# Network settings under test are passed explicitly; don't inherit the shell's.
+for _k in ('TW_WEB_HOST', 'TW_WEB_TAILSCALE', 'TW_WEB_DEBUG', 'TW_WEB_ALLOWED_HOSTS'):
+    os.environ.pop(_k, None)
+
+_real = Path.home() / '.task'
+assert not os.environ['TASKDATA'].startswith(str(_real)), 'tests must not use ~/.task'
+
+sys.path.insert(0, str(REPO))
+os.chdir(REPO)   # app.py serves static files relative to cwd
+
+import app as tw_app  # noqa: E402  (must follow the env setup above)
+
+
+@pytest.fixture
+def app_module():
+    return tw_app
+
+
+@pytest.fixture
+def client():
+    tw_app.app.config['TESTING'] = True
+    return tw_app.app.test_client()
