@@ -109,3 +109,12 @@ taskutil web probe --port 5000              # live attack-surface check (~/dev/t
 - **`~/.task`** is a git repo (gittw). Before risky work on the write path, suggest a snapshot commit.
 - **Mirrors:** `origin` pushes to Codeberg *and* GitHub (`remote.pushDefault=origin`), so a plain `git push`
   updates both. Run `git fetch github` afterwards to refresh the tracking ref.
+
+## Time log
+
+After each milestone (a merged fix, a finished doc or skill), append a line to the day's timedot block in
+`~/.nb/claude/accounting/dev_timelog.md`: `tw-web:<topic>  <hours>  ; <what, concretely>`, in quarter
+hours, under a `## YYYY-MM-DD` heading. If another session already wrote that day's block, start a new
+fenced block under the same heading. Commit it in that notebook as
+`timedot: YYYY-MM-DD tw-web session (…)`. Do it as you go, no end-of-session ritual. Other tw repos use
+their own account (`tw-taskutil:<topic>`, …).
