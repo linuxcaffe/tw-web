@@ -2,7 +2,7 @@
 # tw-web-launch.sh — ensure Flask is running, then open the Epiphany PWA
 #
 # Usage:
-#   tw-web-launch.sh           start server (if needed) + open app
+#   tw-web-launch.sh           snapshot ~/.task, start server (if needed) + open app
 #   tw-web-launch.sh --clean   wipe stale SW cache first, then launch
 #   tw-web-launch.sh --stop    stop the Flask server
 
@@ -73,6 +73,13 @@ if [ "$1" = "--clean" ]; then
             && echo "tw-web-launch: restarting Flask..." \
             && sleep 0.5
     fi
+fi
+
+# ── Snapshot ~/.task (commit, no push) on every launch: taskutil, optional ───
+TASKUTIL=$(command -v taskutil || echo "$HOME/.local/bin/taskutil")
+if [ -x "$TASKUTIL" ]; then
+    timeout 30 "$TASKUTIL" snapshot -m "tw-web launch $(date '+%Y-%m-%d %H:%M')" \
+        | sed -n 's/^ *\(ok\|warn\|FAIL\) */tw-web-launch: /p' || true
 fi
 
 # ── Start Flask if not already running ───────────────────────────────────────

@@ -32,6 +32,9 @@ app.py:tw_preflight
 # ── Runtime paths: computed in three places, kept in step (S9) ──────────────────
 tw-web-launch.sh:RUN_DIR
 tw-web-launch.sh:stop_tw_web_procs
+
+# ── Data safety: snapshot ~/.task on every launch (phase 6) ──────────────────
+tw-web-launch.sh:snapshot -m
 tw-web-native-host.py:RUN_DIR
 tw-web-native-host.py:def stop_tw_web_procs
 

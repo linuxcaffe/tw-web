@@ -117,9 +117,11 @@ deliberate work-in-progress commit with `--no-verify`. Install it once per clone
 
 ## Fleet tools
 
-- **`taskutil`** (`~/dev/tw-taskutil`, its own repo): infrastructure checks around Taskwarrior. Today it
-  has `web probe`; `snapshot`, `stale`, `fixture` and `web start|stop|status` are planned.
-- **`~/.task`** is a git repo (gittw). Before risky work on the write path, suggest a snapshot commit.
+- **`taskutil`** (`~/dev/tw-taskutil`, its own repo): infrastructure checks around Taskwarrior: `web probe`,
+  `snapshot` (commit `~/.task`, no push; the launcher runs it on every start) and `stale` (old uncommitted
+  work, lagging or unreachable mirrors; a daily user timer runs it with `--notify`). `fixture` and
+  `web start|stop|status` are planned.
+- **`~/.task`** is a git repo (gittw). Before risky work on the write path, run `taskutil snapshot -m "before …"`.
 - **Mirrors:** `origin` pushes to Codeberg *and* GitHub (`remote.pushDefault=origin`), so a plain `git push`
   updates both. Run `git fetch github` afterwards to refresh the tracking ref.
 
