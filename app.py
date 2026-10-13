@@ -715,7 +715,7 @@ def get_due_tasks():
             return jsonify({'success': True, 'data': tasks})
         except json.JSONDecodeError as e:
             return jsonify({'success': False, 'error': f'JSON decode error: {str(e)}'}), 500
-    return jsonify({'success': False, 'error': 'Failed to retrieve due tasks', 'stderr': result['stderr']}), 500
+    return jsonify({'success': False, 'error': _task_error('Failed to retrieve due tasks', result), 'stderr': result['stderr']}), 500
 
 @app.route('/api/tasks/planned')
 def get_planned_tasks():
@@ -744,9 +744,17 @@ def get_planned_tasks():
     else:
         return jsonify({
             'success': False,
-            'error': 'Failed to retrieve planned tasks',
+            'error': _task_error('Failed to retrieve planned tasks', result),
             'stderr': result['stderr']
         }), 500
+
+def _task_error(message, result):
+    """`message`, plus Taskwarrior's own reason (last stderr line that isn't an rc override notice),
+    so a view says "Could not read include file …" instead of only "Failed to retrieve tasks"."""
+    lines = [l.strip() for l in (result.get('stderr') or '').splitlines()
+             if l.strip() and not l.startswith(('TASKRC override', 'TASKDATA override', 'Configuration override'))]
+    return f'{message}: {lines[-1]}' if lines else message
+
 
 def _build_task_filter(statuses, filter_text):
     """Build a TW filter argument list from status ids and optional filter text.
@@ -821,7 +829,7 @@ def get_tasks():
     else:
         return jsonify({
             'success': False,
-            'error': 'Failed to retrieve tasks',
+            'error': _task_error('Failed to retrieve tasks', result),
             'stderr': result['stderr']
         }), 500
 

@@ -80,6 +80,9 @@ TASKUTIL=$(command -v taskutil || echo "$HOME/.local/bin/taskutil")
 if [ -x "$TASKUTIL" ]; then
     timeout 30 "$TASKUTIL" snapshot -m "tw-web launch $(date '+%Y-%m-%d %H:%M')" \
         | sed -n 's/^ *\(ok\|warn\|FAIL\) */tw-web-launch: /p' || true
+    # A dangling include stops task (and every tw-web view) from starting: say which, loudly.
+    timeout 30 "$TASKUTIL" config check --notify > /dev/null 2>&1 \
+        || "$TASKUTIL" config check | sed -n 's/^ FAIL  /tw-web-launch: CONFIG PROBLEM: /p'
 fi
 
 # ── Start Flask if not already running ───────────────────────────────────────
