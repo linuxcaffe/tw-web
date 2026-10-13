@@ -622,17 +622,17 @@ function showEventModal(fcEvent) {
 
     const rows = [];
     if (task.status && task.status !== 'pending')
-        rows.push(`<tr><th>Status</th><td><em>${task.status}</em></td></tr>`);
-    if (task.project)  rows.push(`<tr><th>Project</th><td>${task.project}</td></tr>`);
+        rows.push(`<tr><th>Status</th><td><em>${escHtml(task.status)}</em></td></tr>`);
+    if (task.project)  rows.push(`<tr><th>Project</th><td>${escHtml(task.project)}</td></tr>`);
     if (task.priority) {
         const label = { H: 'High', M: 'Medium', L: 'Low' }[task.priority] || task.priority;
-        rows.push(`<tr><th>Priority</th><td>${label}</td></tr>`);
+        rows.push(`<tr><th>Priority</th><td>${escHtml(label)}</td></tr>`);
     }
-    if (task.due)            rows.push(`<tr><th>Due</th><td>${fmt(task.due)}</td></tr>`);
-    if (task.scheduled)      rows.push(`<tr><th>Scheduled</th><td>${fmt(task.scheduled)}</td></tr>`);
-    if (task.sched_duration) rows.push(`<tr><th>Duration</th><td>${task.sched_duration}</td></tr>`);
+    if (task.due)            rows.push(`<tr><th>Due</th><td>${escHtml(fmt(task.due))}</td></tr>`);
+    if (task.scheduled)      rows.push(`<tr><th>Scheduled</th><td>${escHtml(fmt(task.scheduled))}</td></tr>`);
+    if (task.sched_duration) rows.push(`<tr><th>Duration</th><td>${escHtml(task.sched_duration)}</td></tr>`);
     if (task.tags?.length)
-        rows.push(`<tr><th>Tags</th><td>${task.tags.map(t => `<span class="card-tag">${t}</span>`).join(' ')}</td></tr>`);
+        rows.push(`<tr><th>Tags</th><td>${task.tags.map(t => `<span class="card-tag">${escHtml(t)}</span>`).join(' ')}</td></tr>`);
     if (task.urgency != null)
         rows.push(`<tr><th>Urgency</th><td>${Number(task.urgency).toFixed(1)}</td></tr>`);
 
@@ -926,6 +926,13 @@ function toLocalISOString(date) {
     const pad = n => String(n).padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}` +
            `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+// Task text is user data (and can come from hooks, bookmarks, sync):
+// escape it before it reaches innerHTML (security review S6).
+function escHtml(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function escAttr(s) {
