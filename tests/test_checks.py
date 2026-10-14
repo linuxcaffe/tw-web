@@ -180,8 +180,9 @@ def test_guard_word_boundary_and_missing_file(tmp_path):
 
 def test_guard_deleting_the_request_guard_is_caught(tmp_path):
     shutil.copy(REPO / '.guards', tmp_path / '.guards')
-    for f in ('app.py', 'tw-web-launch.sh', 'tw-web-native-host.py', 'nav.js', 'task-card.js',
-              'task-editor.js', 'calendar-planner.js'):
+    guarded = {line.split(':', 1)[0] for line in (REPO / '.guards').read_text().splitlines()
+               if line.strip() and not line.startswith('#')}
+    for f in guarded:
         shutil.copy(REPO / f, tmp_path / f)
     app = (tmp_path / 'app.py').read_text().replace('def _guard_request', 'def _guard_request_disabled')
     (tmp_path / 'app.py').write_text(app)

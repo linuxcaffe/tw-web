@@ -1,6 +1,4 @@
 # Checks that reproduce a known bug (tw:docs/tw-web-known-bugs.md). Remove a line when its bug is fixed.
-bug01-stale-after-done      # bug 1: stale cache after a write (step 1)
-bug01-stale-after-console   # bug 1: stale cache after a console command (step 1)
 bug02-noop-save             # bug 2: edit rewrites unchanged fields (step 1)
 bug03-spool-offer           # bug 3: deferred command run as a task filter (step 4)
 bug04-kanban-edit           # bug 4: Kanban passes onSave (step 1)

@@ -471,8 +471,7 @@ class TaskEditor {
             if (revertBtn) {
                 revertBtn.onclick = async () => {
                     try {
-                        const r = await fetch(`/api/task/${task.uuid}/revert`, { method: 'POST' });
-                        const d = await r.json();
+                        const d = await TW.api.write('POST', `/api/task/${task.uuid}/revert`);
                         if (d.success) {
                             this.onSaveSuccess(d.task, true);
                             this.hide();
@@ -583,15 +582,7 @@ class TaskEditor {
             const endpoint = isEdit ? `/api/task/${taskData.uuid}/modify` : '/api/task/add';
             const method = isEdit ? 'PUT' : 'POST';
             
-            const response = await fetch(endpoint, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(taskDataForAPI)
-            });
-            
-            const data = await response.json();
+            const data = await TW.api.write(method, endpoint, taskDataForAPI);
             
             if (data.success) {
                 if (data.deferred_cmd) window.twTerminal?.offerTerminal(data.deferred_cmd);
@@ -634,12 +625,7 @@ class TaskEditor {
     async logTask(taskData) {
         try {
             const prepared = this.prepareTaskDataForAPI(taskData, false);
-            const response = await fetch('/api/task/log', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify(prepared),
-            });
-            const data = await response.json();
+            const data = await TW.api.write('POST', '/api/task/log', prepared);
             if (data.success) {
                 if (data.deferred_cmd) window.twTerminal?.offerTerminal(data.deferred_cmd);
                 this.hide();
@@ -945,17 +931,8 @@ class TaskEditor {
         } catch (_) {}
     }
 
-    async _callAPI(method, url, body) {
-        try {
-            const r = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-            return await r.json();
-        } catch (e) {
-            return { success: false, error: e.message };
-        }
+    _callAPI(method, url, body) {
+        return TW.api.write(method, url, body);
     }
 }
 

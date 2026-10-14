@@ -332,23 +332,16 @@ class TaskWarriorUI {
             const statusParams = new URLSearchParams();
             statusParams.set('status', (state.statuses || ['pending']).join(','));
             const needTotal    = true;
-            const cacheKey     = 'tw-tasks-cache';
-            const dirtyKey     = 'tw-tasks-dirty';
 
-            // Serve from cache when clean and fresh
-            const dirty = sessionStorage.getItem(dirtyKey) === '1';
-            if (!dirty) {
-                try {
-                    const c = JSON.parse(sessionStorage.getItem(cacheKey));
-                    if (c && c.params === params && (Date.now() - c.ts) < 30_000) {
-                        this.tasks         = c.tasks;
-                        window._twAllTasks = this.tasks;
-                        this.serverTotal   = c.serverTotal;
-                        this.renderTasks();
-                        this.showLoading(false);
-                        return;
-                    }
-                } catch {}
+            // Serve from cache when fresh (every write empties it: TW.api.write)
+            const c = TW.store.read('tasks', c => c.params === params);
+            if (c) {
+                this.tasks         = c.tasks;
+                window._twAllTasks = this.tasks;
+                this.serverTotal   = c.serverTotal;
+                this.renderTasks();
+                this.showLoading(false);
+                return;
             }
 
             // When a context is active, also fetch the unfiltered status total so the
@@ -365,12 +358,7 @@ class TaskWarriorUI {
                 window._twAllTasks  = this.tasks;
                 this.serverTotal = totalData && totalData.success ? totalData.tasks.length : this.tasks.length;
                 window.twNav?.setGrandTotal(this.serverTotal, params);
-                try {
-                    sessionStorage.setItem(cacheKey, JSON.stringify(
-                        { params, tasks: this.tasks, serverTotal: this.serverTotal, ts: Date.now() }
-                    ));
-                    sessionStorage.removeItem(dirtyKey);
-                } catch {}
+                TW.store.save('tasks', { params, tasks: this.tasks, serverTotal: this.serverTotal });
                 this.renderTasks();
                 if (tasksData.warnings && tasksData.warnings.length > 0) {
                     this.showNotification(tasksData.warnings.join(' | '), 'warning');

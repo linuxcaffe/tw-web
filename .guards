@@ -57,3 +57,6 @@ task-card.js:_e
 task-editor.js:class TaskEditor
 task-editor.js:showForTask
 calendar-planner.js:function escHtml
+tw-api.js:const TW
+tw-api.js:function invalidate
+tw-api.js:async function write

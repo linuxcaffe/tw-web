@@ -12,36 +12,18 @@ let _loadId          = 0;     // increment each loadTasks() call; cancelled call
 let _calSettings     = {};    // loaded from /api/config before calendar init
 
 // ── Task cache ────────────────────────────────────────────────────────────────
-// Two-layer cache:
-//   'tw-tasks-cache'  — shared with main.js: {params, tasks, ts}
-//   'tw-cal-extras'   — calendar-only:       {cacheKey, planned, due, ts}
-// 'tw-tasks-dirty' is the shared invalidation flag written by all pages on any write.
-const _SHARED_KEY  = 'tw-tasks-cache';
-const _EXTRAS_KEY  = 'tw-cal-extras';
-const _DIRTY_KEY   = 'tw-tasks-dirty';
-const _CACHE_TTL   = 30_000; // ms
-
-function _isDirty() { return sessionStorage.getItem(_DIRTY_KEY) === '1'; }
-
+// Two TW.store entries, emptied by every write (TW.api.write):
+//   'tasks'  — shared with main.js: {params, tasks}
+//   'extras' — shared with agenda.js: {cacheKey, planned, due}
 function _readCache(params, cacheKey) {
-    try {
-        if (_isDirty()) return null;
-        const now = Date.now();
-        const s = JSON.parse(sessionStorage.getItem(_SHARED_KEY));
-        const x = JSON.parse(sessionStorage.getItem(_EXTRAS_KEY));
-        if (!s || s.params !== params         || (now - s.ts) > _CACHE_TTL) return null;
-        if (!x || x.cacheKey !== cacheKey     || (now - x.ts) > _CACHE_TTL) return null;
-        return { allFetched: s.tasks, plannedTasks: x.planned, due: x.due };
-    } catch { return null; }
+    const s = TW.store.read('tasks',  s => s.params === params);
+    const x = TW.store.read('extras', x => x.cacheKey === cacheKey);
+    return s && x ? { allFetched: s.tasks, plannedTasks: x.planned, due: x.due } : null;
 }
 
 function _writeCache(params, cacheKey, allFetched, plannedTasks, due) {
-    try {
-        const now = Date.now();
-        sessionStorage.setItem(_SHARED_KEY, JSON.stringify({ params, tasks: allFetched, ts: now }));
-        sessionStorage.setItem(_EXTRAS_KEY, JSON.stringify({ cacheKey, planned: plannedTasks, due, ts: now }));
-        sessionStorage.removeItem(_DIRTY_KEY);
-    } catch {}
+    TW.store.save('tasks',  { params, tasks: allFetched });
+    TW.store.save('extras', { cacheKey, planned: plannedTasks, due });
 }
 
 function _applyLoaded(myId, allFetched, plannedTasks, due) {
@@ -332,7 +314,6 @@ async function handleEventDrop(info) {
         info.event.setExtendedProp('raw', updated);
         const idx = allTasks.findIndex(t => t.uuid === task.uuid);
         if (idx !== -1) allTasks[idx] = updated;
-        try { sessionStorage.setItem(_DIRTY_KEY, '1'); } catch {}
         showCalNotification('Task updated', 'info');
     } else {
         info.revert();
@@ -356,7 +337,6 @@ async function handleEventResize(info) {
         info.event.setExtendedProp('raw', updated);
         const idx = allTasks.findIndex(t => t.uuid === task.uuid);
         if (idx !== -1) allTasks[idx] = updated;
-        try { sessionStorage.setItem(_DIRTY_KEY, '1'); } catch {}
         showCalNotification('Task updated', 'info');
     } else {
         info.revert();
@@ -889,33 +869,8 @@ function showCalNotification(message, type = 'info') {
 
 // ── Backend API ───────────────────────────────────────────────────────────────
 async function modifyTaskInBackend(taskId, taskData) {
-    try {
-        const r = await fetch(`/api/task/${taskId}/modify`, {
-            method:  'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify(taskData)
-        });
-        const d = await r.json();
-        return { success: d.success, error: d.error || 'Unknown error' };
-    } catch (err) {
-        return { success: false, error: err.message || 'Network error' };
-    }
-}
-
-async function addTaskToBackend(taskData) {
-    try {
-        const r = await fetch('/api/task/add', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify(taskData)
-        });
-        const d = await r.json();
-        return d.success && d.task
-            ? { success: true,  task: d.task, error: null }
-            : { success: false, task: null,   error: d.error || 'Unknown error' };
-    } catch (err) {
-        return { success: false, task: null, error: err.message || 'Network error' };
-    }
+    const d = await TW.api.write('PUT', `/api/task/${taskId}/modify`, taskData);
+    return { success: d.success, error: d.error || 'Unknown error' };
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────

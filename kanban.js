@@ -609,17 +609,7 @@ async function _kbSaveOrder(col, uuids) {
 }
 
 async function _kbSetState(uuid, newState) {
-    try {
-        const r = await fetch(`/api/task/${uuid}/modify`, {
-            method:  'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ state: newState }),
-        });
-        const d = await r.json();
-        if (!d.success) document.dispatchEvent(new CustomEvent('tw-show-notification',
-            { detail: { message: `Error: ${d.error || d.message}`, type: 'error' } }));
-    } catch {
-        document.dispatchEvent(new CustomEvent('tw-show-notification',
-            { detail: { message: 'Network error updating state', type: 'error' } }));
-    }
+    const d = await TW.api.write('PUT', `/api/task/${uuid}/modify`, { state: newState });
+    if (!d.success) document.dispatchEvent(new CustomEvent('tw-show-notification',
+        { detail: { message: `Error: ${d.error || d.message}`, type: 'error' } }));
 }

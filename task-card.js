@@ -29,8 +29,7 @@ class TaskActionHandler {
         const endpoint = action === 'delete' ? `/api/task/${taskUuid}/delete` : `/api/task/${taskUuid}/${action}`;
 
         try {
-            const response = await fetch(endpoint, { method });
-            const data = await response.json();
+            const data = await TW.api.write(method, endpoint);
 
             if (data.needs_pty) {
                 window.twNav?.openPty(data.cmd);

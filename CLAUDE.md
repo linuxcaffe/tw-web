@@ -24,6 +24,7 @@ Plans, reviews and design notes live in the nb notebook, not this repo:
 |---|---|---|
 | `app.py` | ~1750 | The whole server: guard, settings, `run_task_command`, every `/api/*` route, `/ws/pty`, SSE, static route |
 | `nav.js` | ~2100 | Shared chrome on every page: nav bar, filter/command bar, sidebars, Settings, PTY console, hook prompts |
+| `tw-api.js` | 70 | `TW.store` (the shared task cache) and `TW.api.write`: every task write goes through it, so every write empties the cache |
 | `main.js` | ~600 | List view (`TaskWarriorUI`) |
 | `task-card.js` | ~430 | `TaskCardManager`, annotation linkify + launchers |
 | `task-editor.js` | ~970 | `TaskEditor` add/edit modal |
@@ -34,7 +35,9 @@ Plans, reviews and design notes live in the nb notebook, not this repo:
 | `tests/` | | pytest suite (see Testing) |
 
 `index.html` loads scripts in this order, and the order is load-bearing:
-`nav.js` → `codemirror-bundle.js` → `task-editor.js` → `task-card.js` → `main.js`.
+`nav.js` → `tw-api.js` → `codemirror-bundle.js` → `task-editor.js` → `task-card.js` → `main.js`.
+Every page loads `tw-api.js` right after `nav.js`. A new write from a page uses `TW.api.write`, not `fetch`,
+and a new task cache goes through `TW.store` (consolidation plan, `tw:docs/tw-web-consolidation-plan.md`).
 `codemirror-bundle.js` is built by rollup (`rollup.cm.config.js`) from `codemirror-entry.js`; FullCalendar,
 xterm and Sortable are vendored `.min.js` files. There's no other build step.
 

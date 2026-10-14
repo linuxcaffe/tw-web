@@ -26,7 +26,6 @@
     const CTX_KEY      = 'tw-contexts';
     const CTX_FILT_KEY = 'tw-ctx-filters';
     const COUNT_KEY    = 'tw-count-text';
-    const GT_KEY       = 'tw-grand-total';
 
     const PAGES = [
         { id: 'tasks',    href: '/',                      label: 'List'       },
@@ -94,20 +93,15 @@
         try { sessionStorage.setItem(COUNT_KEY, text); } catch {}
     }
     function setGrandTotal(n, params) {
-        try { sessionStorage.setItem(GT_KEY, JSON.stringify({ n, params, ts: Date.now() })); } catch {}
+        TW.store.save('total', { n, params });
     }
     // Returns the unfiltered total for the given params (status+context), or null if not cached.
     function getGrandTotal(params) {
-        try {
-            const x = JSON.parse(sessionStorage.getItem(GT_KEY));
-            if (x && x.params === params && (Date.now() - x.ts) < 60_000) return x.n;
-        } catch {}
+        const x = TW.store.read('total', x => x.params === params, 60_000);
+        if (x) return x.n;
         // Fall back to shared task cache (written by main.js with serverTotal, or calendar with tasks array)
-        try {
-            const s = JSON.parse(sessionStorage.getItem('tw-tasks-cache'));
-            if (s && s.params === params) return s.serverTotal ?? s.tasks?.length ?? null;
-        } catch {}
-        return null;
+        const s = TW.store.read('tasks', s => s.params === params, Infinity);
+        return s ? (s.serverTotal ?? s.tasks?.length ?? null) : null;
     }
 
     function showOutput(text) {
@@ -207,6 +201,7 @@
         ws.onmessage = e => {
             if (e.data === '\r\n[done]\r\n') {
                 term.writeln('\r\n\x1b[32m[done]\x1b[0m');
+                TW.store.invalidate();   // the command may have changed any task
                 document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: window.twNav.getState() }));
                 if (autoClose) {
                     setTimeout(_closePty, 1200);
@@ -216,6 +211,7 @@
             term.write(e.data);
         };
         ws.onclose = () => {
+            TW.store.invalidate();
             document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: window.twNav.getState() }));
             if (autoClose) {
                 _closePty();
@@ -1024,8 +1020,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             const btn = document.getElementById('tw-brand-refresh');
             btn.classList.add('blinking');
             btn.addEventListener('animationend', () => btn.classList.remove('blinking'), { once: true });
-            // Invalidate cache so loadTasks() always hits the server
-            try { sessionStorage.setItem('tw-tasks-dirty', '1'); } catch {}
+            // Empty the task cache so the view always hits the server
+            TW.store.invalidate();
             document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
             document.dispatchEvent(new CustomEvent('tw-show-notification',
                 { detail: { message: 'Refreshed', type: 'success' } }));
@@ -1920,11 +1916,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             btn.disabled    = true;
             btn.textContent = 'Syncing…';
             output.style.display = 'none';
-            fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: msg })
-            }).then(r => r.json()).then(data => {
+            TW.api.write('POST', '/api/sync', { message: msg }).then(data => {
                 output.textContent   = data.output || (data.success ? 'Sync complete.' : 'Sync failed.');
                 output.style.display = 'block';
                 btn.textContent      = data.success ? 'Sync Now' : 'Retry';
@@ -1957,7 +1949,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             if (!confirm('Undo the last task modification?')) return;
             undoBtn.disabled    = true;
             undoBtn.textContent = 'Undoing…';
-            fetch('/api/sync/undo', { method: 'POST' }).then(r => r.json()).then(d => {
+            TW.api.write('POST', '/api/sync/undo').then(d => {
                 output.textContent   = d.output || (d.success ? 'Undone.' : 'Undo failed.');
                 output.style.display = 'block';
                 if (d.success) document.dispatchEvent(new CustomEvent('tw-sync-complete'));

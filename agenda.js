@@ -49,25 +49,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('tw-filter-change', loadAgenda);
 });
 
-// ── Task cache (shared with calendar-planner.js via tw-cal-extras) ────────────
-const _EXTRAS_KEY = 'tw-cal-extras';
-const _DIRTY_KEY  = 'tw-tasks-dirty';
-const _CACHE_TTL  = 30_000;
-
+// ── Task cache (TW.store 'extras', shared with calendar-planner.js) ──────────
 function _readExtras(cacheKey) {
-    try {
-        if (sessionStorage.getItem(_DIRTY_KEY) === '1') return null;
-        const x = JSON.parse(sessionStorage.getItem(_EXTRAS_KEY));
-        if (!x || x.cacheKey !== cacheKey || (Date.now() - x.ts) > _CACHE_TTL) return null;
-        return { planned: x.planned, due: x.due };
-    } catch { return null; }
+    const x = TW.store.read('extras', x => x.cacheKey === cacheKey);
+    return x && { planned: x.planned, due: x.due };
 }
 
 function _writeExtras(cacheKey, planned, due) {
-    try {
-        sessionStorage.setItem(_EXTRAS_KEY, JSON.stringify({ cacheKey, planned, due, ts: Date.now() }));
-        sessionStorage.removeItem(_DIRTY_KEY);
-    } catch {}
+    TW.store.save('extras', { cacheKey, planned, due });
 }
 
 // ── Data loading ──────────────────────────────────────────────────────────────
@@ -230,14 +219,10 @@ function formatDateKey(key, isHistory = false) {
 
 class AgendaActionHandler extends TaskActionHandler {
     constructor() {
-        // Invalidate shared cache before reloading so calendar also refetches
-        const invalidateAndReload = () => {
-            sessionStorage.setItem(_DIRTY_KEY, '1');
-            loadAgenda();
-        };
+        // The write already emptied the shared cache (TW.api.write), so this refetches
         super({
-            onTaskUpdate: invalidateAndReload,
-            onTaskDelete: invalidateAndReload,
+            onTaskUpdate: () => loadAgenda(),
+            onTaskDelete: () => loadAgenda(),
             showNotification,
         });
     }
