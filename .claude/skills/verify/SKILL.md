@@ -41,21 +41,33 @@ after the user runs `~/dev/tw-web/tw-web-launch.sh --clean`. Ask them, then prob
 
 ## Headless browser check (UI changes)
 
-There's no Playwright install in tw-web yet. Borrow nb-web-tests', with the scratch server up:
+Use the harness, not a hand-started server:
 
-```js
-// save as <scratchpad>/check.cjs, run: node check.cjs
-const { chromium } = require('/home/djp/dev/nb-web-tests/e2e/node_modules/playwright');
-(async () => {
-  const b = await chromium.launch(); const pg = await b.newPage();
-  await pg.goto(`http://localhost:${process.env.TW_WEB_PORT}/calendar-planner.html`);
-  await pg.waitForSelector('.fc-ev-title'); await pg.click('.fc-ev-title');
-  console.log(await pg.textContent('#modal-task-body'));
-  await b.close();
-})();
+```bash
+python3 tests/e2e/run.py                 # all checks: brings a scratch server up, re-seeds, brings it down
+python3 tests/e2e/run.py bug01 kanban    # only checks whose name contains one of these
 ```
 
-Seed whatever the page needs first: a calendar event needs `scheduled:today+10h`.
+A new check is `tests/e2e/<name>.check.cjs`:
+
+```js
+const { check, expect, task, exportOne, B, sleep, cardTexts } = require('./lib.cjs');
+check(async pg => {
+  await pg.goto(B + '/calendar-planner.html');
+  await pg.waitForSelector('.fc-ev-title');
+  expect(cond, 'what is wrong, with the values');   // exit 1: the behaviour is wrong
+});                                                 // a throw / timeout is exit 2: the check is broken
+```
+
+- The seed (7 tasks, IDs 1–7, plus the `state`/duration UDAs and a `work` context) is in `run.py`. Every
+  check starts from it. Times like `scheduled:today+10h` mean today 10:00, so they stay inside the
+  calendar's current week.
+- Make the bug show up as an `expect`, not a timeout: wait for what is there either way, then assert.
+- Bug checks go in `tests/e2e/xfail.txt` until the fix. Read the `xfail` reason line in the output, so a
+  check doesn't count as reproducing the bug when it failed for another reason.
+- Playwright is borrowed from `~/dev/nb-web-tests/e2e/node_modules` (or `$TW_E2E_PLAYWRIGHT`); tw-web has
+  no install of its own.
+- Use substrings that are unique among the seeds: `hasText: 'eta home due'` also matched "beta home due".
 
 ## Traps (each one happened)
 

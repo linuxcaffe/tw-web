@@ -4,11 +4,8 @@
   "description": "A responsive web interface for TaskWarrior that runs locally on both desktop (Ubuntu) and mobile (Android with Termux).",
   "main": "main.js",
   "scripts": {
-    "test": "playwright test",
-    "test:ui": "playwright test --ui",
-    "test:debug": "PWDEBUG=1 playwright test",
-    "test:headed": "playwright test --headed",
-    "install-browsers": "npx playwright install"
+    "test": "python3 -m pytest -q tests/",
+    "test:e2e": "python3 tests/e2e/run.py"
   },
   "keywords": [],
   "author": "",

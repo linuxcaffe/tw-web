@@ -60,6 +60,7 @@ python3 -m pytest -q tests/                 # ~1 s; never touches ~/.task
 taskutil web probe --port 5000              # live attack-surface check (~/dev/tw-taskutil)
 python3 .tools/check-guards.py              # every identifier in .guards still exists
 python3 .tools/check-refs.py                # each page's scripts define what they use, in order
+python3 tests/e2e/run.py [name…]            # headless page checks, scratch server only (~2 min)
 ```
 
 The pre-commit hook (`.tools/pre-commit`) runs all three local checks and blocks a red commit; bypass a
@@ -83,6 +84,12 @@ deliberate work-in-progress commit with `--no-verify`. Install it once per clone
 - **Checking a change on a real server:** follow the **`verify` skill** (`.claude/skills/verify/`).
   `.tools/scratch-server.sh up|env|probe|down` runs the worktree's `app.py` against a throwaway database
   on a free port and stops exactly that server. It also covers the headless-browser check.
+- **Page checks** live in `tests/e2e/*.check.cjs` (helpers in `lib.cjs`). `run.py` brings up a scratch
+  server, re-seeds the throwaway database before each check and always brings it down; both it and `lib.cjs`
+  refuse port 5000 and `~/.task`. A check that reproduces a known bug is listed in `tests/e2e/xfail.txt`;
+  fixing the bug turns it into an XPASS, which fails the run until its line is removed. A page fix starts
+  with a check here, just as a server fix starts with a pytest. The pre-commit hook doesn't run them (too
+  slow); run them before merging a page change.
 - **Stopping processes:** never `pkill`/`pgrep` a bare `"python3 app.py"`. nb-web runs one too, and the
   pattern also matches your own shell's command line. Use the anchored pattern
   `pgrep -f '^(/usr/bin/)?python3 app\.py$'` and kill only PIDs whose `/proc/<pid>/cwd` is your folder.
