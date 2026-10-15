@@ -165,7 +165,6 @@ function initializeCalendar() {
         // Double RAF: let FC finish its setOption re-render before scrolling
         requestAnimationFrame(() => {
             calendar.scrollToTime(_calSettings.cal_scroll_time || '08:00:00');
-            _updateSlotLabel();
         });
     });
     window.addEventListener('resize', fitCalHeight);
@@ -384,7 +383,6 @@ function _cycleSlot() {
     return _SLOT_CYCLE[(idx + 1) % _SLOT_CYCLE.length];
 }
 
-function _updateSlotLabel() { /* labels removed — cycle is silent */ }
 
 function changeView(view) {
     if (view === 'today') {
@@ -408,7 +406,6 @@ function changeView(view) {
     document.querySelectorAll('.view-btn[data-view]').forEach(btn =>
         btn.classList.toggle('active', btn.dataset.view === view)
     );
-    _updateSlotLabel();
     updateCalendarTitle();
 }
 
@@ -849,9 +846,6 @@ function escHtml(s) {
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-function escAttr(s) {
-    return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-}
 
 function parseEstTime(sched_duration) {
     if (!sched_duration) return null;
@@ -864,20 +858,3 @@ function parseEstTime(sched_duration) {
     return m.reduce((sum, p) => sum + (p.includes('h') ? parseInt(p) * 60 : parseInt(p)), 0);
 }
 
-function DateFromISOtoTW(isoString) {
-    if (!isoString) return null;
-    if (/^\d{8}T\d{6}Z$/.test(isoString))
-        return isoString.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6');
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(isoString))
-        return isoString.slice(0, -1);
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(isoString))
-        return isoString;
-    try {
-        const d = new Date(isoString);
-        if (!isNaN(d.getTime())) {
-            const pad = (n) => String(n).padStart(2, '0');
-            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-        }
-    } catch (_) {}
-    return null;
-}

@@ -1,12 +1,11 @@
 /**
- * Composant réutilisable pour l'édition de tâches
- * Unifie les formulaires entre index.html et day-planner.html
+ * The task add/edit modal, shared by every view.
  */
 
 class TaskEditor {
     constructor(options = {}) {
         this.options = {
-            // Configuration par défaut
+            // Defaults
             showAllFields: true,
             priorityFormat: 'letters', // 'letters' (H/M/L) ou 'words' (high/medium/low)
             language: 'en', // 'en' or 'fr'
@@ -30,7 +29,7 @@ class TaskEditor {
     }
     
     createModal() {
-        // Supprimer le modal existant s'il existe
+        // Remove an existing modal with this id
         const existingModal = document.getElementById(this.options.modalId);
         if (existingModal) {
             existingModal.remove();
@@ -43,7 +42,7 @@ class TaskEditor {
         document.body.appendChild(modal);
         this.modal = modal;
         
-        // Charger et appliquer le template
+        // Load and apply the template
         this.loadTemplate().then(() => {
             if (this.template) {
                 this.renderModal();
@@ -77,10 +76,10 @@ class TaskEditor {
         const templateContent = this.template.content.cloneNode(true);
         this.modal.appendChild(templateContent);
         
-        // Remplir les slots avec les textes appropriés
+        // Fill the template's text slots
         this.populateTemplate();
         
-        // Re-lier les événements après le rendu
+        // Re-bind events after rendering
         this.bindEvents();
     }
     
@@ -88,7 +87,7 @@ class TaskEditor {
         const texts = this.getTexts();
         const priorityOptions = this.getPriorityOptions();
         
-        // Remplir les slots de texte
+        // Text slots
         const slots = {
             'title': texts.addTask,
             'description-label': texts.description,
@@ -106,7 +105,7 @@ class TaskEditor {
             'cancel-button': texts.cancel
         };
         
-        // Remplir les slots
+        // Fill the slots
         Object.entries(slots).forEach(([name, value]) => {
             const slot = this.modal.querySelector(`slot[name="${name}"]`);
             if (slot) {
@@ -116,7 +115,7 @@ class TaskEditor {
         
         // Priority is now a plain text input — no options to populate
         
-        // Gérer l'affichage des champs étendus
+        // Show or hide the extended fields
         this.toggleExtendedFields(this.options.showAllFields);
     }
     
@@ -185,7 +184,7 @@ class TaskEditor {
     }
     
     bindEvents() {
-        // Vérifier que les éléments existent avant d'ajouter les événements
+        // Bind only the elements that exist
         const closeBtn = this.modal.querySelector('.task-editor-close');
         const cancelBtn = this.modal.querySelector('#task-editor-cancel');
         const form = this.modal.querySelector('#task-editor-form');
@@ -196,7 +195,7 @@ class TaskEditor {
             });
         }
         
-        // Fermeture en cliquant à l'extérieur
+        // Close on a click outside
         this.modal.addEventListener('click', (e) => {
             if (e.target === this.modal) {
                 this.hide();
@@ -273,7 +272,7 @@ class TaskEditor {
             });
         }
         
-        // Échap pour fermer
+        // Escape closes
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.modal.style.display === 'block') {
                 this.hide();
@@ -292,7 +291,7 @@ class TaskEditor {
         }
         this.currentTask = task;
 
-        // Assurer que le modal et le template sont chargés
+        // Make sure the modal and its template are loaded
         if (!this.modal || !this.template) {
             this.createModal();
             return;
@@ -366,7 +365,7 @@ class TaskEditor {
         
         if (descField) descField.value = task.description || '';
         if (priorityField) {
-            // Convertir la priorité au format attendu par la liste déroulante
+            // Priority select takes the raw value
             const priorityValue = task.priority ?  task.priority : '';
             priorityField.value = priorityValue;
         }
@@ -374,7 +373,7 @@ class TaskEditor {
         if (durationField) durationField.value = '';   // legacy field — unused
         if (dueDurField) dueDurField.value = task.due_duration || '';
         
-        // Champs étendus si disponibles
+        // Extended fields, if present
         if (this.options.showAllFields) {
             const tagsField = form.querySelector('#task-editor-tags');
             const projectField = form.querySelector('#task-editor-project');
@@ -686,10 +685,10 @@ class TaskEditor {
     }
     
     formatDateForTask(dateString) {
-        // Convertir le format datetime-local en format TaskWarrior
+        // datetime-local value → a Taskwarrior date
         if (!dateString) return '';
         
-        // Retourner la chaîne avec les secondes ajoutées si nécessaire
+        // Add seconds if missing
         return dateString.length === 16 ? `${dateString}:00` : dateString;
     }
 
@@ -715,64 +714,24 @@ class TaskEditor {
                `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
     }
 
-    formatDurationString(durationString) {
-        // Format TaskWarrior duration (e.g., "PT2H30M" or "2h30min") for display
-        if (!durationString) return '';
-        
-        // Handle ISO 8601 duration format (PT2H30M)
-        if (durationString.startsWith('PT')) {
-            const match = durationString.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-            if (match) {
-                const hours = parseInt(match[1] || 0);
-                const minutes = parseInt(match[2] || 0);
-                const seconds = parseInt(match[3] || 0);
-                
-                let result = '';
-                if (hours > 0) result += `${hours}h `;
-                if (minutes > 0) result += `${minutes}m `;
-                if (seconds > 0) result += `${seconds}s`;
-                
-                return result.trim() || '0s';
-            }
-        }
-        
-        // Handle simple format (2h30min, 1.5h, etc.)
-        return durationString;
-    }
     
-    // Méthode utilitaire pour convertir entre les formats de priorité
-    static convertPriority(priority, fromFormat, toFormat) {
-        const priorityMap = {
-            'H': 'high',
-            'M': 'medium', 
-            'L': 'low',
-            '': 'None', 
-            'high': 'H',
-            'medium': 'M',
-            'low': 'L',
-            'None': ''
-        };
-        
-        if (fromFormat === toFormat) return priority;
-        return priorityMap[priority] || priority;
-    }
     
-    // Méthode pour détruire le composant
+    // Remove the modal
     destroy() {
         if (this.modal) this.modal.remove();
     }
     
-    // Méthode pour mettre à jour les suggestions de projets
+    // Fill the project field's autocomplete list (no caller yet)
     updateProjectSuggestions(projects = []) {
         if (!this.options.showAllFields) return;
         
         const datalist = this.modal?.querySelector('#task-editor-project-options');
         if (!datalist) return;
         
-        // Vider les options existantes
+        // Clear existing options
         datalist.innerHTML = '';
         
-        // Ajouter les nouveaux projets
+        // Add the projects
         projects.forEach(project => {
             if (project) {
                 const option = document.createElement('option');
@@ -945,7 +904,7 @@ class TaskEditor {
     }
 }
 
-// Export pour utilisation en module
+// CommonJS export, for Node
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = TaskEditor;
 }

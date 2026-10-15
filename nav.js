@@ -946,7 +946,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             else if (action === 'settings')   { openSettingsPanel(); }
             else if (action === 'terminal')   { closeMenu(); openTerminal(); }
             else if (action === 'help')       { closeMenu(); window.location.href = '/help.html'; }
-            else { closeMenu(); document.dispatchEvent(new CustomEvent('tw-menu-action', { detail: { action } })); }
+            else closeMenu();
         });
 
         // Arrow-key navigation inside the side menu

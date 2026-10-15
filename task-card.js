@@ -1,14 +1,14 @@
 /**
- * TaskActionHandler - Interface pour gérer les actions des tâches
- * Version autonome sans dépendance à l'objet app global
+ * TaskActionHandler - runs a card's actions (start, stop, done, delete, …) through TW.api.write
+ * and reports back through callbacks; no dependency on a page's app object
  */
 class TaskActionHandler {
     /**
      * @param {Object} options - Options de configuration
-     * @param {Function} options.onTaskUpdate - Callback pour mise à jour des tâches
-     * @param {Function} options.onTaskDelete - Callback pour suppression de tâche
-     * @param {Function} options.onEditRequest - Callback pour demande d'édition
-     * @param {Function} options.showNotification - Callback pour afficher des notifications
+     * @param {Function} options.onTaskUpdate - called after a task changed
+     * @param {Function} options.onTaskDelete - called after a task was deleted or completed
+     * @param {Function} options.onEditRequest - called to open the editor
+     * @param {Function} options.showNotification - shows a notification
      */
     constructor(options = {}) {
         this.onTaskUpdate = options.onTaskUpdate || (() => {});
@@ -62,8 +62,7 @@ class TaskActionHandler {
 }
 
 /**
- * ScriptTaskActionHandler - Implémentation spécifique pour main.js
- * Maintenue pour compatibilité ascendante
+ * ScriptTaskActionHandler - the List's handler (main.js)
  */
 class ScriptTaskActionHandler extends TaskActionHandler {
     constructor() {
@@ -404,14 +403,5 @@ document.addEventListener('click', async e => {
                 body: JSON.stringify({ label, value }),
             });
         }
-    } else if (link.dataset.openPath) {
-        // Legacy file: /path links
-        e.preventDefault();
-        e.stopPropagation();
-        fetch('/api/open', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ path: link.dataset.openPath }),
-        });
     }
 });

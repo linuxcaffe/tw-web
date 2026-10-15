@@ -7,7 +7,6 @@ class TaskWarriorUI {
         this.tasks = [];
         this.serverTotal = null;
         this.currentEditingTask = null;
-        this.projects = new Set();
         // The page's one TaskEditor is built on DOMContentLoaded (global `taskEditor`, below).
 
         this.viewMode      = localStorage.getItem('tw-view-mode')       || 'card';
@@ -20,7 +19,6 @@ class TaskWarriorUI {
         setTimeout(() => {
             this.initializeEventListeners();
             this.loadTasks();
-            this.updateProjectSuggestions();
         }, 100);
 
         // Re-fetch on server-relevant changes; re-filter only for project/tags
@@ -243,9 +241,8 @@ class TaskWarriorUI {
             const fetches = [
                 fetch('/api/tasks?' + params).then(r => r.json()),
                 needTotal ? fetch('/api/tasks?' + statusParams).then(r => r.json()) : Promise.resolve(null),
-                fetch('/api/projects').then(r => r.json()),
             ];
-            const [tasksData, totalData, projectsData] = await Promise.all(fetches);
+            const [tasksData, totalData] = await Promise.all(fetches);
 
             if (tasksData.success) {
                 this.tasks          = tasksData.tasks;
@@ -261,13 +258,6 @@ class TaskWarriorUI {
                 this.showError(tasksData.error || 'Failed to load tasks');
             }
 
-            if (projectsData.success) {
-                this.updateProjectDatalist(projectsData.projects);
-                // Mettre à jour aussi les suggestions du TaskCreator
-                if (this.taskCreator) {
-                    this.taskCreator.updateProjectSuggestions(projectsData.projects);
-                }
-            }
         } catch (error) {
             this.showError('Network error: ' + error.message);
         } finally {
@@ -275,42 +265,23 @@ class TaskWarriorUI {
         }
     }
     
-    // Update the project datalist with all available projects
-    updateProjectDatalist(projects) {
-        const datalist = document.getElementById('project-options');
-        if (!datalist) return;
-        
-        // Clear existing options
-        datalist.innerHTML = '';
-        
-        // Add projects to datalist
-        projects.forEach(project => {
-            if (project) {  // Only add non-empty projects
-                const option = document.createElement('option');
-                option.value = project;
-                datalist.appendChild(option);
-            }
-        });
-    }
-
-
-    // Gestionnaire unifié pour la sauvegarde des tâches (ajout et modification)
+    // After a save (add or edit)
     handleTaskSaveSuccess(task, isEdit) {
         if (isEdit) {
-            // Mettre à jour la tâche dans le tableau local
+            // Update the task in the local list
             const taskIndex = this.tasks.findIndex(t => t.uuid === task.uuid);
             if (taskIndex !== -1) {
                 this.tasks[taskIndex] = task;
             }
         } else {
-            // Ajouter la nouvelle tâche au début de la liste
+            // Put the new task first
             this.tasks.unshift(task);
         }
         this.renderTasks();
         this.showNotification(isEdit ? 'Task updated successfully' : 'Task added successfully', 'success');
     }
     
-    // Gestionnaire pour l'annulation
+    // Editor cancelled
     handleTaskCancel() {
         this.currentEditingTask = null;
     }
@@ -320,38 +291,6 @@ class TaskWarriorUI {
     // Filter tasks client-side using the nav state (TW.filter)
     getFilteredTasks() {
         return TW.filter.navTasks(this.tasks);
-    }
-
-    updateProjectsList() {
-        this.projects.clear();
-        this.tasks.forEach(task => {
-            if (task.project) {
-                this.projects.add(task.project);
-            }
-        });
-        this.updateProjectSuggestions();
-    }
-    
-    updateProjectSuggestions(filter = '') {
-        const datalist = document.getElementById('project-suggestions');
-        if (!datalist) return;
-        
-        // Clear existing options
-        datalist.innerHTML = '';
-        
-        // Filter and sort projects
-        const filteredProjects = Array.from(this.projects)
-            .filter(project => 
-                project.toLowerCase().includes(filter.toLowerCase())
-            )
-            .sort();
-        
-        // Add filtered projects to datalist
-        filteredProjects.forEach(project => {
-            const option = document.createElement('option');
-            option.value = project;
-            datalist.appendChild(option);
-        });
     }
 
     renderTasks() {
@@ -368,9 +307,6 @@ class TaskWarriorUI {
             const label = status.charAt(0).toUpperCase() + status.slice(1);
             heading.textContent = `${filteredTasks.length} ${label} Tasks`;
         }
-
-        // Update projects list whenever tasks are rendered
-        this.updateProjectsList();
 
         if (window.twNav) window.twNav.setCount(filteredTasks.length, this.serverTotal != null ? this.serverTotal : this.tasks.length);
         document.dispatchEvent(new CustomEvent('tw-tasks-loaded', { detail: { tasks: filteredTasks } }));
@@ -392,7 +328,7 @@ class TaskWarriorUI {
             return;
         }
         
-        // Vide le conteneur
+        // Empty the container
         container.innerHTML = '';
         
         const allLookup = new Map((window._twAllTasks || []).map(t => [t.uuid, t]));
@@ -401,22 +337,20 @@ class TaskWarriorUI {
 
 
     /**
-     * Supprime une taskCard spécifique du DOM sans recharger toutes les tâches
+     * Remove one task card from the DOM without reloading the list
      */
     removeTaskCard(taskUuid) {
         const taskCard = document.querySelector(`.task-card[data-task-id="${taskUuid}"]`);
         if (taskCard) {
             taskCard.remove();
 
-            // Mettre à jour le message "aucune tâche" si nécessaire
+            // Show "No tasks found" if that was the last card
             const container = document.getElementById('tasks-container');
             if (container && container.querySelectorAll('.task-card').length === 0) {
                 container.innerHTML = '<div class="no-tasks">No tasks found</div>';
             }
         }
     }
-
-    // Cette méthode n'est plus nécessaire car TaskEditor gère son propre nettoyage
 
     showLoading(show) {
         const loading = document.getElementById('loading');
@@ -452,7 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
     app = new TaskWarriorUI();
     window.twNav?.initProjectsSidebar(document.getElementById('tw-proj-sidebar'));
     window.twNav?.initTagsSidebar(document.getElementById('tw-tags-sidebar'));
-    // Initialiser taskCardManager avec le gestionnaire d'actions spécifique à main.js
+    // The List's card manager, with the List's action handler
     taskCardManager = new TaskCardManager(new ScriptTaskActionHandler());
     
     // ?add=1 — open the Add dialog on load (e.g. from Firefox extension shortcut)
@@ -461,7 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => document.dispatchEvent(new CustomEvent('tw-open-add')), 300);
     }
 
-    // Initialiser taskEditor comme variable globale
+    // The List's editor (a global, as on the other pages)
     taskEditor = new TaskEditor({
         showAllFields: true,
         priorityFormat: 'letters',
