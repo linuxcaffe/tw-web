@@ -105,7 +105,7 @@ function initializeCalendar() {
         slotMaxTime:          _calSettings.cal_day_end       || '23:00:00',
         firstDay:             1,         // Monday
         nowIndicator:         true,
-        allDaySlot:           false,     // due events are timed; no allday strip needed
+        allDaySlot:           true,      // date-only (midnight) tasks; the grid starts at cal_day_start
         editable:             true,      // drag + resize on scheduled events
         droppable:            true,      // accept external drags from sidebar
         eventMinHeight:       18,
@@ -191,15 +191,15 @@ function setupExternalDrag() {
         itemSelector: '.task-card',
         eventData(cardEl) {
             const task = JSON.parse(cardEl.dataset.taskData || '{}');
-            const mins = parseEstTime(task.sched_duration) || 30;
+            const kind = EVENT_KINDS.scheduled;
             return {
                 id:              task.uuid,
                 title:           task.description || '',
-                duration:        { hours: Math.floor(mins / 60), minutes: mins % 60 },
-                backgroundColor: '#4a90e2',
-                borderColor:     '#357abd',
+                duration:        { minutes: parseDuration(task[kind.duration]) || kind.defaultMins },
+                backgroundColor: kind.bg,
+                borderColor:     kind.border,
                 textColor:       '#fff',
-                extendedProps:   { raw: task },
+                extendedProps:   { raw: task, kind: 'scheduled' },
             };
         }
     });
@@ -207,15 +207,14 @@ function setupExternalDrag() {
 
 // ── Click or drag empty slots → create new task ──────────────────────────────
 // Replaces dateClick: handles both single-slot clicks and dragged ranges.
-// When the user drags, sched_duration is pre-filled from the selection length.
+// When the user drags a time range, sched_duration is pre-filled from the selection length.
+// An all-day selection (Month, the all-day strip) gives a date only: midnight, no duration.
 function handleSelect(info) {
     if (!taskEditor) return;
     calendar.unselect();   // clear selection highlight before editor opens
 
-    const d      = info.start;
-    const pad    = n => String(n).padStart(2, '0');
-    const localDT = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    const mins   = Math.round((info.end - info.start) / 60000);
+    const localDT = toLocalISOString(info.start).slice(0, 16);   // datetime-local: no seconds
+    const mins    = info.allDay ? 0 : Math.round((info.end - info.start) / 60000);
 
     taskEditor.show(null);   // open as new task (clears form)
 
@@ -276,53 +275,37 @@ function renderEventContent(arg) {
 }
 
 // ── Optimistic event drop/resize ──────────────────────────────────────────────
-function _isDueEvent(fcEvent) { return fcEvent.id.endsWith('_due'); }
+function _isDueEvent(fcEvent) { return fcEvent.extendedProps?.kind === 'due'; }
 
-async function handleEventDrop(info) {
-    const task = info.event.extendedProps?.raw;
+// A move writes the new start only: an event without a duration is drawn at its kind's default
+// length, which is not the task's. A resize writes the start and the duration. An all-day event
+// writes local midnight (a date with no time), and the page reloads, since a hook may set the time
+// (time-defaults).
+async function writeEventTimes(info, withDuration, failText) {
+    const ev   = info.event;
+    const task = ev.extendedProps?.raw;
     if (!task?.uuid) return;
-
-    const isDue   = _isDueEvent(info.event);
-    const mins    = info.event.end ? Math.round((info.event.end - info.event.start) / 60000) : null;
-    const modData = isDue
-        ? { due: toLocalISOString(info.event.start), ...(mins ? { due_duration: minsToISO(mins) } : {}) }
-        : { scheduled: toLocalISOString(info.event.start), ...(mins ? { sched_duration: minsToISO(mins) } : {}) };
+    const kind    = EVENT_KINDS[ev.extendedProps.kind];
+    const modData = { [kind.field]: toLocalISOString(ev.start) };
+    if (withDuration && ev.end) modData[kind.duration] = minsToISO(Math.round((ev.end - ev.start) / 60000));
 
     const result = await modifyTaskInBackend(task.uuid, modData);
-    if (result.success) {
-        const updated = { ...task, ...modData };
-        info.event.setExtendedProp('raw', updated);
-        const idx = allTasks.findIndex(t => t.uuid === task.uuid);
-        if (idx !== -1) allTasks[idx] = updated;
-        showCalNotification('Task updated', 'info');
-    } else {
+    if (!result.success) {
         info.revert();
-        showCalNotification('Failed to move task: ' + (result.error || ''), 'error');
+        showCalNotification(failText + ': ' + (result.error || ''), 'error');
+        return;
     }
+    if (ev.allDay) { loadTasks(); return; }
+    const updated = { ...task, [kind.field]: toTWDate(ev.start) };
+    if (modData[kind.duration]) updated[kind.duration] = modData[kind.duration];
+    ev.setExtendedProp('raw', updated);
+    const idx = allTasks.findIndex(t => t.uuid === task.uuid);
+    if (idx !== -1) allTasks[idx] = updated;
+    showCalNotification('Task updated', 'info');
 }
 
-async function handleEventResize(info) {
-    const task = info.event.extendedProps?.raw;
-    if (!task?.uuid) return;
-
-    const isDue   = _isDueEvent(info.event);
-    const mins    = Math.round((info.event.end - info.event.start) / 60000);
-    const modData = isDue
-        ? { due: toLocalISOString(info.event.start), due_duration: minsToISO(mins) }
-        : { scheduled: toLocalISOString(info.event.start), sched_duration: minsToISO(mins) };
-
-    const result = await modifyTaskInBackend(task.uuid, modData);
-    if (result.success) {
-        const updated = { ...task, ...modData };
-        info.event.setExtendedProp('raw', updated);
-        const idx = allTasks.findIndex(t => t.uuid === task.uuid);
-        if (idx !== -1) allTasks[idx] = updated;
-        showCalNotification('Task updated', 'info');
-    } else {
-        info.revert();
-        showCalNotification('Failed to resize: ' + (result.error || ''), 'error');
-    }
-}
+function handleEventDrop(info)   { return writeEventTimes(info, false, 'Failed to move task'); }
+function handleEventResize(info) { return writeEventTimes(info, true,  'Failed to resize'); }
 
 // External drag received from sidebar
 async function handleEventReceive(info) {
@@ -480,75 +463,53 @@ function processTasksForCalendar(scheduledTasks) {
     }
 
     const events = [];
-    scheduledTasks.forEach(task => {
-        try { const e = createCalendarEvent(task); if (e) events.push(e); } catch (_) {}
-    });
-    dueTasks.forEach(task => {
-        try { const e = createDueEvent(task); if (e) events.push(e); } catch (_) {}
-    });
+    scheduledTasks.forEach(task => { const e = createCalendarEvent(task, 'scheduled'); if (e) events.push(e); });
+    dueTasks.forEach(task =>       { const e = createCalendarEvent(task, 'due');       if (e) events.push(e); });
 
     _calEventSource = calendar.addEventSource(events);
 }
 
-// ── Event object factories ─────────────────────────────────────────────────────
-function createCalendarEvent(task) {
-    if (!task.scheduled) return null;
-    // Keep Z — TW exports UTC; let JS parse as UTC so FullCalendar displays in local time
-    const isoDate = task.scheduled.replace(
-        /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z'
-    );
-    const start = new Date(isoDate);
-    if (isNaN(start.getTime())) return null;
+// ── Event object factory ───────────────────────────────────────────────────────
+// Two kinds of event: a scheduled task (blue), and a due task with no scheduled date (red ⚑).
+// defaultMins is the height an event is drawn at when the task has no duration; it is never
+// written to the task.
+const EVENT_KINDS = {
+    scheduled: { field: 'scheduled', duration: 'sched_duration', defaultMins: 60, idSuffix: '',
+                 prefix: '',   bg: '#4a90e2', border: '#357abd' },
+    due:       { field: 'due',       duration: 'due_duration',   defaultMins: 30, idSuffix: '_due',
+                 prefix: '⚑ ', bg: '#e74c3c', border: '#c0392b' },
+};
+const STATUS_COLOURS = {
+    completed: { bg: '#78909c', border: '#546e7a' },
+    deleted:   { bg: '#ab47bc', border: '#8e24aa' },
+};
 
-    let mins = 60;
-    if (task.sched_duration?.startsWith('PT')) {
-        const m = task.sched_duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
-        if (m) mins = (parseInt(m[1] || 0) * 60 + parseInt(m[2] || 0)) || 60;
-    }
+// A task at local midnight has a date and no time, so it is an all-day event: in the all-day
+// strip on Week and Day, as a bar on Month. It can be moved but not resized.
+function createCalendarEvent(task, kindName) {
+    const kind  = EVENT_KINDS[kindName];
+    const start = parseTWDate(task[kind.field]);
+    if (!start) return null;
 
+    const allDay = isLocalMidnight(start);
     const ev = {
-        id:              task.uuid,
-        title:           task.description,
+        id:              task.uuid + kind.idSuffix,
+        title:           kind.prefix + task.description,
         start,
-        end:             new Date(start.getTime() + mins * 60000),
-        backgroundColor: '#4a90e2',
-        borderColor:     '#357abd',
+        allDay,
+        backgroundColor: kind.bg,
+        borderColor:     kind.border,
         textColor:       '#fff',
         editable:        true,
-        extendedProps:   { raw: task },
+        durationEditable: !allDay,
+        extendedProps:   { raw: task, kind: kindName },
     };
-    if (task.status === 'completed') { ev.backgroundColor = '#78909c'; ev.borderColor = '#546e7a'; ev.editable = false; }
-    if (task.status === 'deleted')   { ev.backgroundColor = '#ab47bc'; ev.borderColor = '#8e24aa'; ev.editable = false; }
-    return ev;
-}
-
-function createDueEvent(task) {
-    if (!task.due) return null;
-    const isoDate = task.due.replace(
-        /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z'
-    );
-    const start = new Date(isoDate);
-    if (isNaN(start.getTime())) return null;
-
-    let mins = 30;
-    if (task.due_duration?.startsWith('PT')) {
-        const m = task.due_duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
-        if (m) mins = (parseInt(m[1] || 0) * 60 + parseInt(m[2] || 0)) || 30;
+    if (!allDay) {
+        const mins = parseDuration(task[kind.duration]) || kind.defaultMins;
+        ev.end = new Date(start.getTime() + mins * 60000);
     }
-
-    const ev = {
-        id:              task.uuid + '_due',
-        title:           '⚑ ' + task.description,
-        start,
-        end:             new Date(start.getTime() + mins * 60000),
-        backgroundColor: '#e74c3c',
-        borderColor:     '#c0392b',
-        textColor:       '#fff',
-        editable:        true,
-        extendedProps:   { raw: task },
-    };
-    if (task.status === 'completed') { ev.backgroundColor = '#78909c'; ev.borderColor = '#546e7a'; ev.editable = false; }
-    if (task.status === 'deleted')   { ev.backgroundColor = '#ab47bc'; ev.borderColor = '#8e24aa'; ev.editable = false; }
+    const done = STATUS_COLOURS[task.status];
+    if (done) { ev.backgroundColor = done.bg; ev.borderColor = done.border; ev.editable = false; }
     return ev;
 }
 
@@ -561,22 +522,13 @@ function showEventModal(fcEvent) {
     document.getElementById('modal-task-title').textContent =
         task.description || fcEvent.title || 'Task';
 
-    // Format a TW date for display in local time.
-    // TW exports timed dates as compact UTC: '20260418T140000Z'
-    // Parsing with the Z suffix makes JS treat it as UTC, and getHours()/getMinutes()
-    // then return the user's local time — avoiding the UTC/local offset bug.
+    // A TW date in local time: dd/mm/yyyy hh:mm, or the date alone at midnight
     const fmt = (twDate) => {
-        if (!twDate) return twDate;
-        const pad = n => String(n).padStart(2, '0');
-        const timed = (twDate).match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/);
-        if (timed) {
-            const d = new Date(`${timed[1]}-${timed[2]}-${timed[3]}T${timed[4]}:${timed[5]}:${timed[6]}Z`);
-            if (!isNaN(d))
-                return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        }
-        const dateOnly = (twDate).match(/^(\d{4})(\d{2})(\d{2})$/);
-        if (dateOnly) return `${dateOnly[3]}/${dateOnly[2]}/${dateOnly[1]}`;
-        return twDate;
+        const d = parseTWDate(twDate);
+        if (!d) return twDate;
+        const pad  = n => String(n).padStart(2, '0');
+        const date = `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`;
+        return isLocalMidnight(d) ? date : `${date} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     };
 
     const rows = [];
@@ -589,7 +541,8 @@ function showEventModal(fcEvent) {
     }
     if (task.due)            rows.push(`<tr><th>Due</th><td>${escHtml(fmt(task.due))}</td></tr>`);
     if (task.scheduled)      rows.push(`<tr><th>Scheduled</th><td>${escHtml(fmt(task.scheduled))}</td></tr>`);
-    if (task.sched_duration) rows.push(`<tr><th>Duration</th><td>${escHtml(task.sched_duration)}</td></tr>`);
+    const durField = EVENT_KINDS[fcEvent.extendedProps?.kind]?.duration || 'sched_duration';
+    if (task[durField])      rows.push(`<tr><th>Duration</th><td>${escHtml(task[durField])}</td></tr>`);
     if (task.tags?.length)
         rows.push(`<tr><th>Tags</th><td>${task.tags.map(t => `<span class="card-tag">${escHtml(t)}</span>`).join(' ')}</td></tr>`);
     if (task.urgency != null)
@@ -847,14 +800,28 @@ function escHtml(s) {
 }
 
 
-function parseEstTime(sched_duration) {
-    if (!sched_duration) return null;
-    if (sched_duration.startsWith('PT')) {
-        const m = sched_duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-        if (m) return parseInt(m[1] || 0) * 60 + parseInt(m[2] || 0) + Math.round(parseInt(m[3] || 0) / 60);
-    }
-    const m = sched_duration.match(/(\d+)h|(\d+)min/g);
+// TW exports dates as compact UTC ('20260418T140000Z'); null for anything else.
+// A Date shows in local time, so a date-only task (local midnight) reads back as 00:00.
+function parseTWDate(s) {
+    const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(s || '');
     if (!m) return null;
-    return m.reduce((sum, p) => sum + (p.includes('h') ? parseInt(p) * 60 : parseInt(p)), 0);
+    const d = new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`);
+    return isNaN(d) ? null : d;
 }
 
+// A Date as TW's compact UTC form, as export gives it
+function toTWDate(date) {
+    return date.toISOString().replace(/[-:]|\.\d{3}/g, '');
+}
+
+function isLocalMidnight(d) {
+    return d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0;
+}
+
+// An ISO 8601 duration as TW exports a duration UDA (PT1H30M, P2D, P1DT2H) → minutes; null if not one
+function parseDuration(s) {
+    const m = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(s || '');
+    if (!m) return null;
+    const [, d, h, mi, sec] = m.map(x => parseInt(x || 0));
+    return d * 1440 + h * 60 + mi + Math.round(sec / 60) || null;
+}
