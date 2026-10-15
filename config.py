@@ -7,7 +7,7 @@ Menu → Settings and are saved to settings.json — no server restart needed.
 This file is for deployment-level overrides only.
 """
 
-# Developer mode settings
+# Developer mode: log each task command to DEBUG_FILE instead of running it (nothing is logged otherwise)
 DEVELOPER_MODE = False
 DEBUG_FILE = 'command.debug'
 

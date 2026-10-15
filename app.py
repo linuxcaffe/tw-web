@@ -395,9 +395,10 @@ def run_task_command(args, readonly=False, extra_overrides=None, extra_env=None)
             overrides.extend(extra_overrides)
         args = [args[0]] + overrides + args[1:]
 
-        log_command(args)
-
         if DEVELOPER_MODE:
+            # Developer mode logs the command instead of running it. Never log otherwise:
+            # the log held every description and annotation, forever (H3).
+            log_command(args)
             return {
                 'success': True,
                 'stdout': f'[DEV MODE] Command logged to {DEBUG_FILE}: {" ".join(args)}',
