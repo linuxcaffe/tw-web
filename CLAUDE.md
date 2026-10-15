@@ -22,7 +22,7 @@ Plans, reviews and design notes live in the nb notebook, not this repo:
 pieces (`tw-api.js`, `tw-filter.js`, the server query builder `_task_filter_args`, the typed console request
 and `_hook_signals`), each step fixing bugs from `tw:docs/tw-web-known-bugs.md`;
 `tw:docs/tw-web-behavioural-spec.md` is the reference for what must not change. The feature freeze ended
-with step 4. Small leftovers (bug 10, H3, the debug harness, dead code, `add.html`) are listed in the plan.
+with step 4; the leftovers (bug 10, H3, the debug harness, dead code, `add.html`) were done the same day.
 Doc changes owed or made are tracked in `tw:docs/tw-web-doc-updates.md`: add a line when you change a doc.
 
 ## Key files
