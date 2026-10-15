@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     _step('initSidebarControls', () => initSidebarControls());
     _step('loadTasks', () => loadTasks());
     _step('setupCalTooltip', () => setupCalTooltip());
+    _step('setupOffscreenMarkers', () => setupOffscreenMarkers());
 
     document.addEventListener('tw-open-add',      () => { if (taskEditor) taskEditor.show(null); });
     document.addEventListener('tw-filter-change', () => loadTasks());
@@ -147,7 +148,8 @@ function initializeCalendar() {
         eventReceive: handleEventReceive,
         select:       handleSelect,          // drag/click to create — replaces dateClick
 
-        datesSet: () => updateCalendarTitle(),
+        datesSet:  () => { updateCalendarTitle(); scheduleMarkers(); },
+        eventsSet: () => scheduleMarkers(),
     });
 
     calendar.render();
@@ -386,6 +388,7 @@ function changeView(view) {
     }
 
     document.getElementById('calendar').dataset.view = view;
+    scheduleMarkers();
     document.querySelectorAll('.view-btn[data-view]').forEach(btn =>
         btn.classList.toggle('active', btn.dataset.view === view)
     );
@@ -740,6 +743,85 @@ function initSidebarControls() {
     });
     document.addEventListener('click', () => { sortPopup.style.display = 'none'; });
     sortPopup.addEventListener('click', (e) => e.stopPropagation());
+}
+
+// ── Off-screen markers ────────────────────────────────────────────────────────
+// Week and Day draw 24 hours but open at cal_scroll_time, so events can be scrolled out of view.
+// "↑ N earlier" / "↓ N later" sit at the top and bottom edge of the visible grid; a click scrolls
+// to the nearest hidden event. The grid scrolls inside FullCalendar's scroller, or with the page
+// when the height is auto (narrow screens), so the visible band is the scroller cut to the window.
+let _markerFrame = 0;
+
+function setupOffscreenMarkers() {
+    for (const dir of ['up', 'down']) {
+        const btn = document.createElement('button');
+        btn.id        = `cal-marker-${dir}`;
+        btn.className = `cal-marker cal-marker-${dir}`;
+        btn.style.display = 'none';
+        btn.addEventListener('click', () => scrollToHidden(dir));
+        document.body.appendChild(btn);
+    }
+    // scroll doesn't bubble: capture it from the scroller inside #calendar, and the page's own
+    document.getElementById('calendar').addEventListener('scroll', scheduleMarkers, true);
+    window.addEventListener('scroll', scheduleMarkers, { passive: true });
+    window.addEventListener('resize', scheduleMarkers);
+}
+
+function scheduleMarkers() {
+    cancelAnimationFrame(_markerFrame);
+    _markerFrame = requestAnimationFrame(updateOffscreenMarkers);
+}
+
+// The visible band of the time grid, and the timed events above and below it
+function _offscreenEvents() {
+    const body = document.querySelector('#calendar .fc-timegrid-body');
+    if (!body || !calendar?.view.type.startsWith('timeGrid')) return null;
+    const scroller = body.closest('.fc-scroller');
+    const sr       = scroller.getBoundingClientRect();
+    // below the day headers and the nav bar, both sticky when the page scrolls
+    const edges    = ['#calendar .fc-col-header', '#tw-nav-bar']
+        .map(sel => document.querySelector(sel)?.getBoundingClientRect().bottom || 0);
+    const top      = Math.max(sr.top, 0, ...edges);
+    const bottom   = Math.min(sr.bottom, window.innerHeight);
+    const above = [], below = [];
+    body.querySelectorAll('.fc-timegrid-event').forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.height === 0) return;
+        if (r.bottom <= top) above.push(r);
+        else if (r.top >= bottom) below.push(r);
+    });
+    return { scroller, sr, top, bottom, above, below };
+}
+
+function updateOffscreenMarkers() {
+    const up   = document.getElementById('cal-marker-up');
+    const down = document.getElementById('cal-marker-down');
+    if (!up || !down) return;
+    const o = _offscreenEvents();
+    const place = (btn, list, word, y) => {
+        if (!o || list.length === 0) { btn.style.display = 'none'; return; }
+        btn.textContent   = `${btn === up ? '↑' : '↓'} ${list.length} ${word}`;
+        btn.style.display = '';
+        btn.style.left    = `${o.sr.left + o.sr.width / 2}px`;
+        btn.style.top     = `${y}px`;
+    };
+    place(up,   o?.above || [], 'earlier', o ? o.top + 6 : 0);
+    place(down, o?.below || [], 'later',   o ? o.bottom - 6 - (down.offsetHeight || 24) : 0);
+}
+
+// Bring the nearest hidden event above (or below) to the top of the visible band
+function scrollToHidden(dir) {
+    const o = _offscreenEvents();
+    if (!o) return;
+    const list = dir === 'up' ? o.above : o.below;
+    if (!list.length) return;
+    const target = dir === 'up'
+        ? list.reduce((a, b) => (b.bottom > a.bottom ? b : a))
+        : list.reduce((a, b) => (b.top < a.top ? b : a));
+    const delta = target.top - (o.top + 8);
+    if (o.scroller.scrollHeight > o.scroller.clientHeight) o.scroller.scrollTop += delta;
+    else window.scrollBy(0, delta);
+    scheduleMarkers();
 }
 
 // ── Hover tooltip (shows full description when event block is small) ───────────

@@ -362,6 +362,23 @@ body.cal-page .app-container {
 /* ===================================
    Hover tooltip
    =================================== */
+/* Off-screen markers: "↑ N earlier" / "↓ N later" over the time grid (calendar-planner.js) */
+.cal-marker {
+    position: fixed;
+    transform: translateX(-50%);
+    z-index: 20;
+    padding: 2px 10px;
+    border: none;
+    border-radius: 12px;
+    background: var(--primary-color);
+    color: #fff;
+    font-size: 0.75rem;
+    opacity: 0.85;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+}
+.cal-marker:hover { opacity: 1; }
+
 .cal-tooltip {
     position: fixed;
     background: #333;
