@@ -18,6 +18,12 @@ project that `~/dev/CLAUDE.md` describes; that file's tw-web-relevant parts are 
 Plans, reviews and design notes live in the nb notebook, not this repo:
 `tw:docs/tw-web-dev-infra-plan.md` (premises, phased plan, security review S1–S11, taskutil design).
 
+**Consolidation in progress (since 2026-10-13):** `tw:docs/tw-web-consolidation-plan.md` builds shared
+pieces (`tw-api.js`, a shared filter, a server query builder, a typed console request) one step at a time,
+each fixing bugs from `tw:docs/tw-web-known-bugs.md`; `tw:docs/tw-web-behavioural-spec.md` is the
+reference for what must not change. **No significant new features until step 4 is merged** (user's call).
+Check the plan for the current step before starting work.
+
 ## Key files
 
 | File | Lines | Role |
