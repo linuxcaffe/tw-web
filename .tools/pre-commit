@@ -14,7 +14,7 @@ SHELL_ASSETS=(
     nav.js tw-api.js tw-filter.js main.js task-card.js task-editor.js task-editor-templates.html
     agenda.html agenda.js
     calendar-planner.html calendar-planner.js calendar-planner.css
-    kanban.html add.html about.html help.html
+    kanban.html about.html help.html
 )
 
 staged=$(git diff --cached --name-only)

@@ -229,9 +229,13 @@ def main(repo=REPO):
                 Unit(u, (repo / u).read_text(encoding='utf-8', errors='replace'))
         return cache[u]
 
+    # Read every page's scripts first: rule 2 needs to know every definer, not only those
+    # on pages already checked (a page sorting first used to hide its own missing script).
+    pages = {page: [unit(u) for u in page_units(page, repo)] for page in sorted(repo.glob('*.html'))}
+    ours = {name for c in cache.values() for name in c.decls}
+
     findings, checked = [], 0
-    for page in sorted(repo.glob('*.html')):
-        units = [unit(u) for u in page_units(page, repo)]
+    for page, units in pages.items():
         if not units:
             continue
         checked += 1
@@ -245,7 +249,6 @@ def main(repo=REPO):
                                         f'{u.name}; the second script fails to load (rule 3)')
                 else:
                     owner[name] = (pos, u)
-        ours = {name for c in cache.values() for name in c.decls}
         for pos, u in enumerate(units):
             seen = set()
             for name, line, load_time in u.refs:

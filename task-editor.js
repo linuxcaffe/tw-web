@@ -11,8 +11,6 @@ class TaskEditor {
             priorityFormat: 'letters', // 'letters' (H/M/L) ou 'words' (high/medium/low)
             language: 'en', // 'en' or 'fr'
             modalId: 'task-editor-modal',
-            inline: false, // Mode inline ou modal
-            containerId: null, // ID du conteneur pour le mode inline
             ...options
         };
         
@@ -27,12 +25,8 @@ class TaskEditor {
     }
     
     init() {
-        if (this.options.inline) {
-            this.createInlineContainer();
-        } else {
-            this.createModal();
-            this.bindEvents();
-        }
+        this.createModal();
+        this.bindEvents();
     }
     
     createModal() {
@@ -53,26 +47,6 @@ class TaskEditor {
         this.loadTemplate().then(() => {
             if (this.template) {
                 this.renderModal();
-            }
-        });
-    }
-    
-    createInlineContainer() {
-        const container = document.getElementById(this.options.containerId);
-        if (!container) {
-            console.error(`Container with id "${this.options.containerId}" not found`);
-            return;
-        }
-        
-        // Charger et appliquer le template
-        this.loadTemplate().then(() => {
-            if (this.template) {
-                container.innerHTML = '';
-                const templateContent = this.template.content.cloneNode(true);
-                container.appendChild(templateContent);
-                this.modal = container.querySelector('.modal-content');
-                this.populateTemplate();
-                this.bindEvents();
             }
         });
     }
@@ -320,11 +294,7 @@ class TaskEditor {
 
         // Assurer que le modal et le template sont chargés
         if (!this.modal || !this.template) {
-            if (this.options.inline) {
-                this.createInlineContainer();
-            } else {
-                this.createModal();
-            }
+            this.createModal();
             return;
         }
 
@@ -356,11 +326,7 @@ class TaskEditor {
     }
     
     hide() {
-        if (this.options.inline) {
-            this.clearForm();
-        } else {
-            this.modal.style.display = 'none';
-        }
+        this.modal.style.display = 'none';
         this.currentTask = null;
     }
     
@@ -793,13 +759,7 @@ class TaskEditor {
     
     // Méthode pour détruire le composant
     destroy() {
-        if (this.modal) {
-            if (this.options.inline) {
-                this.modal.innerHTML = '';
-            } else {
-                this.modal.remove();
-            }
-        }
+        if (this.modal) this.modal.remove();
     }
     
     // Méthode pour mettre à jour les suggestions de projets
