@@ -645,9 +645,10 @@ function showEventModal(fcEvent) {
         if (taskEditor) taskEditor.showForTask(task);
     };
 
-    // Unschedule (calendar-specific — hide for non-editable/due events)
+    // Unschedule (calendar-specific — hide for non-editable/due events: a due event's task
+    // has no scheduled date to clear; bug 10)
     const unschedBtn = document.getElementById('modal-unschedule-btn');
-    unschedBtn.style.display = isEditable ? '' : 'none';
+    unschedBtn.style.display = (isEditable && !_isDueEvent(fcEvent)) ? '' : 'none';
     unschedBtn.onclick = async () => {
         const r = await modifyTaskInBackend(task.uuid, { scheduled: null });
         if (r.success) { close(); loadTasks(); }
