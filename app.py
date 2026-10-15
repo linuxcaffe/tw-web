@@ -53,7 +53,36 @@ def _valid_hour(v):
     return f'{h:02d}:{m:02d}:00'
 
 _CAL_VIEWS     = {'timeGridWeek', 'timeGridDay', 'dayGridMonth'}
-_CAL_SLOT_DURS = {'00:15:00', '00:30:00', '01:00:00'}
+_CAL_SLOT_DURS = {'00:05:00', '00:10:00', '00:15:00', '00:20:00', '00:30:00', '01:00:00'}
+
+# Calendar zoom: for Week and Day, three steps of [row size, start hour] and the step a view opens
+# at. Clicking the active view's button moves to the next step; a reload goes back to the default.
+_CAL_ZOOM_DEFAULT = {
+    view: {'steps': [['00:15:00', '08:00:00'], ['00:30:00', '08:00:00'], ['01:00:00', '00:00:00']],
+           'default': 1}
+    for view in ('week', 'day')
+}
+
+def _valid_zoom(v):
+    """cal_zoom: {'week'|'day': {'steps': three [slot, start], 'default': 0-2}}, times normalised."""
+    if not isinstance(v, dict) or set(v) != {'week', 'day'}:
+        raise ValueError('cal_zoom needs week and day')
+    out = {}
+    for view, z in v.items():
+        steps = z.get('steps') if isinstance(z, dict) else None
+        if not isinstance(steps, list) or len(steps) != 3:
+            raise ValueError(f'cal_zoom.{view}: three steps')
+        norm = []
+        for step in steps:
+            slot, start = (_valid_hour(x) for x in step)
+            if slot not in _CAL_SLOT_DURS or start > '23:59:00':
+                raise ValueError(f'cal_zoom.{view}: bad step {step!r}')
+            norm.append([slot, start])
+        default = z.get('default')
+        if default not in (0, 1, 2):
+            raise ValueError(f'cal_zoom.{view}: default is 0, 1 or 2')
+        out[view] = {'steps': norm, 'default': default}
+    return out
 
 _SETTINGS_SCHEMA = {
     'notification_timeout': {'type': int,  'default': 3000,
@@ -63,11 +92,9 @@ _SETTINGS_SCHEMA = {
                                   (v if isinstance(v, list) else str(v).split(',')) if c.strip()]},
     'cal_day_start':        {'type': None, 'default': '06:00:00', 'coerce': _valid_hour},
     'cal_day_end':          {'type': None, 'default': '23:00:00', 'coerce': _valid_hour},
-    'cal_scroll_time':      {'type': None, 'default': '08:00:00', 'coerce': _valid_hour},
     'cal_default_view':     {'type': str,  'default': 'timeGridWeek',
                               'validate': lambda v: v in _CAL_VIEWS},
-    'cal_slot_duration':    {'type': str,  'default': '00:15:00',
-                              'validate': lambda v: v in _CAL_SLOT_DURS},
+    'cal_zoom':             {'type': None, 'default': _CAL_ZOOM_DEFAULT, 'coerce': _valid_zoom},
     'pty_height':           {'type': int,  'default': 240,
                               'validate': lambda v: 60 <= v <= 1200},
     'pty_cwd':              {'type': str,  'default': '',

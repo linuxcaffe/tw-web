@@ -1677,14 +1677,34 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             dayRow.appendChild(_note('Hours outside this range are shaded (the grid always shows all 24)'));
             bd.appendChild(dayRow);
 
-            const calScroll = _inp('tws-cal-scroll', 'time', { value: (cfg.cal_scroll_time || '08:00').slice(0,5), css: 'width:90px' });
-            bd.appendChild(_row('Scroll to (on open)', calScroll, _note('Time shown at top of calendar')));
             bd.appendChild(_row('Default view',
                 _sel('tws-cal-view', [['timeGridWeek','Week'],['timeGridDay','Day'],['dayGridMonth','Month']], cfg.cal_default_view || 'timeGridWeek'),
                 _note('Opening view for Calendar page')));
-            bd.appendChild(_row('Time grid slot',
-                _sel('tws-cal-slot', [['00:15:00','15 min'],['00:30:00','30 min'],['01:00:00','60 min']], cfg.cal_slot_duration || '00:15:00'),
-                _note('Row height / snap interval')));
+
+            // Zoom steps: three [row size, start hour] per view; the radio marks the one it opens at
+            const ROWS = [['00:05:00','5 min'],['00:10:00','10 min'],['00:15:00','15 min'],
+                          ['00:20:00','20 min'],['00:30:00','30 min'],['01:00:00','60 min']];
+            ['week', 'day'].forEach(view => {
+                const z = cfg.cal_zoom?.[view];
+                if (!z) return;
+                const row = _mk('div', { cls: 'tw-settings-row stack' });
+                row.appendChild(_mk('div', { cls: 'tw-settings-label', text: `${view === 'week' ? 'Week' : 'Day'} zoom steps` }));
+                z.steps.forEach(([slot, start], i) => {
+                    const line = _mk('div', { cls: 'tws-zoom-step', css: 'display:flex;gap:6px;align-items:center' });
+                    line.dataset.view = view;
+                    const radio = _mk('input', { type: 'radio', name: `tws-zoom-${view}`, value: String(i), checked: i === z.default,
+                                                 title: 'Opens at this step' });
+                    const sel = _sel('', ROWS, slot);
+                    sel.removeAttribute('id');
+                    sel.classList.add('tws-zoom-slot');
+                    sel.style.width = '90px';
+                    const time = _mk('input', { type: 'time', value: start.slice(0, 5), cls: 'tw-settings-input tws-zoom-start', css: 'width:90px' });
+                    line.append(radio, sel, _mk('span', { css: 'color:rgba(255,255,255,0.5);font-size:0.8rem;white-space:nowrap', text: 'from' }), time);
+                    row.appendChild(line);
+                });
+                row.appendChild(_note(`Click ${view === 'week' ? 'Week' : 'Day'} again to step through these; ◉ is where it opens. All 24 hours scroll.`));
+                bd.appendChild(row);
+            });
         }));
 
         // Terminal
@@ -1744,9 +1764,16 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             const kanbanVal = form.querySelector('#tws-kanban').value;
             const calStart  = form.querySelector('#tws-cal-start').value;
             const calEnd    = form.querySelector('#tws-cal-end').value;
-            const calScroll = form.querySelector('#tws-cal-scroll').value;
             const calView   = form.querySelector('#tws-cal-view').value;
-            const calSlot   = form.querySelector('#tws-cal-slot').value;
+            const calZoom   = {};
+            ['week', 'day'].forEach(view => {
+                const lines = [...form.querySelectorAll(`.tws-zoom-step[data-view="${view}"]`)];
+                if (!lines.length) return;
+                calZoom[view] = {
+                    steps:   lines.map(l => [l.querySelector('.tws-zoom-slot').value, l.querySelector('.tws-zoom-start').value]),
+                    default: lines.findIndex(l => l.querySelector('input[type=radio]').checked),
+                };
+            });
             const ptyHeight = parseInt(form.querySelector('#tws-pty-height').value, 10);
             const ptyCwd    = form.querySelector('#tws-pty-cwd').value.trim();
             const ptyInit   = form.querySelector('#tws-pty-init').value.trim();
@@ -1767,9 +1794,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                         kanban_columns:       kanbanVal,
                         cal_day_start:        calStart,
                         cal_day_end:          calEnd,
-                        cal_scroll_time:      calScroll,
                         cal_default_view:     calView,
-                        cal_slot_duration:    calSlot,
+                        ...(calZoom.week && calZoom.day ? { cal_zoom: calZoom } : {}),
                         pty_height:           isNaN(ptyHeight) ? 240 : ptyHeight,
                         pty_cwd:              ptyCwd,
                         pty_init:             ptyInit,

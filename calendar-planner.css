@@ -448,6 +448,9 @@ body.cal-page .app-container {
 /* ── Mobile vertical scroll: cal-topbar scrolls away, calendar expands ── */
 /* Only touches height/overflow — does NOT change the width flex layout     */
 @media (max-width: 768px) {
+    /* The page scrolls here (height auto): day headers stick below the sticky nav bar,
+       whose height calendar-planner.js keeps in --tw-nav-h, not at top 0 under it */
+    .fc .fc-scrollgrid-section-header.fc-scrollgrid-section-sticky > * { top: var(--tw-nav-h, 0px); }
     body.cal-page              { height: auto; min-height: 100vh; overflow-y: auto; }
     body.cal-page .app-container { height: auto; overflow: visible; }
     body.cal-page .main-content  { overflow: visible; }

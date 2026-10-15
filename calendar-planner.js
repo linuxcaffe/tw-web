@@ -115,8 +115,9 @@ function initializeCalendar() {
         dayMaxEvents:            true,      // month view: "+N more" instead of overflowing
         weekNumbers:             true,      // ISO week numbers in gutter (TW users love these)
         weekNumberFormat:        { week: 'narrow' },  // "W16" compact style
-        slotDuration:            _calSettings.cal_slot_duration || '00:15:00',
-        scrollTime:              _calSettings.cal_scroll_time || '08:00:00',
+        views: { timeGridWeek: { dayHeaderFormat: { weekday: 'short' } } },   // the title has the dates
+        // row size, drag snap and start hour come from the view's zoom step (applyZoom)
+        ...zoomOptions(_zoomStep(_fcToZoomView(_calSettings.cal_default_view || 'timeGridWeek'))),
         scrollTimeReset:         false,      // don't jump back on week/day navigation
         selectable:              true,       // drag to select a time range
         selectMirror:            true,       // ghost event preview while selecting
@@ -154,6 +155,8 @@ function initializeCalendar() {
 
     calendar.render();
     setupExternalDrag();
+    zoomTitle('week');
+    zoomTitle('day');
 
     // Set explicit pixel height after flex layout settles, and on every resize.
     // Observe the COLUMN (parent), not #calendar itself — observing the mount point
@@ -166,7 +169,7 @@ function initializeCalendar() {
         fitCalHeight();
         // Double RAF: let FC finish its setOption re-render before scrolling
         requestAnimationFrame(() => {
-            calendar.scrollToTime(_calSettings.cal_scroll_time || '08:00:00');
+            calendar.scrollToTime(zoomOptions(_zoomStep(_fcToZoomView(calendar.view.type))).scrollTime);
         });
     });
     window.addEventListener('resize', fitCalHeight);
@@ -175,6 +178,9 @@ function initializeCalendar() {
 
 function fitCalHeight() {
     if (!calendar) return;
+    // narrow screens: the sticky day headers sit below the nav bar (calendar-planner.css)
+    const nav = document.getElementById('tw-nav-bar');
+    if (nav) document.documentElement.style.setProperty('--tw-nav-h', nav.offsetHeight + 'px');
     if (window.innerWidth <= 768) {
         calendar.setOption('height', 'auto');
         return;
@@ -353,21 +359,51 @@ function setupEventListeners() {
     });
 }
 
-const _SLOT_CYCLE = ['00:15:00', '00:30:00', '01:00:00'];
-const _SLOT_LABEL = { '00:15:00': '15m', '00:30:00': '30m', '01:00:00': '60m' };
+// ── Zoom ──────────────────────────────────────────────────────────────────────
+// Week and Day each have three zoom steps from settings (cal_zoom): a row size and the hour the
+// view starts at. Clicking the active view's button moves to the next step; changing view or
+// reloading goes back to that view's default. All 24 hours stay reachable by scrolling.
+const _ZOOM_FALLBACK = { steps: [['00:15:00', '08:00:00'], ['00:30:00', '08:00:00'], ['01:00:00', '00:00:00']],
+                         default: 1 };
+const _zoomAt = {};   // view → current step index (this page load only)
 
-function _currentSlot() {
-    return calendar.getOption('slotDuration') || _calSettings.cal_slot_duration || '00:15:00';
+function _fcToZoomView(fcType) {
+    return { timeGridWeek: 'week', timeGridDay: 'day' }[fcType] || null;
 }
 
-function _cycleSlot() {
-    const cur = _currentSlot();
-    // Normalise FC's returned value (may be an object or string like "00:15:00")
-    const curStr = typeof cur === 'string' ? cur : `${String(cur.hours || 0).padStart(2,'0')}:${String(cur.minutes || 0).padStart(2,'0')}:00`;
-    const idx = _SLOT_CYCLE.indexOf(curStr);
-    return _SLOT_CYCLE[(idx + 1) % _SLOT_CYCLE.length];
+function _zoomConf(view) {
+    return _calSettings.cal_zoom?.[view] || _ZOOM_FALLBACK;
 }
 
+// The view's current step, starting at its default
+function _zoomStep(view) {
+    if (!view) return _ZOOM_FALLBACK.steps[_ZOOM_FALLBACK.default];
+    const conf = _zoomConf(view);
+    if (!(view in _zoomAt)) _zoomAt[view] = conf.default;
+    return conf.steps[_zoomAt[view]];
+}
+
+// FullCalendar options for a step. Drags snap to 15 minutes, or to the row when rows are smaller.
+function zoomOptions([slot, start]) {
+    return { slotDuration: slot, snapDuration: slot < '00:15:00' ? slot : '00:15:00', scrollTime: start };
+}
+
+function applyZoom(view) {
+    const opts = zoomOptions(_zoomStep(view));
+    calendar.setOption('slotDuration', opts.slotDuration);
+    calendar.setOption('snapDuration', opts.snapDuration);
+    requestAnimationFrame(() => calendar.scrollToTime(opts.scrollTime));
+    zoomTitle(view);
+}
+
+// The view button's tooltip names its current step
+function zoomTitle(view) {
+    const btn = document.querySelector(`.view-btn[data-view="${view}"]`);
+    if (!btn) return;
+    const [slot, start] = _zoomStep(view);
+    const mins = parseInt(slot.slice(0, 2)) * 60 + parseInt(slot.slice(3, 5));
+    btn.title = `${mins} min rows from ${start.slice(0, 5)}; click again to zoom`;
+}
 
 function changeView(view) {
     if (view === 'today') {
@@ -378,13 +414,14 @@ function changeView(view) {
     const currentFC = calendar.view.type;
     const isTimegrid = view === 'week' || view === 'day';
 
-    // Repeated click on active timegrid view → cycle slot duration
+    // Repeated click on the active Week/Day → its next zoom step; another view → its default step
     if (isTimegrid && currentFC === fcViews[view]) {
-        const next = _cycleSlot();
-        calendar.setOption('slotDuration', next);
-        requestAnimationFrame(() => calendar.scrollToTime(_calSettings.cal_scroll_time || '08:00:00'));
-    } else {
-        if (fcViews[view]) calendar.changeView(fcViews[view]);
+        _zoomAt[view] = (_zoomAt[view] + 1) % 3;
+        applyZoom(view);
+    } else if (fcViews[view]) {
+        if (isTimegrid) delete _zoomAt[view];
+        calendar.changeView(fcViews[view]);
+        if (isTimegrid) applyZoom(view);
     }
 
     document.getElementById('calendar').dataset.view = view;
@@ -746,7 +783,7 @@ function initSidebarControls() {
 }
 
 // ── Off-screen markers ────────────────────────────────────────────────────────
-// Week and Day draw 24 hours but open at cal_scroll_time, so events can be scrolled out of view.
+// Week and Day draw 24 hours but open at a zoom step's start hour, so events can be scrolled out of view.
 // "↑ N earlier" / "↓ N later" sit at the top and bottom edge of the visible grid; a click scrolls
 // to the nearest hidden event. The grid scrolls inside FullCalendar's scroller, or with the page
 // when the height is auto (narrow screens), so the visible band is the scroller cut to the window.
