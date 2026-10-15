@@ -18,11 +18,12 @@ project that `~/dev/CLAUDE.md` describes; that file's tw-web-relevant parts are 
 Plans, reviews and design notes live in the nb notebook, not this repo:
 `tw:docs/tw-web-dev-infra-plan.md` (premises, phased plan, security review S1–S11, taskutil design).
 
-**Consolidation in progress (since 2026-10-13):** `tw:docs/tw-web-consolidation-plan.md` builds shared
-pieces (`tw-api.js`, a shared filter, a server query builder, a typed console request) one step at a time,
-each fixing bugs from `tw:docs/tw-web-known-bugs.md`; `tw:docs/tw-web-behavioural-spec.md` is the
-reference for what must not change. **No significant new features until step 4 is merged** (user's call).
-Check the plan for the current step before starting work.
+**Consolidation (2026-10-13 → 15, steps 0–4 merged):** `tw:docs/tw-web-consolidation-plan.md` built the shared
+pieces (`tw-api.js`, `tw-filter.js`, the server query builder `_task_filter_args`, the typed console request
+and `_hook_signals`), each step fixing bugs from `tw:docs/tw-web-known-bugs.md`;
+`tw:docs/tw-web-behavioural-spec.md` is the reference for what must not change. The feature freeze ended
+with step 4. Small leftovers (bug 10, H3, the debug harness, dead code, `add.html`) are listed in the plan.
+Doc changes owed or made are tracked in `tw:docs/tw-web-doc-updates.md`: add a line when you change a doc.
 
 ## Key files
 
