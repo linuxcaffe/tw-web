@@ -258,6 +258,8 @@ next,work        # tags: has BOTH +next and +work
 
 The Projects sidebar (left) and Tags sidebar (right) let you click to filter by project or tag. Tags in active mode show only the tags present in the currently visible task set, sorted by frequency.
 
+**Adding a run of related tasks:** a new task (Add or Log) starts with the filter bar's project, priority and tags, so with `home` and `H` in the filter every task you add is `project:home priority:H` until you change it. Only values that name one thing count: `home`, `.is:home`, `.has:next`; ranges and negatives (`< M`, `.none:`, `.hasnt:x`) and the description search don't. Editing a task always shows the task's own values. In both, the project field suggests the projects the Projects sidebar lists.
+
 ### Command bar
 
 Press `f` (or the `⇅` button) to switch from filter inputs to the command bar. Type any Taskwarrior command or filter expression:

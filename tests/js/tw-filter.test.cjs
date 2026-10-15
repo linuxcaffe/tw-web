@@ -49,6 +49,19 @@ t('navTasks reads twNav.getState()', () => {
     finally { delete ctx.window.twNav; }
 });
 
+const D = state => JSON.parse(JSON.stringify(F.addDefaults(state)));
+t('addDefaults: plain values become defaults', () =>
+    eq(D({ project: 'home.garden', priority: 'h', tags: 'next, errand', filter: 'milk' }),
+       { project: 'home.garden', priority: 'H', tags: ['next', 'errand'] }));
+t('addDefaults: .is: and .has: name one value', () =>
+    eq(D({ project: '.is:work', priority: '.is:2', tags: '.has:phone' }), { project: 'work', priority: '2', tags: ['phone'] }));
+t('addDefaults: ranges and negatives give nothing', () =>
+    eq(D({ project: '.none:', priority: '< M', tags: '.hasnt:x' }), {}));
+t('addDefaults: other modifiers give nothing', () =>
+    eq(D({ project: '.startswith:wo', priority: '.any:', tags: '.any:' }), {}));
+t('addDefaults: an empty state gives nothing', () => eq(D({}), {}));
+t('addDefaults: an unknown priority is not a default', () => eq(D({ priority: 'Z' }), {}));
+
 t('priRank: 1 highest, then 2…6, H, M, L, none 0', () => {
     const ranks = ['1','2','3','4','5','6','H','M','L',''].map(S.priRank);
     eq(ranks, [9,8,7,6,5,4,3,2,1,0]);

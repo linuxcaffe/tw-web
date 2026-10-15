@@ -35,7 +35,7 @@ Doc changes owed or made are tracked in `tw:docs/tw-web-doc-updates.md`: add a l
 | `tw-filter.js` | 140 | `TW.filter` (the nav bar's filter, priority, project and tags inputs, with modifiers: one set of rules for every view) and `TW.sort` (`PRI_ORDER` 1–6 H M L, the List's sort). Pure functions, unit-tested in Node (`tests/js/`) |
 | `main.js` | ~600 | List view (`TaskWarriorUI`) |
 | `task-card.js` | ~430 | `TaskCardManager`, annotation linkify + launchers |
-| `task-editor.js` | ~1000 | `TaskEditor` add/edit modal. An edit re-reads the task on open and sends only the fields the user changed (`_formValues` snapshots); a save with no changes sends nothing |
+| `task-editor.js` | ~1000 | `TaskEditor` add/edit modal. An edit re-reads the task on open and sends only the fields the user changed (`_formValues` snapshots); a save with no changes sends nothing. A new task starts from the nav filter's project, priority and tags (`TW.filter.addDefaults`); the project field suggests the Projects sidebar's list |
 | `kanban.js`, `agenda.js`, `calendar-planner.js` | | The other three views, each with its own `.html` page |
 | `sw.js` | 50 | Service worker shell cache (`CACHE = 'tw-web-vN'`) |
 | `tw-web-launch.sh` | | How the user runs it: Flask + Epiphany PWA; `--clean` wipes SW caches and restarts |

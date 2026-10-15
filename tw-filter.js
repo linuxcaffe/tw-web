@@ -138,5 +138,25 @@ TW.filter = (() => {
         return list.filter(t => matchesNav(t, state));
     }
 
-    return { parseModifier, matchAttr, matchTags, matchesNav, navTasks };
+    // Defaults for a new task from the nav state: the project, priority and tags it names, so a
+    // run of related tasks needs no retyping. A plain value or .is:/.has: names one value;
+    // ranges, negatives and other modifiers name none. The description search is never one.
+    function addDefaults(state) {
+        const out = {};
+        const one = (input, mod) => {
+            input = (input || '').trim();
+            const p = parseModifier(input);
+            if (!p) return input;
+            return p.mod === mod ? p.val.trim() : '';
+        };
+        const project = one(state.project, 'is');
+        if (project) out.project = project;
+        const pri = one(state.priority, 'is').toUpperCase();
+        if (pri && TW.sort.PRI_ORDER.includes(pri)) out.priority = pri;
+        const tags = one(state.tags, 'has').split(',').map(t => t.trim()).filter(Boolean);
+        if (tags.length) out.tags = tags;
+        return out;
+    }
+
+    return { parseModifier, matchAttr, matchTags, matchesNav, navTasks, addDefaults };
 })();

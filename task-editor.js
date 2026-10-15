@@ -306,7 +306,9 @@ class TaskEditor {
         } else {
             if (title) title.textContent = texts.addTask;
             this.clearForm();
+            this._applyFilterDefaults();
         }
+        this._loadProjectSuggestions();
 
         // Log button only makes sense for new tasks
         const logBtn = this.modal.querySelector('#task-editor-log');
@@ -721,7 +723,24 @@ class TaskEditor {
         if (this.modal) this.modal.remove();
     }
     
-    // Fill the project field's autocomplete list (no caller yet)
+    // A new task starts from the nav filter's project, priority and tags (TW.filter.addDefaults)
+    _applyFilterDefaults() {
+        if (!window.twNav) return;
+        const d = TW.filter.addDefaults(window.twNav.getState());
+        const set = (sel, v) => { const el = this.modal.querySelector(sel); if (el && v) el.value = v; };
+        set('#task-editor-project', d.project);
+        set('#task-editor-priority', d.priority);
+        set('#task-editor-tags', d.tags && d.tags.join(', '));
+    }
+
+    // The project field suggests what the Projects sidebar lists (its active/all mode)
+    async _loadProjectSuggestions() {
+        const all = localStorage.getItem('tw-proj-mode') === 'all';
+        const d = await TW.api.get('/api/projects' + (all ? '' : '?active=1'));
+        if (d.success) this.updateProjectSuggestions((d.projects || []).map(p => p.name));
+    }
+
+    // Fill the project field's autocomplete list
     updateProjectSuggestions(projects = []) {
         if (!this.options.showAllFields) return;
         
