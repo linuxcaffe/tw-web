@@ -60,3 +60,6 @@ calendar-planner.js:function escHtml
 tw-api.js:const TW
 tw-api.js:function invalidate
 tw-api.js:async function write
+tw-api.js:function handleWriteResult
+task-editor.js:_formValues
+app.py:def _export_one

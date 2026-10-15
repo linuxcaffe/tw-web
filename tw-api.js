@@ -7,6 +7,7 @@
  *   TW.store.invalidate()             forget every cached task list (after any write)
  *   TW.api.get(url)                   GET, parsed JSON
  *   TW.api.write(method, url, body?)  POST/PUT/DELETE, parsed JSON; always invalidates the cache
+ *   TW.api.handleWriteResult(data)    act on a write's hook signals; returns true if the PTY took over
  *
  * Every write that can change tasks goes through TW.api.write, so no page has to remember to
  * invalidate. A write that never got an answer still invalidates: it may have reached the server.
@@ -63,5 +64,16 @@ const TW = (() => {
         }
     }
 
-    return { store: { read, save, invalidate }, api: { get, write } };
+    // The signals a write result can carry (tw:docs/tw-web-behavioural-spec.md, "write-result
+    // signals"), handled the same way wherever the write came from. Returns true when a hook
+    // asked for a terminal and the PTY console took over, so the caller should do nothing else.
+    function handleWriteResult(data) {
+        if (data.needs_pty) { window.twNav?.openPty(data.cmd); return true; }
+        if (data.deferred_cmd) window.twTerminal?.offerTerminal(data.deferred_cmd);
+        if (data.terminal_launched) window.twNav?.showOutput('Opening in terminal…');
+        else if (data.timed_out && data.cmd) window.twTerminal?.offerTerminal(data.cmd);
+        return false;
+    }
+
+    return { store: { read, save, invalidate }, api: { get, write, handleWriteResult } };
 })();

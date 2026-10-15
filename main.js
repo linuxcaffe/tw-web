@@ -90,17 +90,8 @@ class TaskWarriorUI {
         this.serverTotal = null;
         this.currentEditingTask = null;
         this.projects = new Set();
-        
-        // Initialiser le composant TaskEditor
-        this.taskEditor = new TaskEditor({
-            showAllFields: true,
-            priorityFormat: 'letters',
-            language: 'en',
-            modalId: 'unified-task-editor',
-            onSave: (taskData, isEdit) => this.handleTaskSave(taskData, isEdit),
-            onCancel: () => this.handleTaskCancel()
-        });
-        
+        // The page's one TaskEditor is built on DOMContentLoaded (global `taskEditor`, below).
+
         this.viewMode      = localStorage.getItem('tw-view-mode')       || 'card';
         this.sortField     = localStorage.getItem('tw-sort-field')     || 'urgency';
         this.sortReverse   = localStorage.getItem('tw-sort-reverse')   === 'true';

@@ -1086,6 +1086,15 @@ def _deferred_cmd(result):
     cmds = result.get('deferred_cmds', [])  # spool path (hook wrote .cmd file)
     return cmds[0] if cmds else None
 
+def _export_one(task_id):
+    """The task as it is now, or None (read-only export)."""
+    r = run_task_command(['task', task_id, 'export'], readonly=True)
+    try:
+        tasks = json.loads(r['stdout']) if r['success'] and r['stdout'].strip() else []
+    except json.JSONDecodeError:
+        tasks = []
+    return tasks[0] if tasks else None
+
 @app.route('/api/task/<task_id>', methods=['GET'])
 def get_task(task_id):
     """Return a single task by UUID or ID (used for annotation refresh)."""
@@ -1116,6 +1125,8 @@ def start_task(task_id):
     resp = {'success': result['success'],
             'message': result['stdout'] if result['success'] else result['stderr'],
             'warnings': _warnings(result)}
+    if result['success']:
+        resp['task'] = _export_one(task_id)   # so the page can redraw the card (bug 7)
     dc = _deferred_cmd(result)
     if dc: resp['deferred_cmd'] = dc
     return jsonify(resp)
@@ -1129,6 +1140,8 @@ def stop_task(task_id):
     resp = {'success': result['success'],
             'message': result['stdout'] if result['success'] else result['stderr'],
             'warnings': _warnings(result)}
+    if result['success']:
+        resp['task'] = _export_one(task_id)
     dc = _deferred_cmd(result)
     if dc: resp['deferred_cmd'] = dc
     return jsonify(resp)

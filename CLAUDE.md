@@ -30,10 +30,10 @@ Check the plan for the current step before starting work.
 |---|---|---|
 | `app.py` | ~1750 | The whole server: guard, settings, `run_task_command`, every `/api/*` route, `/ws/pty`, SSE, static route |
 | `nav.js` | ~2100 | Shared chrome on every page: nav bar, filter/command bar, sidebars, Settings, PTY console, hook prompts |
-| `tw-api.js` | 70 | `TW.store` (the shared task cache) and `TW.api.write`: every task write goes through it, so every write empties the cache |
+| `tw-api.js` | 80 | `TW.store` (the shared task cache), `TW.api.write` (every task write goes through it, so every write empties the cache) and `TW.api.handleWriteResult` (hook signals: PTY, deferred offer, timeout) |
 | `main.js` | ~600 | List view (`TaskWarriorUI`) |
 | `task-card.js` | ~430 | `TaskCardManager`, annotation linkify + launchers |
-| `task-editor.js` | ~970 | `TaskEditor` add/edit modal |
+| `task-editor.js` | ~1000 | `TaskEditor` add/edit modal. An edit re-reads the task on open and sends only the fields the user changed (`_formValues` snapshots); a save with no changes sends nothing |
 | `kanban.js`, `agenda.js`, `calendar-planner.js` | | The other three views, each with its own `.html` page |
 | `sw.js` | 50 | Service worker shell cache (`CACHE = 'tw-web-vN'`) |
 | `tw-web-launch.sh` | | How the user runs it: Flask + Epiphany PWA; `--clean` wipes SW caches and restarts |

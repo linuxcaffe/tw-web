@@ -18,7 +18,6 @@ class TaskEditor {
         
         this.currentTask = null;
         this.template = null;
-        this.onSave = options.onSave || (() => {});
         this.onCancel = options.onCancel || (() => {});
         this.onSaveSuccess = options.onSaveSuccess || (() => {});
         this.onSaveError = options.onSaveError || (() => {});
@@ -308,7 +307,15 @@ class TaskEditor {
         });
     }
     
-    show(task = null) {
+    async show(task = null) {
+        // Edit from the server's copy, not the one the card was drawn from: it may be older,
+        // and the save below sends only what differs from what the form showed (bug 2).
+        if (task?.uuid) {
+            try {
+                const fresh = await TW.api.get(`/api/task/${task.uuid}`);
+                if (fresh?.uuid === task.uuid) task = fresh;
+            } catch {}
+        }
         this.currentTask = task;
 
         // Assurer que le modal et le template sont chargés
@@ -447,10 +454,37 @@ class TaskEditor {
             inp.classList.toggle('te-dt-empty', !inp.value)
         );
 
+        // What the form shows now; an edit sends only the fields that differ from this
+        this._shown = this._formValues();
+
         // Show existing annotations with edit/delete controls
         this._renderAnnotations(Array.isArray(task.annotations) ? task.annotations : []);
 
         this._setupRevertBtn(task);
+    }
+
+    // The edit form's values as the inputs hold them (minute precision for dates). Comparing
+    // two snapshots says which fields the user actually changed.
+    _formValues() {
+        const f = this.modal.querySelector('#task-editor-form');
+        const v = id => f?.querySelector('#task-editor-' + id)?.value ?? '';
+        return {
+            description: v('description'), priority: v('priority'), tags: v('tags'),
+            project: v('project'), due: v('due'), due_duration: v('due-duration'),
+            scheduled: v('scheduled'), sched_duration: v('sched-duration'),
+            state: f?.querySelector('#task-editor-state')?.dataset.current ?? '',
+            deps: v('deps'), wait: v('wait'), until: v('until'),
+        };
+    }
+
+    // Which taskData keys each form field produces (handleSave)
+    static get FIELD_KEYS() {
+        return {
+            description: ['description'], priority: ['priority'], tags: ['tags_add', 'tags_remove'],
+            project: ['project'], due: ['due'], due_duration: ['due_duration'],
+            scheduled: ['scheduled'], sched_duration: ['sched_duration'], state: ['state'],
+            deps: ['depends', 'parent_id'], wait: ['wait'], until: ['until'],
+        };
     }
 
     _setupRevertBtn(task) {
@@ -489,6 +523,7 @@ class TaskEditor {
     }
     
     clearForm() {
+        this._shown = null;
         const form = this.modal.querySelector('#task-editor-form');
         if (form) form.reset();
         // Clear any leftover annotation state from a previous edit
@@ -569,6 +604,17 @@ class TaskEditor {
         if (untilField)    taskData.until          = untilField.value;
 
         if (this.currentTask) {
+            if (this._shown) {
+                const now = this._formValues();
+                for (const [field, keys] of Object.entries(TaskEditor.FIELD_KEYS))
+                    if (now[field] === this._shown[field]) keys.forEach(k => delete taskData[k]);
+            }
+            if (Object.keys(taskData).length === 0) {
+                this.hide();
+                document.dispatchEvent(new CustomEvent('tw-show-notification',
+                    { detail: { message: 'No changes', type: 'info' } }));
+                return;
+            }
             taskData.id = this.currentTask.id;
             taskData.uuid = this.currentTask.uuid;
         }
@@ -584,8 +630,8 @@ class TaskEditor {
             
             const data = await TW.api.write(method, endpoint, taskDataForAPI);
             
+            if (TW.api.handleWriteResult(data)) { this.hide(); return; }
             if (data.success) {
-                if (data.deferred_cmd) window.twTerminal?.offerTerminal(data.deferred_cmd);
                 this.onSaveSuccess(data.task, isEdit);
                 this.hide();
             } else {
@@ -626,8 +672,8 @@ class TaskEditor {
         try {
             const prepared = this.prepareTaskDataForAPI(taskData, false);
             const data = await TW.api.write('POST', '/api/task/log', prepared);
+            if (TW.api.handleWriteResult(data)) { this.hide(); return; }
             if (data.success) {
-                if (data.deferred_cmd) window.twTerminal?.offerTerminal(data.deferred_cmd);
                 this.hide();
                 this.onLogSuccess();
             } else {
@@ -639,18 +685,18 @@ class TaskEditor {
     }
 
     prepareTaskDataForAPI(taskData, isEdit) {
-        const preparedData = {
-            description: taskData.description,
-            project:     taskData.project  || null,
-            priority:    taskData.priority || null,
-        };
+        // Add and log send every field; an edit sends only those the user changed
+        const preparedData = {};
+        if (taskData.description !== undefined) preparedData.description = taskData.description;
+        if (taskData.project     !== undefined) preparedData.project     = taskData.project  || null;
+        if (taskData.priority    !== undefined) preparedData.priority    = taskData.priority || null;
 
         // Edit mode sends a diff; add mode sends the full tag list
         if (taskData.tags_add !== undefined || taskData.tags_remove !== undefined) {
             preparedData.tags_add    = taskData.tags_add    || [];
             preparedData.tags_remove = taskData.tags_remove || [];
-        } else {
-            preparedData.tags = taskData.tags || [];
+        } else if (taskData.tags !== undefined) {
+            preparedData.tags = taskData.tags;
         }
         
         // Always send date fields — empty string signals "clear this date" to the backend

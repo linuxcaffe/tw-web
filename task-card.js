@@ -31,10 +31,7 @@ class TaskActionHandler {
         try {
             const data = await TW.api.write(method, endpoint);
 
-            if (data.needs_pty) {
-                window.twNav?.openPty(data.cmd);
-                return;
-            }
+            if (TW.api.handleWriteResult(data)) return;
             if (data.success) {
                 if (action === 'delete' || action === 'done') {
                     this.onTaskDelete(taskUuid);
@@ -43,18 +40,11 @@ class TaskActionHandler {
                 } else {
                     this.onTaskUpdate(null);
                 }
-                if (data.deferred_cmd) {
-                    window.twTerminal?.offerTerminal(data.deferred_cmd);
-                }
                 const msg = data.warnings?.length
                     ? data.warnings.join('\n')
                     : (data.message || `Task ${action} successful`);
                 window.twNav?.showOutput(msg);
-            } else if (data.terminal_launched) {
-                window.twNav?.showOutput('Opening in terminal…');
-            } else if (data.timed_out && data.cmd) {
-                window.twTerminal?.offerTerminal(data.cmd);
-            } else {
+            } else if (!data.terminal_launched && !(data.timed_out && data.cmd)) {
                 window.twNav?.showOutput(data.message || data.error || `Failed to ${action} task`);
             }
         } catch (error) {
