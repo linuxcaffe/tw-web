@@ -252,7 +252,8 @@ foo              # description contains "foo"
 next,work        # tags: has BOTH +next and +work
 .hasnt:waiting   # tags: does not have +waiting
 
-> M              # priority higher than Medium
+> M              # priority higher than Medium (H, and 1–6 if you use them)
+< M              # priority lower than Medium (L)
 ```
 
 The Projects sidebar (left) and Tags sidebar (right) let you click to filter by project or tag. Tags in active mode show only the tags present in the currently visible task set, sorted by frequency.

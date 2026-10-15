@@ -31,8 +31,10 @@ t('project .is:', () => eq(pick({ project: '.is:home' }), ['Buy milk']));
 t('project .startswith:', () => eq(pick({ project: '.startswith:work' }), ['Write spec']));
 t('project unknown modifier matches nothing', () => eq(pick({ project: '.bogus:x' }), []));
 t('priority is exact', () => eq(pick({ priority: 'h' }), ['Buy milk']));
-t('priority < M is higher than M', () => eq(pick({ priority: '< M' }), ['Buy milk', 'Write spec']));
-t('priority > H is lower than H', () => eq(pick({ priority: '> H' }), ['File taxes']));
+// Read literally (user, 2026-10-15): "> M" is "higher priority than M"
+t('priority > M is higher than M', () => eq(pick({ priority: '> M' }), ['Buy milk', 'Write spec']));
+t('priority < H is lower than H', () => eq(pick({ priority: '< H' }), ['File taxes']));
+t('priority > 3 is 1 and 2', () => eq(['1','2','3','4','H'].filter(p => F.matchAttr(p, '> 3', 'ord')), ['1','2']));
 t('priority .any:', () => eq(pick({ priority: '.any:' }).length, 3));
 t('priority .contains: is not an ordered modifier', () => eq(pick({ priority: '.contains:H' }), []));
 t('tags: all listed must be present', () => eq(pick({ tags: 'shop, phone' }), ['Call Bob']));

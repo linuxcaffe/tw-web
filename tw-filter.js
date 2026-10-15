@@ -51,7 +51,7 @@ TW.filter = (() => {
     }
 
     // Compare a scalar field value against a filter string, with optional modifier.
-    // type: 'text' (case-insensitive string ops) | 'ord' (priority order for </> )
+    // type: 'text' (case-insensitive string ops) | 'ord' (priority order: "> M" = higher than M)
     function matchAttr(fieldVal, input, type) {
         const p = parseModifier(input);
         const fv = String(fieldVal);
@@ -76,7 +76,8 @@ TW.filter = (() => {
                 if (isNaN(an) || isNaN(bn)) return false;
                 return mod === 'lt' ? an < bn : an > bn;
             }
-            return mod === 'lt' ? ai < bi : ai > bi;
+            // PRI_ORDER runs highest first, so "> M" (higher than M) means an earlier index
+            return mod === 'gt' ? ai < bi : ai > bi;
         }
 
         const allowed = type === 'ord' ? ORD_MODS : TEXT_MODS;
