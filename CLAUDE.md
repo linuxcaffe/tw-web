@@ -31,6 +31,7 @@ Check the plan for the current step before starting work.
 | `app.py` | ~1750 | The whole server: guard, settings, `run_task_command`, every `/api/*` route, `/ws/pty`, SSE, static route |
 | `nav.js` | ~2100 | Shared chrome on every page: nav bar, filter/command bar, sidebars, Settings, PTY console, hook prompts |
 | `tw-api.js` | 80 | `TW.store` (the shared task cache), `TW.api.write` (every task write goes through it, so every write empties the cache) and `TW.api.handleWriteResult` (hook signals: PTY, deferred offer, timeout) |
+| `tw-filter.js` | 140 | `TW.filter` (the nav bar's filter, priority, project and tags inputs, with modifiers: one set of rules for every view) and `TW.sort` (`PRI_ORDER` 1–6 H M L, the List's sort). Pure functions, unit-tested in Node (`tests/js/`) |
 | `main.js` | ~600 | List view (`TaskWarriorUI`) |
 | `task-card.js` | ~430 | `TaskCardManager`, annotation linkify + launchers |
 | `task-editor.js` | ~1000 | `TaskEditor` add/edit modal. An edit re-reads the task on open and sends only the fields the user changed (`_formValues` snapshots); a save with no changes sends nothing |
@@ -41,9 +42,10 @@ Check the plan for the current step before starting work.
 | `tests/` | | pytest suite (see Testing) |
 
 `index.html` loads scripts in this order, and the order is load-bearing:
-`nav.js` → `tw-api.js` → `codemirror-bundle.js` → `task-editor.js` → `task-card.js` → `main.js`.
+`nav.js` → `tw-api.js` → `tw-filter.js` → `codemirror-bundle.js` → `task-editor.js` → `task-card.js` → `main.js`.
 Every page loads `tw-api.js` right after `nav.js`. A new write from a page uses `TW.api.write`, not `fetch`,
-and a new task cache goes through `TW.store` (consolidation plan, `tw:docs/tw-web-consolidation-plan.md`).
+a new task cache goes through `TW.store`, and a view filters and sorts with `TW.filter`/`TW.sort` (loaded on
+the four view pages; `tests/test_tw_filter.py` checks that a page using them loads them) (consolidation plan, `tw:docs/tw-web-consolidation-plan.md`).
 `codemirror-bundle.js` is built by rollup (`rollup.cm.config.js`) from `codemirror-entry.js`; FullCalendar,
 xterm and Sortable are vendored `.min.js` files. There's no other build step.
 

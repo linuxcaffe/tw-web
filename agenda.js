@@ -122,19 +122,8 @@ function renderAgenda(scheduled, due) {
     const p     = window.twNav?.stateToParams() ?? '';
     let grandTotal = window.twNav?.getGrandTotal(p) ?? null;
 
-    // Client-side filtering (mirrors main.js / calendar-planner.js)
-    const filter   = (navState.filter   || '').trim().toLowerCase();
-    const priority = (navState.priority || '').trim().toLowerCase();
-    const project  = (navState.project  || '').trim().toLowerCase();
-    const tags     = (navState.tags     || '').split(',').map(t => t.trim()).filter(Boolean);
-
-    const filtered = items.filter(task => {
-        if (filter   && !(task.description || '').toLowerCase().includes(filter))      return false;
-        if (priority && !String(task.priority || '').toLowerCase().includes(priority)) return false;
-        if (project  && !(task.project      || '').toLowerCase().includes(project))    return false;
-        if (tags.length && !tags.every(t => (task.tags || []).includes(t)))            return false;
-        return true;
-    });
+    // Client-side filtering: the List's rules (TW.filter)
+    const filtered = TW.filter.navTasks(items);
 
     window.twNav?.setCount(filtered.length, grandTotal ?? total);
     window._twAllTasks = items;  // seed dep lookup for agenda cards

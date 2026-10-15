@@ -683,20 +683,6 @@ class CalendarTaskActionHandler extends TaskActionHandler {
 }
 
 // ── Sidebar: filter + display ─────────────────────────────────────────────────
-// Shared client-side filter predicate — used by both sidebar and calendar
-function matchesNavFilter(task) {
-    const state    = window.twNav ? window.twNav.getState() : {};
-    const filter   = (state.filter   || '').trim().toLowerCase();
-    const priority = (state.priority || '').trim().toLowerCase();
-    const project  = (state.project  || '').trim().toLowerCase();
-    const tags     = (state.tags     || '').split(',').map(t => t.trim()).filter(Boolean);
-    if (filter   && !(task.description || '').toLowerCase().includes(filter))       return false;
-    if (priority && !String(task.priority || '').toLowerCase().includes(priority))  return false;
-    if (project  && !(task.project      || '').toLowerCase().includes(project))     return false;
-    if (tags.length && !tags.every(t => (task.tags || []).includes(t)))             return false;
-    return true;
-}
-
 function applyFiltersAndDisplay() {
     // Nav counter: dated tasks shown (status + context) / the status-only total, as on the List
     const navState      = window.twNav ? window.twNav.getState() : {};
@@ -715,7 +701,7 @@ function applyFiltersAndDisplay() {
     }
 
     // Drag-list: always pending + context + nav filter
-    const filtered = unplannedTasks.filter(matchesNavFilter);
+    const filtered = TW.filter.navTasks(unplannedTasks);
     const title = document.getElementById('cal-unscheduled-title');
     if (title) title.textContent = `${filtered.length} Unscheduled`;
     displayUnplannedTasks(sortUnplanned(filtered));
@@ -750,20 +736,10 @@ const SIDEBAR_SORT_FIELDS = [
     { value: 'tags',        label: 'Tags' },
 ];
 
+// Same sort (and the same saved choice) as the List
 function sortUnplanned(tasks) {
-    const field = localStorage.getItem('tw-sort-field') || 'urgency';
-    const rev   = localStorage.getItem('tw-sort-reverse') === 'true' ? -1 : 1;
-    if (field === 'urgency') return rev === 1 ? tasks : [...tasks].reverse();
-    const PRI = { H: 3, M: 2, L: 1 };
-    return [...tasks].sort((a, b) => {
-        let av = a[field], bv = b[field];
-        if (field === 'priority') { av = PRI[av] || 0; bv = PRI[bv] || 0; }
-        else if (field === 'tags') { av = (av || []).join(','); bv = (bv || []).join(','); }
-        av = av ?? ''; bv = bv ?? '';
-        if (av < bv) return -1 * rev;
-        if (av > bv) return  1 * rev;
-        return 0;
-    });
+    return TW.sort.tasks(tasks, localStorage.getItem('tw-sort-field') || 'urgency',
+                         localStorage.getItem('tw-sort-reverse') === 'true');
 }
 
 function initSidebarControls() {

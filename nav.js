@@ -1299,6 +1299,41 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         } catch { /* ignore — keep the button visible */ }
     }
 
+    // ── Project tree (the Projects panel and the inline sidebar) ──────────────
+    // Rows for each project, indented by depth; a parent folds from its arrow area and picks
+    // from its label. Returns '' when there are no projects.
+    function _projectTreeHtml(allProjects, collapsed, current) {
+        if (!allProjects.length) return '';
+        const names = allProjects.map(p => p.name);
+        let html = `<div class="tw-pick-section-label">Projects</div>`;
+        allProjects.forEach(({ name, count }) => {
+            const parts    = name.split('.');
+            const depth    = parts.length - 1;
+            const label    = parts[parts.length - 1];
+            const pad      = 16 + depth * 12;
+            const isParent = names.some(n => n.startsWith(name + '.'));
+            const isColl   = collapsed.has(name);
+            const hidden   = parts.some((_, i) => i > 0 && collapsed.has(parts.slice(0, i).join('.')));
+            if (hidden) return;
+            const arrow = isParent
+                ? `<span class="tw-proj-arrow">${isColl ? '▶' : '▼'}</span>`
+                : `<span class="tw-proj-arrow"></span>`;
+            const badge = count ? `<span class="tw-proj-count">${count}</span>` : '';
+            // Parent: data-fold on button, data-pick on label only (so left area folds, text picks)
+            // Non-parent: data-pick on button as usual
+            if (isParent) {
+                html += `<button class="tw-pick-item${current === name ? ' active' : ''}" ` +
+                        `data-fold="${esc(name)}" style="padding-left:${pad}px" title="${esc(name)}">` +
+                        `${arrow}<span class="tw-proj-label" data-pick="${esc(name)}">${esc(label)}</span>${badge}</button>`;
+            } else {
+                html += `<button class="tw-pick-item${current === name ? ' active' : ''}" ` +
+                        `data-pick="${esc(name)}" style="padding-left:${pad}px" title="${esc(name)}">` +
+                        `${arrow}<span class="tw-proj-label">${esc(label)}</span>${badge}</button>`;
+            }
+        });
+        return html;
+    }
+
     // ── Projects panel ────────────────────────────────────────────────────────
     async function openProjectsPanel(mode) {
         if (!mode || mode === 'count') mode = localStorage.getItem('tw-proj-mode') || 'active';
@@ -1314,7 +1349,6 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         }
 
         function render(allProjects) {
-            const names = allProjects.map(p => p.name);
             const state = getState();
 
             let html =
@@ -1328,36 +1362,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 `<button class="tw-pick-item${state.project === '.none:' ? ' active' : ''}" data-pick=".none:">` +
                     `<span class="tw-proj-label">No project</span></button>`;
 
-            if (allProjects.length) {
-                html += `<div class="tw-pick-section-label">Projects</div>`;
-                allProjects.forEach(({ name, count }) => {
-                    const parts    = name.split('.');
-                    const depth    = parts.length - 1;
-                    const label    = parts[parts.length - 1];
-                    const pad      = 16 + depth * 12;
-                    const isParent = names.some(n => n.startsWith(name + '.'));
-                    const isColl   = collapsed.has(name);
-                    const hidden   = parts.some((_, i) => i > 0 && collapsed.has(parts.slice(0, i).join('.')));
-                    if (hidden) return;
-                    const arrow = isParent
-                        ? `<span class="tw-proj-arrow">${isColl ? '▶' : '▼'}</span>`
-                        : `<span class="tw-proj-arrow"></span>`;
-                    const badge = count ? `<span class="tw-proj-count">${count}</span>` : '';
-                    // Parent: data-fold on button, data-pick on label only (so left area folds, text picks)
-                    // Non-parent: data-pick on button as usual
-                    if (isParent) {
-                        html += `<button class="tw-pick-item${state.project === name ? ' active' : ''}" ` +
-                                `data-fold="${esc(name)}" style="padding-left:${pad}px" title="${esc(name)}">` +
-                                `${arrow}<span class="tw-proj-label" data-pick="${esc(name)}">${esc(label)}</span>${badge}</button>`;
-                    } else {
-                        html += `<button class="tw-pick-item${state.project === name ? ' active' : ''}" ` +
-                                `data-pick="${esc(name)}" style="padding-left:${pad}px" title="${esc(name)}">` +
-                                `${arrow}<span class="tw-proj-label">${esc(label)}</span>${badge}</button>`;
-                    }
-                });
-            } else {
-                html += `<div class="tw-panel-loading">No projects found</div>`;
-            }
+            html += _projectTreeHtml(allProjects, collapsed, state.project) ||
+                    `<div class="tw-panel-loading">No projects found</div>`;
             body.innerHTML = html;
         }
 
@@ -1500,7 +1506,6 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 
         function render() {
             const state = getState();
-            const names = allProjects.map(p => p.name);
             let html =
                 `<div class="tw-sb-label">Projects</div>` +
                 `<div class="tw-toggle-bar">` +
@@ -1510,26 +1515,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 `</div>` +
                 `<button class="tw-pick-item${!state.project?' active':''}" data-pick=""><span class="tw-proj-label">All projects</span></button>` +
                 `<button class="tw-pick-item${state.project==='.none:'?' active':''}" data-pick=".none:"><span class="tw-proj-label">No project</span></button>`;
-            if (allProjects.length) {
-                html += `<div class="tw-pick-section-label">Projects</div>`;
-                allProjects.forEach(({ name, count }) => {
-                    const parts    = name.split('.');
-                    const depth    = parts.length - 1;
-                    const label    = parts[parts.length - 1];
-                    const pad      = 16 + depth * 12;
-                    const isParent = names.some(n => n.startsWith(name + '.'));
-                    const isColl   = sbCollapsed.has(name);
-                    const hidden   = parts.some((_, i) => i > 0 && sbCollapsed.has(parts.slice(0, i).join('.')));
-                    if (hidden) return;
-                    const arrow = isParent ? `<span class="tw-proj-arrow">${isColl ? '▶' : '▼'}</span>` : `<span class="tw-proj-arrow"></span>`;
-                    const badge = count ? `<span class="tw-proj-count">${count}</span>` : '';
-                    if (isParent) {
-                        html += `<button class="tw-pick-item${state.project===name?' active':''}" data-fold="${esc(name)}" style="padding-left:${pad}px" title="${esc(name)}">${arrow}<span class="tw-proj-label" data-pick="${esc(name)}">${esc(label)}</span>${badge}</button>`;
-                    } else {
-                        html += `<button class="tw-pick-item${state.project===name?' active':''}" data-pick="${esc(name)}" style="padding-left:${pad}px" title="${esc(name)}">${arrow}<span class="tw-proj-label">${esc(label)}</span>${badge}</button>`;
-                    }
-                });
-            }
+            html += _projectTreeHtml(allProjects, sbCollapsed, state.project);
             container.innerHTML = html;
         }
 

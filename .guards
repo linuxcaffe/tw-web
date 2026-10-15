@@ -61,6 +61,10 @@ tw-api.js:const TW
 tw-api.js:function invalidate
 tw-api.js:async function write
 tw-api.js:function handleWriteResult
+tw-filter.js:TW.filter =
+tw-filter.js:TW.sort =
+tw-filter.js:function matchesNav
+tw-filter.js:function priRank
 task-editor.js:_formValues
 app.py:def _export_one
 app.py:def _task_filter_args

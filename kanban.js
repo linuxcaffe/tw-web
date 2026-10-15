@@ -9,7 +9,6 @@ const KB_SORT_OPTIONS = [
     { key: 'project',  label: 'Project' },
     { key: 'desc',     label: 'Description' },
 ];
-const KB_PRI_ORDER = ['1','2','3','4','5','6','H','M','L',''];
 // Saturated-enough to read but dark enough for white text
 const KB_COL_COLORS = [
     '#1a4a6e','#1a5a2e','#6a4a14','#3a1a6e','#6e1a1a','#1a5a5a','#5a5a1a','#2e1a5a',
@@ -104,55 +103,10 @@ async function kbReload(preserveView = false) {
 }
 
 // ── Unassigned-only filter ────────────────────────────────────────────────────
-// Mirrors main.js _matchAttr/_matchTags — applied to Unassigned column only.
+// The nav filter (TW.filter, the List's rules) applies to the Unassigned column only.
 // State columns show all tasks for that state within the active context.
-const _KP = ['1','2','3','4','5','6','H','M','L'];
-function _kbMod(input) {
-    const m = input.match(/^\.([a-z]+):(.*)/i);
-    if (m) return { mod: m[1].toLowerCase(), val: m[2] };
-    const c = input.match(/^([<>])\s+(.*)/);
-    if (c) return { mod: c[1] === '<' ? 'lt' : 'gt', val: c[2] };
-    return null;
-}
-function _kbMatchAttr(fv, input, type) {
-    const p = _kbMod(input), fvs = String(fv);
-    if (!p) return type === 'ord'
-        ? fvs.toLowerCase() === input.toLowerCase()
-        : fvs.toLowerCase().includes(input.toLowerCase());
-    const { mod, val } = p, fvl = fvs.toLowerCase(), vl = val.toLowerCase();
-    if (mod === 'lt' || mod === 'gt') {
-        const ai = _KP.indexOf(fvs.toUpperCase()), bi = _KP.indexOf(val.toUpperCase());
-        if (ai === -1 || bi === -1) { const an = parseFloat(fvs), bn = parseFloat(val); return !isNaN(an) && !isNaN(bn) && (mod === 'lt' ? an < bn : an > bn); }
-        return mod === 'lt' ? ai < bi : ai > bi;
-    }
-    switch (mod) {
-        case 'any': return fvs !== ''; case 'none': return fvs === '';
-        case 'is': return fvl === vl; case 'isnt': case 'not': return fvl !== vl;
-        case 'contains': return fvl.includes(vl); case 'startswith': return fvl.startsWith(vl);
-        case 'endswith': return fvl.endsWith(vl); default: return false;
-    }
-}
-function _kbMatchTags(taskTags, input) {
-    const p = _kbMod(input);
-    if (!p) { const w = input.split(',').map(t => t.trim()).filter(Boolean); return !w.length || w.every(t => taskTags.includes(t)); }
-    switch (p.mod) {
-        case 'has': return taskTags.includes(p.val); case 'hasnt': return !taskTags.includes(p.val);
-        case 'any': return taskTags.length > 0;      case 'none': return taskTags.length === 0;
-        default: return false;
-    }
-}
 function kbNavFilter(tasks) {
-    if (!window.twNav) return tasks;
-    const s = window.twNav.getState();
-    const f = (s.filter || '').trim(), pr = (s.priority || '').trim(),
-          pj = (s.project || '').trim(), tg = (s.tags || '').trim();
-    return tasks.filter(t => {
-        if (f  && !_kbMatchAttr(t.description || '', f,  'text')) return false;
-        if (pr && !_kbMatchAttr(t.priority    || '', pr, 'ord'))  return false;
-        if (pj && !_kbMatchAttr(t.project     || '', pj, 'text')) return false;
-        if (tg && !_kbMatchTags(t.tags        || [], tg))         return false;
-        return true;
-    });
+    return TW.filter.navTasks(tasks);
 }
 
 // ── Sort / view persistence ───────────────────────────────────────────────────
@@ -177,7 +131,7 @@ function kbSort(tasks, col) {
         switch (key) {
             case 'urgency':  return (b.urgency || 0) - (a.urgency || 0);
             case 'due':      return !a.due ? 1 : !b.due ? -1 : a.due < b.due ? -1 : 1;
-            case 'priority': return KB_PRI_ORDER.indexOf(a.priority || '') - KB_PRI_ORDER.indexOf(b.priority || '');
+            case 'priority': return TW.sort.priRank(b.priority) - TW.sort.priRank(a.priority);
             case 'project':  return (a.project || '').localeCompare(b.project || '');
             case 'desc':     return (a.description || '').localeCompare(b.description || '');
             default:         return 0;
