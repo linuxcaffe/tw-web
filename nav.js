@@ -1674,7 +1674,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             const dayRow = _mk('div', { cls: 'tw-settings-row stack' });
             dayRow.appendChild(_mk('div', { cls: 'tw-settings-label', text: 'Day start / end' }));
             dayRow.appendChild(pair);
-            dayRow.appendChild(_note('Visible hour range'));
+            dayRow.appendChild(_note('Hours outside this range are shaded (the grid always shows all 24)'));
             bd.appendChild(dayRow);
 
             const calScroll = _inp('tws-cal-scroll', 'time', { value: (cfg.cal_scroll_time || '08:00').slice(0,5), css: 'width:90px' });

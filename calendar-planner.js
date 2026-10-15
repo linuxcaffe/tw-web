@@ -101,8 +101,8 @@ function initializeCalendar() {
     calendar = new FullCalendar.Calendar(el, {
         initialView:          _calSettings.cal_default_view  || 'timeGridWeek',
         headerToolbar:        false,     // we render our own toolbar
-        slotMinTime:          _calSettings.cal_day_start     || '06:00:00',
-        slotMaxTime:          _calSettings.cal_day_end       || '23:00:00',
+        slotMinTime:          '00:00:00',   // always all 24 hours: nothing lands in hours you can't see;
+        slotMaxTime:          '24:00:00',   // the day range shades (businessHours), scrollTime places the view
         firstDay:             1,         // Monday
         nowIndicator:         true,
         allDaySlot:           true,      // date-only (midnight) tasks; the grid starts at cal_day_start
@@ -119,10 +119,10 @@ function initializeCalendar() {
         scrollTimeReset:         false,      // don't jump back on week/day navigation
         selectable:              true,       // drag to select a time range
         selectMirror:            true,       // ghost event preview while selecting
-        businessHours: {                     // subtle shading for Mon–Fri 9–5
-            daysOfWeek: [1, 2, 3, 4, 5],
-            startTime:  '09:00',
-            endTime:    '17:00',
+        businessHours: {                     // hours outside the day range (settings) are shaded
+            daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+            startTime:  _calSettings.cal_day_start || '06:00:00',
+            endTime:    _calSettings.cal_day_end   || '23:00:00',
         },
         moreLinkClick: (info) => {           // "+N more" → day view with correct button state
             changeView('day');
