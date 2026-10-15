@@ -63,6 +63,8 @@ tw-api.js:const TW
 tw-api.js:function invalidate
 tw-api.js:async function write
 tw-api.js:function handleWriteResult
+tw-api.js:function isFilterOnly
+app.py:def get_commands
 tw-filter.js:TW.filter =
 tw-filter.js:TW.sort =
 tw-filter.js:function matchesNav
