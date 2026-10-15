@@ -1,6 +1,3 @@
 # Checks that reproduce a known bug (tw:docs/tw-web-known-bugs.md). Remove a line when its bug is fixed.
 bug03-spool-offer           # bug 3: deferred command run as a task filter (step 4)
-bug05-kanban-context        # bug 5: Unassigned ignores context (step 3)
-bug05-calendar-context      # bug 5: Calendar events ignore context (step 3)
-bug06-agenda-rawfilter      # bug 6: planned/due routes drop rawfilter (step 3)
 bug10-unschedule-due        # bug 10: Unschedule on due events (leftover)

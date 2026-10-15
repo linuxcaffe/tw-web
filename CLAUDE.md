@@ -132,6 +132,11 @@ deliberate work-in-progress commit with `--no-verify`. Install it once per clone
     `TW_NOINTERACT`, `TW_WEB`, `TW_SPOOL_DIR` and `TW_PREFLIGHT_*` so hooks can prompt there.
 11. **Service-worker cache:** the pre-commit hook bumps `sw.js` `CACHE` whenever a shell asset is staged.
     Don't bump it by hand. If the hook isn't installed (fresh clone), install it (see Testing).
+12. **Reads never use the CLI's context.** tw-web takes context only from the nav bar (`context=`). In 2.6.2
+    `export` ignores `rc.context` but reports (`count`, `projects`) apply it, so every read passes
+    `rc.context=none` (`tests/test_queries.py` checks the read routes). Task-list reads build their filter in
+    `_task_filter_args`: context and raw-filter expressions are `shlex`-split and parenthesised, because one
+    argument holding `a or b` with quotes matches nothing.
 
 ## Fleet tools
 

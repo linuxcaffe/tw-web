@@ -31,6 +31,7 @@ uda.sched_duration.type=duration
 uda.due_duration.type=duration
 uda.priority.values=1,2,3,4,5,6,H,M,L,
 context.work.read=project:work
+context.either.read=description.has:'(alpha|beta)' or project:nowhere
 """
 
 # IDs 1..7 in this order. 'today' is midnight, so these times all fall on today.

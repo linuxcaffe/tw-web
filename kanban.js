@@ -20,7 +20,7 @@ const KB_COL_GAP   = 10;
 // ── Globals ───────────────────────────────────────────────────────────────────
 let kbColumns       = [];
 let kbAllTasks      = [];   // swimlane tasks — context-filtered, always pending
-let kbUnassignedSrc = [];   // unassigned tasks — status-filtered, no context
+let kbUnassignedSrc = [];   // same tasks as kbAllTasks: Unassigned follows the context too
 let kbManualOrder   = {};   // { col: [uuid, ...] } loaded from server
 let kbColOffset     = 0;
 let kbFocusedColIdx = 0;
@@ -75,15 +75,14 @@ async function kbReload(preserveView = false) {
         const context    = (navState.context || '').trim();
         // Kanban is always pending-only; status filter is suppressed on this page
         const swimParams = 'status=pending' + (context ? '&context=' + encodeURIComponent(context) : '');
-        const [colsData, swimData, unassignData, orderData] = await Promise.all([
+        const [colsData, swimData, orderData] = await Promise.all([
             fetch('/api/kanban/columns').then(r => r.json()),
             fetch('/api/tasks?' + swimParams).then(r => r.json()),
-            fetch('/api/tasks?status=pending').then(r => r.json()),
             fetch('/api/kanban/order').then(r => r.json()),
         ]);
         kbColumns       = colsData.columns    || [];
         kbAllTasks      = swimData.tasks      || [];
-        kbUnassignedSrc = unassignData.tasks  || [];
+        kbUnassignedSrc = kbAllTasks;
         kbManualOrder   = orderData.order     || {};
         // On fresh load: restore persisted focus column; default to first swimlane
         if (!preserveView) {
@@ -96,7 +95,7 @@ async function kbReload(preserveView = false) {
             kbColOffset     = savedOffset;
         }
         kbRenderBoard();
-        window.twNav?.setCount(kbAllTasks.filter(t => t.state).length, kbUnassignedSrc.length);
+        _kbSetCount();
     } catch (e) {
         console.error('Kanban load failed:', e);
         document.dispatchEvent(new CustomEvent('tw-show-notification',
@@ -219,7 +218,13 @@ function kbRerenderUnassigned() {
     if (existing) board.replaceChild(fresh, existing); else board.prepend(fresh);
     _kbApplyVisibility();
     _kbApplyFocus();
-    window.twNav?.setCount(kbAllTasks.length, kbUnassignedSrc.length);
+    _kbSetCount();
+}
+
+// Counter: cards on the board / pending tasks in the context (one population, bug 5)
+function _kbSetCount() {
+    const shown = document.querySelectorAll('#kb-board .kb-col-body > .task-card:not(.task-card-dep)').length;
+    window.twNav?.setCount(shown, kbAllTasks.length);
 }
 
 function _kbColKey(col) { return col === '' ? '__unassigned__' : col; }

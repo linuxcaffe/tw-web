@@ -63,3 +63,4 @@ tw-api.js:async function write
 tw-api.js:function handleWriteResult
 task-editor.js:_formValues
 app.py:def _export_one
+app.py:def _task_filter_args

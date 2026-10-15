@@ -448,10 +448,11 @@ function loadTasks() {
     const myId        = ++_loadId;   // mark this wave; older in-flight calls become stale
     const navState    = window.twNav ? window.twNav.getState() : {};
     const context     = (navState.context || '').trim();
-    // Drag-list: always pending, context-aware — blind to status bar
-    const params      = 'status=pending' + (context ? '&context=' + encodeURIComponent(context) : '');
-    // Calendar events: follow status bar (completed, deleted, waiting, recurring all visible)
-    const calParams   = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(','));
+    const ctxParam    = context ? '&context=' + encodeURIComponent(context) : '';
+    // Drag-list: always pending, blind to the status bar
+    const params      = 'status=pending' + ctxParam;
+    // Calendar events: follow the status bar (completed, deleted, waiting, recurring all visible)
+    const calParams   = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(',')) + ctxParam;
 
     // Serve from cache when clean and fresh — skips all three fetches
     const cached = _readCache(params, calParams);
@@ -697,7 +698,7 @@ function matchesNavFilter(task) {
 }
 
 function applyFiltersAndDisplay() {
-    // Nav counter: dated tasks (calendar events) — status-only, no context, no text filter
+    // Nav counter: dated tasks shown (status + context) / the status-only total, as on the List
     const navState      = window.twNav ? window.twNav.getState() : {};
     const calParams     = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(','));
     const calendarTasks = [...allTasks.filter(t => t.scheduled), ...dueTasks];

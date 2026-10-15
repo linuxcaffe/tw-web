@@ -109,16 +109,6 @@ def test_launch_refuses_option_values(client, app_module, monkeypatch, no_spawn)
 
 # ── S11 ───────────────────────────────────────────────────────────────────────
 
-@pytest.fixture
-def captured(app_module, monkeypatch):
-    calls = []
-    def fake(args, readonly=False, extra_overrides=None, extra_env=None):
-        calls.append(list(args))
-        return {'success': True, 'stdout': '[]', 'stderr': ''}
-    monkeypatch.setattr(app_module, 'run_task_command', fake)
-    return calls
-
-
 def _free_text_after_separator(args, text):
     assert '--' in args, args
     i = args.index('--')

@@ -51,3 +51,14 @@ def app_module():
 def client():
     tw_app.app.config['TESTING'] = True
     return tw_app.app.test_client()
+
+
+@pytest.fixture
+def captured(app_module, monkeypatch):
+    """Record the argv each run_task_command call would send to `task`; nothing runs."""
+    calls = []
+    def fake(args, readonly=False, extra_overrides=None, extra_env=None):
+        calls.append(list(args))
+        return {'success': True, 'stdout': '[]', 'stderr': ''}
+    monkeypatch.setattr(app_module, 'run_task_command', fake)
+    return calls

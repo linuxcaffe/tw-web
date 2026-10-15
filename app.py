@@ -700,14 +700,10 @@ def static_files(filename):
 @app.route('/api/tasks/due')
 def get_due_tasks():
     """Get tasks that have a due date but no scheduled date (for calendar due-event display)."""
-    statuses = [s.strip() for s in request.args.get('status', 'pending').split(',') if s.strip()]
-    context  = request.args.get('context', '').strip()
-    args = ['task']
-    if context:
-        ctx_expr = _get_context_filters().get(context)
-        if ctx_expr:
-            args += ['(', ctx_expr, ')']
-    args += ['due.any:', 'scheduled.none:'] + _build_task_filter(statuses, None) + ['export']
+    try:
+        args = ['task'] + _task_filter_args(request.args) + ['due.any:', 'scheduled.none:', 'export']
+    except ValueError as e:
+        return jsonify({'success': False, 'error': f'Invalid filter: {e}'}), 400
     result = run_task_command(args, readonly=True)
     if result['success']:
         try:
@@ -720,14 +716,10 @@ def get_due_tasks():
 @app.route('/api/tasks/planned')
 def get_planned_tasks():
     """Get all planned tasks (with scheduled date) in JSON format"""
-    statuses = [s.strip() for s in request.args.get('status', 'pending').split(',') if s.strip()]
-    context  = request.args.get('context', '').strip()
-    args = ['task']
-    if context:
-        ctx_expr = _get_context_filters().get(context)
-        if ctx_expr:
-            args += ['(', ctx_expr, ')']
-    args += ['scheduled.not:'] + _build_task_filter(statuses, None) + ['export']
+    try:
+        args = ['task'] + _task_filter_args(request.args) + ['scheduled.not:', 'export']
+    except ValueError as e:
+        return jsonify({'success': False, 'error': f'Invalid filter: {e}'}), 400
     result = run_task_command(args, readonly=True)
 
     if result['success']:
@@ -756,11 +748,34 @@ def _task_error(message, result):
     return f'{message}: {lines[-1]}' if lines else message
 
 
-def _build_task_filter(statuses, filter_text):
-    """Build a TW filter argument list from status ids and optional filter text.
-    Multiple statuses are OR'd; filter text is AND'd with the status block.
-    Returns a list of args to insert before 'export'.
+def _task_filter_args(params):
+    """Filter argv for a task-list read (/api/tasks, /planned, /due), before the route's own terms.
+
+    rawfilter= is a whole TW expression and replaces status and context. Otherwise status= (ids,
+    OR'd) and context= (a context name, AND'd). Every read says rc.context=none: in 2.6.2 `export`
+    ignores the active context but reports apply it, and tw-web takes context only from the nav bar.
+    Expressions are split like a shell would (shlex), so a context or raw filter with quotes and
+    `or` reaches task as separate terms, and each is parenthesised so its `or` can't swallow the
+    route's own terms. Raises ValueError for a raw filter that can't be split.
     """
+    raw = params.get('rawfilter', '').strip()
+    if raw:
+        return ['rc.context=none', '('] + shlex.split(raw) + [')']
+    args = ['rc.context=none']
+    context = params.get('context', '').strip()
+    expr = _get_context_filters().get(context) if context else None
+    if expr:
+        try:
+            terms = shlex.split(expr)
+        except ValueError:
+            terms = [expr]
+        args += ['('] + terms + [')']
+    statuses = [s.strip() for s in params.get('status', 'pending').split(',') if s.strip()]
+    return args + _build_task_filter(statuses)
+
+
+def _build_task_filter(statuses):
+    """TW filter args for status ids; several are OR'd in parentheses."""
     STATUS_MAP = {
         'pending':   'status:pending',
         'waiting':   'status:waiting',
@@ -773,43 +788,20 @@ def _build_task_filter(statuses, filter_text):
         parts = ['status:pending']
 
     if len(parts) == 1:
-        args = parts
-    else:
-        args = ['('] + [p for pair in zip(parts, ['or'] * len(parts)) for p in pair][:-1] + [')']
-
-    if filter_text:
-        args.append(f'description.contains:{filter_text}')
-
-    return args
+        return parts
+    return ['('] + [p for pair in zip(parts, ['or'] * len(parts)) for p in pair][:-1] + [')']
 
 
 @app.route('/api/tasks')
 def get_tasks():
     """Get all pending tasks in JSON format.
     Query params: status (comma-separated), filter (text), context (name).
-    rawfilter: complete TW filter expression override — bypasses all other params.
+    rawfilter: complete TW filter expression override — bypasses status and context.
     """
-    rawfilter = request.args.get('rawfilter', '').strip()
-    if rawfilter:
-        try:
-            filter_args = shlex.split(rawfilter)
-        except ValueError as e:
-            return jsonify({'success': False, 'error': f'Invalid filter: {e}'}), 400
-        args = ['task', 'rc.context=none'] + filter_args + ['export']
-    else:
-        statuses    = [s.strip() for s in request.args.get('status', 'pending').split(',') if s.strip()]
-        raw_filter  = request.args.get('filter', '').strip()
-        filter_text = re.sub(r'[^\w\s\-\.]', '', raw_filter)[:80]
-        context     = request.args.get('context', '').strip()
-
-        args = ['task']
-        if context:
-            ctx_filters = _get_context_filters()
-            ctx_expr = ctx_filters.get(context)
-            if ctx_expr:
-                args += ['(', ctx_expr, ')']
-        args += _build_task_filter(statuses, filter_text)
-        args.append('export')
+    try:
+        args = ['task'] + _task_filter_args(request.args) + ['export']
+    except ValueError as e:
+        return jsonify({'success': False, 'error': f'Invalid filter: {e}'}), 400
 
     result = run_task_command(args, readonly=True)
 
@@ -875,7 +867,7 @@ def get_projects():
     """
     active_only = request.args.get('active', '0') == '1'
 
-    r = run_task_command(['task', 'projects'], readonly=True)
+    r = run_task_command(['task', 'rc.context=none', 'projects'], readonly=True)
     counts = _parse_task_projects(r['stdout']) if r['success'] else {}
 
     if active_only:
@@ -898,7 +890,7 @@ def get_tags():
     """
     all_tags = request.args.get('all', '0') == '1'
     if all_tags:
-        result = run_task_command(['task', 'rc.complete.all.tags=yes', '_tags'], readonly=True)
+        result = run_task_command(['task', 'rc.context=none', 'rc.complete.all.tags=yes', '_tags'], readonly=True)
         if result['success']:
             tags = sorted({t.strip() for t in result['stdout'].split('\n')
                            if t.strip() and t.strip() not in TW_VIRTUAL_TAGS})
@@ -906,7 +898,7 @@ def get_tags():
             return jsonify({'success': True, 'tags': tags, 'counts': counts})
         return jsonify({'success': False, 'error': result['stderr']}), 500
 
-    result = run_task_command(['task', 'status:pending', 'export'], readonly=True)
+    result = run_task_command(['task', 'rc.context=none', 'status:pending', 'export'], readonly=True)
     if result['success']:
         try:
             tasks = json.loads(result['stdout'] or '[]')
@@ -934,7 +926,7 @@ def server_health():
     """Return server uptime and basic TW stats."""
     import signal as _signal
     uptime = int(time.time() - _START_TIME)
-    tw = run_task_command(['task', 'status:pending', 'count'], readonly=True)
+    tw = run_task_command(['task', 'rc.context=none', 'status:pending', 'count'], readonly=True)
     count = tw['stdout'].strip() if tw['success'] else '?'
     ver   = run_task_command(['task', '_version'], readonly=True)
     version = ver['stdout'].strip() if ver['success'] else '?'
