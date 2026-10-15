@@ -88,11 +88,9 @@
         </div>
     </div>
 
-    <!-- FullCalendar v5: core + view plugins (local — avoids PWA sandbox CDN issues) -->
+    <!-- FullCalendar v5: the full bundle (core, daygrid, timegrid, interaction, list); local, as the PWA sandbox blocks CDNs.
+         Loading the plugin files as well registers each plugin twice (one drag, two writes). -->
     <script src="/fullcalendar.min.js"></script>
-    <script src="/fullcalendar-daygrid.min.js"></script>
-    <script src="/fullcalendar-timegrid.min.js"></script>
-    <script src="/fullcalendar-interaction.min.js"></script>
     <!-- Custom JS -->
     <script src="task-card.js"></script>
     <script src="/codemirror-bundle.js"></script>
