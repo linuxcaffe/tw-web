@@ -78,8 +78,7 @@ check(async pg => {
   Use `scratch-server.sh down`. If you must look, use `pgrep -f '^(/usr/bin/)?python3 app\.py$'` and check
   `/proc/<pid>/cwd`.
 - **Red tests must not launch anything.** A red test against the old `/api/open` opened `/etc/passwd`
-  in the user's editor. Stub `subprocess.Popen` (`no_spawn` fixture) for `/api/open`, `/api/launch` and
-  `/api/terminal`. Never call `/api/server/stop`: its PID file can point at the live server.
+  in the user's editor. Stub `subprocess.Popen` (`no_spawn` fixture) for `/api/open` and `/api/launch`. Never call `/api/server/stop`: its PID file can point at the live server.
 - **A worktree hides one S7 regression.** `.git` is a file in a worktree, so `/.git/config` gives 404
   there regardless. Only the live probe (step 4) proves the real `.git/` folder is hidden.
 - **`$!` after `cd … &&` in a subshell** is the subshell, not Python. `scratch-server.sh` uses `exec` so

@@ -1,3 +1,2 @@
 # Checks that reproduce a known bug (tw:docs/tw-web-known-bugs.md). Remove a line when its bug is fixed.
-bug03-spool-offer           # bug 3: deferred command run as a task filter (step 4)
 bug10-unschedule-due        # bug 10: Unschedule on due events (leftover)

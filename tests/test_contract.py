@@ -40,23 +40,13 @@ def test_terminal_console_clears_the_no_terminal_variables(app_module):
     assert env['TERM'] == 'xterm-256color'
 
 
-def test_preflight_variables_reach_the_hook(client, app_module, monkeypatch):
-    seen = {}
-
-    def fake(args, readonly=False, extra_overrides=None, extra_env=None):
-        seen.update(extra_env or {})
-        return {'success': True, 'stdout': '', 'stderr': ''}
-    monkeypatch.setattr(app_module, 'run_task_command', fake)
-    client.post('/api/run', json={'cmd': 'project:home modify +x'},
-                headers={'Origin': 'http://localhost'})
-    assert seen.get('TW_PREFLIGHT_VERB') == 'modify'
-    assert seen.get('TW_PREFLIGHT_FILTER') == 'project:home'
-    assert seen.get('TW_PREFLIGHT_CMD') == 'project:home modify +x'
-
-    seen.clear()
-    client.post('/api/run', json={'cmd': 'project:home modify +x', 'confirmed': True},
-                headers={'Origin': 'http://localhost'})
-    assert seen.get('TW_PREFLIGHT_CONFIRMED') == '1'
+def test_console_leaves_bulk_confirmation_to_taskwarrior(app_module):
+    """tw-web has no bulk-confirmation UI of its own (it was /api/run, never called): command
+    mode runs in the console, where TW_NOINTERACT and TW_PREFLIGHT_* are cleared (above), so
+    nointeract-preflight stays out of the way and Taskwarrior asks "This command will alter N
+    tasks…" itself. That needs no rc.confirmation=no in the console's argv."""
+    argv, _ = app_module._pty_argv({'kind': 'task', 'cmd': 'project:home modify +x'}, '/bin/sh')
+    assert argv == ['task', 'project:home', 'modify', '+x']
 
 
 # ── hook → client: signals on stderr ──────────────────────────────────────────
@@ -90,15 +80,10 @@ def test_needs_pty_without_cmd_falls_back_to_the_route(client, hook_fails_with):
     assert r['needs_pty'] is True and r['cmd'] == '12 start'
 
 
-def test_preflight_turns_into_a_confirmation(client, hook_fails_with):
-    hook_fails_with(PREFLIGHT)
-    r = client.post('/api/run', json={'cmd': 'project:home modify +x'},
-                    headers={'Origin': 'http://localhost'}).get_json()
-    assert r['preflight'] is True and r['count'] == 7 and r['verb'] == 'modify'
-
-
 def test_legacy_marker_is_still_recognised(app_module):
     assert app_module.TW_INTERACTIVE_MARKER == 'TW_INTERACTIVE_REQUIRED'
+    sig = app_module._hook_signals({'success': False, 'stderr': 'x TW_INTERACTIVE_REQUIRED y'}, ['task', '12', 'done'])
+    assert sig == {'needs_pty': True, 'cmd': '12 done'}
 
 
 # ── spool ─────────────────────────────────────────────────────────────────────

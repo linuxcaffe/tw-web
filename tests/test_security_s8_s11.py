@@ -3,7 +3,7 @@ Phase 1, second half of the security review (tw:docs/tw-web-dev-infra-plan.md).
 
 S8   A Firefox extension origin may use only the routes tw-web's own popup
      needs (health, server stop, task add, bookmark) — not the terminal,
-     /api/run, settings or anything else. CORS likewise.
+     settings or anything else. CORS likewise.
 S9   Runtime files (hook prompts, spool, PID) live in a private 0700 dir
      under $XDG_RUNTIME_DIR, not in world-writable /tmp.
 S10  /api/open only opens paths under $HOME and never .desktop launchers;
@@ -28,7 +28,7 @@ def test_extension_allowed_on_popup_routes(app_module, path):
     assert app_module._origin_allowed(EXT, 'localhost:5000', path)
 
 
-@pytest.mark.parametrize('path', ['/ws/pty', '/api/run', '/api/config', '/api/terminal',
+@pytest.mark.parametrize('path', ['/ws/pty', '/api/commands', '/api/config',
                                   '/api/launch', '/api/open', '/api/debug', '/api/task/1/done'])
 def test_extension_refused_elsewhere(app_module, path):
     assert not app_module._origin_allowed(EXT, 'localhost:5000', path)

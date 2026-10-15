@@ -367,9 +367,8 @@ def _pty_env():
 # Prevents a hung interactive hook from deadlocking the Flask request.
 TASK_TIMEOUT = 15
 
-# Marker written to stderr by hooks that abort because they need a terminal.
-# Flask detects this and returns deferred_cmd = the original clean command,
-# so the frontend can offer "Run in terminal" with the full task command.
+# Legacy marker: a hook that aborts because it needs a terminal may write this anywhere on
+# stderr (CONVENTIONS §2). It means tw_needs_pty without a cmd; _hook_signals reads both.
 TW_INTERACTIVE_MARKER = 'TW_INTERACTIVE_REQUIRED'
 
 def run_task_command(args, readonly=False, extra_overrides=None, extra_env=None):
@@ -387,7 +386,7 @@ def run_task_command(args, readonly=False, extra_overrides=None, extra_env=None)
     try:
         if args[0] != 'task':
             args = ['task'] + args
-        clean_cmd = ' '.join(args)   # human-readable before rc overrides
+        user_cmd = _console_cmd(args)   # what follows `task`, before the rc overrides
         # Inject web-only rc overrides immediately after 'task'
         overrides = ['rc.confirmation=no']
         if readonly:
@@ -418,10 +417,6 @@ def run_task_command(args, readonly=False, extra_overrides=None, extra_env=None)
             'returncode': result.returncode
         }
         if not readonly:
-            # Hook signalled it needs a terminal → launch one immediately and
-            # let the client know so it can suppress the error notification.
-            if not out['success'] and TW_INTERACTIVE_MARKER in result.stderr:
-                out['terminal_launched'] = _launch_terminal(clean_cmd)
             # Drain any spool files written by hooks
             spooled = _drain_spool()
             if spooled:
@@ -434,7 +429,7 @@ def run_task_command(args, readonly=False, extra_overrides=None, extra_env=None)
             'stderr':    f'Command timed out after {TASK_TIMEOUT}s — a hook likely needs terminal interaction.',
             'returncode': -1,
             'timed_out': True,
-            'cmd':       clean_cmd,
+            'cmd':       user_cmd,
         }
     except Exception as e:
         return {
@@ -462,33 +457,13 @@ def run_command(args):
     except Exception as e:
         return {'success': False, 'stdout': '', 'stderr': str(e), 'returncode': -1}
 
-# ── Preflight helpers for /api/run ───────────────────────────────────────────
-_MUTATING_VERBS = {
-    'add', 'modify', 'mod', 'mo',
-    'delete', 'del', 'dele',
-    'done', 'do', 'don',
-    'start', 'sta', 'star',
-    'stop', 'sto',
-    'annotate', 'ann', 'anno',
-    'append', 'app', 'appe',
-    'prepend', 'pre', 'prep',
-    'duplicate', 'dup', 'dupl',
-    'purge', 'pur',
-}
-# Verbs that act on a single implicit target — no bulk risk
-_BULK_SAFE_VERBS = {'add', 'sync', 'sy', 'syn', 'undo', 'un', 'und', 'import', 'im', 'imp'}
-
-def _parse_preflight(args):
-    """Split user args into (filter_args, verb).  Ignores rc.xxx tokens."""
-    filter_args, verb = [], None
-    for tok in args:
-        if tok.startswith('rc.') or tok == 'task':
-            continue
-        if verb is None and tok.lower() in _MUTATING_VERBS:
-            verb = tok.lower()
-            break
-        filter_args.append(tok)
-    return filter_args, verb
+# ── Hook signals → the terminal console (CONVENTIONS §2, §3) ────────────────
+def _console_cmd(args):
+    """The command as typed after `task`, quoted so the console's shlex.split gives back the
+    same arguments: free text stays one argument and never reaches a shell (H2)."""
+    if args and args[0] == 'task':
+        args = args[1:]
+    return shlex.join(args)
 
 def _detect_signal(stderr, sig_type):
     """Return the first parsed JSON signal of sig_type from stderr, else None."""
@@ -505,55 +480,48 @@ def _detect_signal(stderr, sig_type):
     return None
 
 
-@app.route('/api/run', methods=['POST'])
-def api_run():
-    """Expert command mode: run an arbitrary task command verbatim.
-    On first call, the on-launch preflight hook may block bulk operations and
-    return {"preflight":true,...}.  Re-POST with confirmed:true to proceed.
+def _hook_signals(result, args):
+    """The write-result signals for the browser (tw-api.js handleWriteResult), from one
+    run_task_command result. args is the command that ran; the console runs it as kind 'task'.
+      needs_pty + cmd     a hook needs a terminal (tw_needs_pty, or the legacy marker)
+      timed_out + cmd     the call hit TASK_TIMEOUT: offer to run it in the console
+      deferred_cmd        a hook spooled a shell command (offered as kind 'shell')
     """
-    data = request.get_json(silent=True) or {}
-    cmd_str   = (data.get('cmd') or '').strip()
-    confirmed = bool(data.get('confirmed', False))
+    out = {}
+    if result.get('timed_out'):
+        out.update(timed_out=True, cmd=_console_cmd(args))
+    elif not result.get('success'):
+        stderr = result.get('stderr', '')
+        sig = _detect_signal(stderr, 'tw_needs_pty')
+        if sig is not None or TW_INTERACTIVE_MARKER in stderr:
+            out.update(needs_pty=True, cmd=(sig or {}).get('cmd') or _console_cmd(args))
+    dc = _deferred_cmd(result)
+    if dc:
+        out['deferred_cmd'] = dc
+    return out
 
-    if not cmd_str:
-        return jsonify({'success': False, 'error': 'No command provided'})
-    try:
-        args = shlex.split(cmd_str)
-    except ValueError as e:
-        return jsonify({'success': False, 'error': f'Parse error: {e}'})
-    if not args:
-        return jsonify({'success': False, 'error': 'Empty command'})
 
-    # Build env extras for the preflight hook protocol
-    extra_env = {}
-    if confirmed:
-        extra_env['TW_PREFLIGHT_CONFIRMED'] = '1'
-    else:
-        filter_args, verb = _parse_preflight(args)
-        if verb and verb not in _BULK_SAFE_VERBS and filter_args:
-            extra_env['TW_PREFLIGHT_VERB']   = verb
-            extra_env['TW_PREFLIGHT_FILTER'] = ' '.join(filter_args)
-            extra_env['TW_PREFLIGHT_CMD']    = cmd_str
+def _pty_argv(payload, shell_bin):
+    """argv for /ws/pty's first message {kind, cmd}, and whether it's an interactive shell.
+    kind 'task' (the default) runs `task <cmd>`; 'shell' runs cmd with `$SHELL -c` (a spooled
+    command is a shell command line, CONVENTIONS §3); an empty cmd opens a shell.
+    Raises ValueError for an unknown kind or a task command that doesn't split."""
+    kind = payload.get('kind') or 'task'
+    cmd  = (payload.get('cmd') or '').strip()
+    if kind not in ('task', 'shell'):
+        raise ValueError(f'unknown kind {kind!r}')
+    if not cmd:
+        return [shell_bin], True
+    if kind == 'shell':
+        return [shell_bin, '-c', cmd], False
+    return ['task'] + shlex.split(cmd), False
 
-    result = run_task_command(args, extra_overrides=['rc.bulk=0'], extra_env=extra_env)
-
-    if not result['success'] and not confirmed:
-        signal = _detect_signal(result.get('stderr', ''), 'tw_preflight')
-        if signal:
-            return jsonify({
-                'preflight': True,
-                'count':     signal['count'],
-                'verb':      signal['verb'],
-                'filter':    signal['filter'],
-                'cmd':       cmd_str,
-            })
-
-    return jsonify(result)
 
 @sock.route('/ws/pty')
 def ws_pty(ws):
-    """WebSocket PTY: run a task command in a real pseudo-terminal.
-    Client sends first message: JSON {"cmd": "start 111"}
+    """WebSocket PTY: run a command in a real pseudo-terminal.
+    Client sends first message: JSON {"kind": "task"|"shell", "cmd": "start 111", "cwd", "init"}
+    (see _pty_argv)
     Then relays stdin as raw text; receives stdout/stderr as raw text.
     Server closes the socket when the process exits.
     """
@@ -564,17 +532,18 @@ def ws_pty(ws):
         return
     try:
         payload = json.loads(first)
-        cmd_str  = payload.get('cmd',  '').strip()
-        cwd_str  = payload.get('cwd',  '').strip()
-        init_str = payload.get('init', '').strip()
-    except (json.JSONDecodeError, AttributeError):
-        cmd_str = first.strip()
-        cwd_str = init_str = ''
+        if not isinstance(payload, dict):
+            raise ValueError
+    except ValueError:
+        payload = {'cmd': first}
+    cwd_str  = (payload.get('cwd')  or '').strip()
+    init_str = (payload.get('init') or '').strip()
 
+    shell_bin = os.environ.get('SHELL') or shutil.which('bash') or 'sh'
     try:
-        args = shlex.split(cmd_str) if cmd_str else []
+        cmd_argv, shell_mode = _pty_argv(payload, shell_bin)
     except ValueError as e:
-        ws.send(f'\r\n[pty] Parse error: {e}\r\n')
+        ws.send(f'\r\n[pty] {e}\r\n')
         return
 
     # Resolve cwd — fall back to home dir if path doesn't exist
@@ -583,8 +552,6 @@ def ws_pty(ws):
         cwd_path = Path(cwd_str).expanduser()
         cwd = str(cwd_path) if cwd_path.is_dir() else None
 
-    # Empty cmd → open shell
-    shell_mode = not args
     master_fd, slave_fd = pty.openpty()
 
     # Set sane terminal size (80×24)
@@ -597,8 +564,6 @@ def ws_pty(ws):
         os.setsid()
         fcntl.ioctl(0, termios.TIOCSCTTY, 0)
 
-    shell_bin = os.environ.get('SHELL') or shutil.which('bash') or 'sh'
-    cmd_argv = [shell_bin] if shell_mode else (['task'] + args)
     try:
         proc = subprocess.Popen(
             cmd_argv,
@@ -1055,6 +1020,28 @@ def get_stats():
     result = run_task_command(['task', 'rc.context=none', 'stats'], readonly=True)
     return jsonify({'success': result['success'], 'output': result['stdout'], 'error': result['stderr']})
 
+# Command mode tells a command from a filter with task's own vocabulary (bug 9), cached 30s
+_commands_cache: dict = {}
+_commands_cache_ts: float = 0.0
+
+@app.route('/api/commands')
+def get_commands():
+    """task _commands (reports included, custom ones too), _aliases, and abbreviation.minimum."""
+    global _commands_cache, _commands_cache_ts
+    if time.time() - _commands_cache_ts < 30:
+        return jsonify(_commands_cache)
+    def words(*args):
+        r = run_task_command(['task', 'rc.context=none'] + list(args), readonly=True)
+        return r['stdout'].split() if r['success'] else None
+    commands, aliases = words('_commands'), words('_aliases')
+    if commands is None:
+        return jsonify({'success': False, 'error': 'task _commands failed'}), 500
+    minimum = words('_get', 'rc.abbreviation.minimum') or ['2']
+    _commands_cache = {'success': True, 'commands': commands, 'aliases': aliases or [],
+                       'abbreviation_minimum': int(minimum[0]) if minimum[0].isdigit() else 2}
+    _commands_cache_ts = time.time()
+    return jsonify(_commands_cache)
+
 @app.route('/api/contexts')
 def get_contexts():
     """Get all defined contexts, their filter definitions, and the active context."""
@@ -1072,10 +1059,8 @@ def _warnings(result):
     return [l for l in result['stderr'].splitlines() if l.strip()]
 
 def _deferred_cmd(result):
-    """Return the deferred command for a write result (interactive abort or spool), or None."""
-    if result.get('deferred_cmd'):        # interactive abort path (hook exited with marker)
-        return result['deferred_cmd']
-    cmds = result.get('deferred_cmds', [])  # spool path (hook wrote .cmd file)
+    """The first command a hook spooled during this write (CONVENTIONS §3), or None."""
+    cmds = result.get('deferred_cmds', [])
     return cmds[0] if cmds else None
 
 def _export_one(task_id):
@@ -1108,19 +1093,16 @@ def start_task(task_id):
     """Start a task"""
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
-    extra_env = {'TW_PREFLIGHT_CMD': f'{task_id} start'}
-    result = run_task_command([task_id, 'start'], extra_env=extra_env)
-    if not result['success']:
-        sig = _detect_signal(result.get('stderr', ''), 'tw_needs_pty')
-        if sig:
-            return jsonify({'success': False, 'needs_pty': True, 'cmd': sig.get('cmd') or f'{task_id} start'})
+    args = [task_id, 'start']
+    result = run_task_command(args, extra_env={'TW_PREFLIGHT_CMD': _console_cmd(args)})
+    signals = _hook_signals(result, args)
+    if signals.get('needs_pty'):
+        return jsonify({'success': False, **signals})
     resp = {'success': result['success'],
             'message': result['stdout'] if result['success'] else result['stderr'],
-            'warnings': _warnings(result)}
+            'warnings': _warnings(result), **signals}
     if result['success']:
         resp['task'] = _export_one(task_id)   # so the page can redraw the card (bug 7)
-    dc = _deferred_cmd(result)
-    if dc: resp['deferred_cmd'] = dc
     return jsonify(resp)
 
 @app.route('/api/task/<task_id>/stop', methods=['POST'])
@@ -1128,14 +1110,13 @@ def stop_task(task_id):
     """Stop a task"""
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
-    result = run_task_command(['task', task_id, 'stop'])
+    args = ['task', task_id, 'stop']
+    result = run_task_command(args)
     resp = {'success': result['success'],
             'message': result['stdout'] if result['success'] else result['stderr'],
-            'warnings': _warnings(result)}
+            'warnings': _warnings(result), **_hook_signals(result, args)}
     if result['success']:
         resp['task'] = _export_one(task_id)
-    dc = _deferred_cmd(result)
-    if dc: resp['deferred_cmd'] = dc
     return jsonify(resp)
 
 @app.route('/api/task/<task_id>/done', methods=['POST'])
@@ -1143,38 +1124,38 @@ def complete_task(task_id):
     """Mark a task as done"""
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
-    extra_env = {'TW_PREFLIGHT_CMD': f'{task_id} done'}
-    result = run_task_command([task_id, 'done'], extra_env=extra_env)
-    if not result['success']:
-        sig = _detect_signal(result.get('stderr', ''), 'tw_needs_pty')
-        if sig:
-            return jsonify({'success': False, 'needs_pty': True, 'cmd': sig.get('cmd') or f'{task_id} done'})
-    dc = _deferred_cmd(result)
-    resp = {'success': result['success'],
-            'message': result['stdout'] if result['success'] else result['stderr'],
-            'warnings': _warnings(result)}
-    if dc: resp['deferred_cmd'] = dc
-    return jsonify(resp)
+    args = [task_id, 'done']
+    result = run_task_command(args, extra_env={'TW_PREFLIGHT_CMD': _console_cmd(args)})
+    signals = _hook_signals(result, args)
+    if signals.get('needs_pty'):
+        return jsonify({'success': False, **signals})
+    return jsonify({'success': result['success'],
+                    'message': result['stdout'] if result['success'] else result['stderr'],
+                    'warnings': _warnings(result), **signals})
 
 @app.route('/api/task/<task_id>/revert', methods=['POST'])
 def revert_task(task_id):
     """Revert a completed or deleted task back to pending"""
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
-    result = run_task_command(['task', task_id, 'modify', 'status:pending'])
+    args = ['task', task_id, 'modify', 'status:pending']
+    result = run_task_command(args)
+    signals = _hook_signals(result, args)
     if result['success']:
         export_result = run_task_command(['task', task_id, 'export'], readonly=True)
         if export_result['success'] and export_result['stdout'].strip():
             try:
                 tasks = json.loads(export_result['stdout'])
                 if tasks:
-                    return jsonify({'success': True, 'task': tasks[0], 'warnings': _warnings(result)})
+                    return jsonify({'success': True, 'task': tasks[0], 'warnings': _warnings(result),
+                                    **signals})
             except (json.JSONDecodeError, IndexError):
                 pass
     return jsonify({
         'success': result['success'],
         'message': result['stdout'] if result['success'] else result['stderr'],
-        'warnings': _warnings(result)
+        'warnings': _warnings(result),
+        **signals,
     })
 
 @app.route('/api/task/<task_id>/delete', methods=['DELETE'])
@@ -1182,13 +1163,11 @@ def delete_task(task_id):
     """Delete a task"""
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
-    result = run_task_command(['task', task_id, 'delete'])
-    resp = {'success': result['success'],
-            'message': result['stdout'] if result['success'] else result['stderr'],
-            'warnings': _warnings(result)}
-    dc = _deferred_cmd(result)
-    if dc: resp['deferred_cmd'] = dc
-    return jsonify(resp)
+    args = ['task', task_id, 'delete']
+    result = run_task_command(args)
+    return jsonify({'success': result['success'],
+                    'message': result['stdout'] if result['success'] else result['stderr'],
+                    'warnings': _warnings(result), **_hook_signals(result, args)})
 
 @app.route('/api/task/<task_id>/modify', methods=['PUT'])
 def modify_task(task_id):
@@ -1242,30 +1221,28 @@ def modify_task(task_id):
         modifications.append(f'until:{data["until"]}' if data['until'] else 'until:')
 
     if modifications:
-        result = run_task_command(['task', task_id, 'modify'] + modifications)
-
-        dc = _deferred_cmd(result)
+        args = ['task', task_id, 'modify'] + modifications
+        result = run_task_command(args)
+        signals = _hook_signals(result, args)
         if result['success']:
             export_result = run_task_command(['task', task_id, 'export'], readonly=True)
             if export_result['success'] and export_result['stdout'].strip():
                 try:
                     task = json.loads(export_result['stdout'])
                     if task:
-                        resp = {'success': True, 'message': result['stdout'],
-                                'task': task[0], 'warnings': _warnings(result)}
-                        if dc: resp['deferred_cmd'] = dc
-                        return jsonify(resp)
+                        return jsonify({'success': True, 'message': result['stdout'],
+                                        'task': task[0], 'warnings': _warnings(result), **signals})
                 except (json.JSONDecodeError, IndexError) as e:
                     print(f"Error parsing task data: {e}")
-                    resp = {'success': True, 'message': result['stdout'], 'task': None, 'warnings': _warnings(result)}
-                    if dc: resp['deferred_cmd'] = dc
-                    return jsonify(resp)
+                    return jsonify({'success': True, 'message': result['stdout'], 'task': None,
+                                    'warnings': _warnings(result), **signals})
 
         return jsonify({
             'success': False,
             'error': result['stderr'],
             'task': None,
-            'warnings': _warnings(result)
+            'warnings': _warnings(result),
+            **signals,
         })
     else:
         return jsonify({'success': True, 'message': 'No changes to apply', 'task': None, 'warnings': []})
@@ -1404,8 +1381,7 @@ def add_task():
 
     args += ['--', data['description']]   # free text last, after `--` (S11)
     create_result = run_task_command(args)
-
-    dc = _deferred_cmd(create_result)
+    signals = _hook_signals(create_result, args)
     if create_result['success']:
         export_result = run_task_command(['task', '+LATEST', 'export'], readonly=True)
         if export_result['success'] and export_result['stdout'].strip():
@@ -1425,10 +1401,8 @@ def add_task():
                                 f'Task created but could not link to parent {parent_id}: '
                                 + mod.get('stderr', '').strip()]
 
-                    resp = {'success': True, 'message': 'Task created successfully',
-                            'task': task[0], 'warnings': warnings}
-                    if dc: resp['deferred_cmd'] = dc
-                    return jsonify(resp)
+                    return jsonify({'success': True, 'message': 'Task created successfully',
+                                    'task': task[0], 'warnings': warnings, **signals})
             except (json.JSONDecodeError, IndexError) as e:
                 print(f"Error parsing task data: {e}")
 
@@ -1436,7 +1410,8 @@ def add_task():
         'success': create_result.get('success', False),
         'error': create_result.get('stderr', 'Failed to create task'),
         'task': None,
-        'warnings': _warnings(create_result)
+        'warnings': _warnings(create_result),
+        **signals,
     })
 
 @app.route('/api/task/log', methods=['POST'])
@@ -1467,12 +1442,9 @@ def log_task():
 
     args += ['--', data['description']]   # free text last, after `--` (S11)
     result = run_task_command(args)
-    resp = {'success': result['success'],
-            'error':   result.get('stderr', '') if not result['success'] else None,
-            'warnings': _warnings(result)}
-    dc = _deferred_cmd(result)
-    if dc: resp['deferred_cmd'] = dc
-    return jsonify(resp)
+    return jsonify({'success': result['success'],
+                    'error':   result.get('stderr', '') if not result['success'] else None,
+                    'warnings': _warnings(result), **_hook_signals(result, args)})
 
 @app.route('/api/task/<task_id>/annotate', methods=['POST'])
 def annotate_task(task_id):
@@ -1483,12 +1455,11 @@ def annotate_task(task_id):
     text = (data.get('annotation') or '').strip()
     if not text:
         return jsonify({'success': False, 'error': 'Annotation text is required'}), 400
-    result = run_task_command(['task', task_id, 'annotate', '--', text])
-    resp = {'success': result['success'],
-            'error':   result['stderr'] if not result['success'] else None}
-    dc = _deferred_cmd(result)
-    if dc: resp['deferred_cmd'] = dc
-    return jsonify(resp)
+    args = ['task', task_id, 'annotate', '--', text]
+    result = run_task_command(args)
+    return jsonify({'success': result['success'],
+                    'error':   result['stderr'] if not result['success'] else None,
+                    **_hook_signals(result, args)})
 
 @app.route('/api/task/<task_id>/annotation', methods=['DELETE'])
 def delete_annotation(task_id):
@@ -1499,10 +1470,12 @@ def delete_annotation(task_id):
     text = (data.get('annotation') or '').strip()
     if not text:
         return jsonify({'success': False, 'error': 'Annotation text is required'}), 400
-    result = run_task_command(['task', task_id, 'denotate', '--', text])
+    args = ['task', task_id, 'denotate', '--', text]
+    result = run_task_command(args)
     return jsonify({
         'success': result['success'],
         'error':   result['stderr'] if not result['success'] else None,
+        **_hook_signals(result, args),
     })
 
 @app.route('/api/task/<task_id>/annotation', methods=['PUT'])
@@ -1515,13 +1488,16 @@ def edit_annotation(task_id):
     new_text = (data.get('new_annotation') or '').strip()
     if not old_text or not new_text:
         return jsonify({'success': False, 'error': 'old_annotation and new_annotation are required'}), 400
-    denotate = run_task_command(['task', task_id, 'denotate', '--', old_text])
+    args = ['task', task_id, 'denotate', '--', old_text]
+    denotate = run_task_command(args)
     if not denotate['success']:
-        return jsonify({'success': False, 'error': denotate['stderr']})
-    annotate = run_task_command(['task', task_id, 'annotate', '--', new_text])
+        return jsonify({'success': False, 'error': denotate['stderr'], **_hook_signals(denotate, args)})
+    args = ['task', task_id, 'annotate', '--', new_text]
+    annotate = run_task_command(args)
     return jsonify({
         'success': annotate['success'],
         'error':   annotate['stderr'] if not annotate['success'] else None,
+        **_hook_signals(annotate, args),
     })
 
 @app.route('/api/sync/status')
@@ -1616,87 +1592,6 @@ def sync_tasks():
         'output': output,
         'warnings': _warnings(result)
     })
-
-# ── Terminal launch ───────────────────────────────────────────────────────────
-
-# Ordered by preference; flag is the arg that separates terminal options from
-# the command to run (None = terminal accepts bare command args without a flag).
-_TERMINAL_CANDIDATES = [
-    ('xterm',           '-e'),
-    ('gnome-terminal',  '--'),
-    ('alacritty',       '-e'),
-    ('konsole',         '-e'),
-    ('xfce4-terminal',  '-e'),
-    ('mate-terminal',   '-e'),
-    ('lxterminal',      '-e'),
-    ('tilix',           '-e'),
-    ('kitty',           '-e'),
-    ('foot',            '-e'),
-]
-
-def _find_terminal():
-    """Return (exe, flag) for the first terminal emulator found, or (None, None)."""
-    for name, flag in _TERMINAL_CANDIDATES:
-        if shutil.which(name):
-            return name, flag
-    return None, None
-
-def _terminal_available():
-    display = os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')
-    if not display:
-        return False, 'No display — desktop only'
-    exe, _ = _find_terminal()
-    if not exe:
-        return False, 'No terminal emulator found (tried xterm, gnome-terminal, alacritty, …)'
-    return True, exe
-
-def _launch_terminal(cmd=''):
-    """Launch a terminal window with cmd pre-loaded. Returns True if launched."""
-    ok, _ = _terminal_available()
-    if not ok:
-        return False
-    exe, flag = _find_terminal()
-    if cmd:
-        fd, script_path = tempfile.mkstemp(prefix='tw-web-', suffix='.sh')
-        try:
-            with os.fdopen(fd, 'w') as f:
-                f.write('#!/bin/bash\n')
-                f.write(f'{cmd}\n')
-                f.write('echo\necho "[done — press Enter to close]"\nread\n')
-                f.write(f'rm -f {shlex.quote(script_path)}\n')
-            os.chmod(script_path, 0o700)
-        except Exception:
-            return False
-        full_cmd = [exe, flag, script_path]
-    else:
-        full_cmd = [exe]
-    try:
-        subprocess.Popen(full_cmd, env=os.environ, start_new_session=True)
-        return True
-    except Exception:
-        return False
-
-@app.route('/api/terminal/check', methods=['GET'])
-def terminal_check():
-    """Report whether a terminal emulator is available on this display."""
-    ok, detail = _terminal_available()
-    return jsonify({'available': ok, 'detail': detail})
-
-@app.route('/api/terminal', methods=['POST'])
-def open_terminal():
-    """Launch a terminal window, optionally pre-loaded with a command.
-    JSON body: { "cmd": "task 42 done" }  (omit or empty to open a blank shell)
-    """
-    ok, detail = _terminal_available()
-    if not ok:
-        return jsonify({'success': False, 'error': detail}), 400
-
-    data = request.get_json(silent=True) or {}
-    cmd  = (data.get('cmd') or '').strip()
-    exe, _ = _find_terminal()
-    if _launch_terminal(cmd):
-        return jsonify({'success': True, 'terminal': exe, 'cmd': cmd or None})
-    return jsonify({'success': False, 'error': 'Could not launch terminal'}), 500
 
 @app.route('/api/events')
 def sse_stream():

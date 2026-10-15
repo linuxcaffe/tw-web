@@ -977,8 +977,11 @@ class TaskEditor {
         } catch (_) {}
     }
 
-    _callAPI(method, url, body) {
-        return TW.api.write(method, url, body);
+    // Annotation writes: act on hook signals (console, deferred offer, timeout) like the save does
+    async _callAPI(method, url, body) {
+        const data = await TW.api.write(method, url, body);
+        TW.api.handleWriteResult(data);
+        return data;
     }
 }
 

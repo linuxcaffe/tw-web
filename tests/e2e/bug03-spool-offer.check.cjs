@@ -5,7 +5,8 @@ check(async pg => {
     pg.on('websocket', ws => ws.on('framereceived', f => received.push(String(f.payload))));
     await pg.goto(B + '/');
     await pg.waitForSelector('.card-desc-text');
-    await pg.evaluate(() => window.twTerminal.offerTerminal('echo spooled-ok'));
+    // What a write returns when a hook spooled a command (CONVENTIONS §3)
+    await pg.evaluate(() => TW.api.handleWriteResult({ success: true, deferred_cmd: 'echo spooled-ok' }));
     await pg.click('.tw-offer-btn-run');
     await sleep(3000);
     const out = received.join('');

@@ -114,7 +114,8 @@
 
     let _ptyTerm = null;
 
-    async function openPty(cmd, { autoClose = true } = {}) {
+    // kind 'task' runs `task <cmd>`, 'shell' runs a shell command line; an empty cmd opens a shell
+    async function openPty(cmd, { autoClose = true, kind = 'task' } = {}) {
         const out = document.getElementById('tw-cmd-output');
         if (!out) return;
 
@@ -127,7 +128,7 @@
         }
 
         // Build output bar container
-        out.innerHTML = `<div id="tw-pty-titlebar"><span>${esc(cmd || 'terminal')}</span><button id="tw-cmd-output-close" title="Close">×</button></div><div id="tw-pty-container"></div><div id="tw-pty-resize-handle"></div>`;
+        out.innerHTML = `<div id="tw-pty-titlebar"><span>${esc(cmd ? (kind === 'task' ? 'task ' + cmd : cmd) : 'terminal')}</span><button id="tw-cmd-output-close" title="Close">×</button></div><div id="tw-pty-container"></div><div id="tw-pty-resize-handle"></div>`;
         out.classList.add('active', 'pty-mode');
         out.querySelector('#tw-cmd-output-close')?.addEventListener('click', () => {
             out.classList.remove('pty-mode');
@@ -194,6 +195,7 @@
         }
 
         ws.onopen = () => ws.send(JSON.stringify({
+            kind,
             cmd,
             cwd:  _ptyCfg.pty_cwd  || '',
             init: _ptyCfg.pty_init || '',
@@ -373,14 +375,6 @@
 #tw-pty-container { padding: 2px 0; background: #0a0a0a; }
 #tw-pty-container .xterm { padding: 2px 6px; }
 #tw-pty-container .xterm-viewport { overflow-y: auto !important; }
-.tw-preflight-yes, .tw-preflight-no {
-    border: none; border-radius: 4px; cursor: pointer;
-    font-size: 12px; padding: 3px 10px; margin-left: 10px;
-}
-.tw-preflight-yes { background: #27ae60; color: #fff; }
-.tw-preflight-yes:hover { background: #2ecc71; }
-.tw-preflight-no  { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7); }
-.tw-preflight-no:hover  { background: rgba(255,255,255,0.22); color: #fff; }
 .tw-inp-clear {
     background: none; border: none; color: rgba(255,255,255,0.4);
     cursor: pointer; font-size: 14px; padding: 0 1px; line-height: 1; display: none;
@@ -804,50 +798,6 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         try { localStorage.setItem(_HIST_KEY, JSON.stringify(_cmdHistory)); } catch {}
     }
 
-    // Known TW verbs + common abbreviations — bare tokens only ("+list" or "pro:list" won't match)
-    const _TW_CMDS = new Set([
-        // full verbs
-        'add','annotate','append','calc','completed','config','count',
-        'delete','denotate','done','duplicate','edit','execute','export',
-        'help','import','log','modify','prepend','purge','start','stop',
-        'sync','undo','version',
-        // common abbreviations TW accepts
-        'mod','mo',                          // modify
-        'do','don',                          // done
-        'del','dele',                        // delete
-        'sta','star',                        // start
-        'sto',                               // stop
-        'ann','anno',                        // annotate
-        'app','appe',                        // append
-        'pre','prep',                        // prepend
-        'dup','dupl',                        // duplicate
-        'ed','edi',                          // edit
-        'ex','exp',                          // execute/export
-        'im','imp',                          // import
-        'sy','syn',                          // sync
-        'un','und',                          // undo
-        'co','con','conf',                   // config
-        'co','cou',                          // count
-        // report names + abbreviations
-        'list','li','lis',
-        'all','al',
-        'long','lo','lon',
-        'ls','minimal','newest','next','ne','nex',
-        'oldest','overdue','ready','recurring',
-        'unblocked','waiting','blocked',
-        'burndown','calendar','ghistory','history','summary','timesheet',
-        // diagnostic / info commands
-        'diag','columns','col','cols','show','info','ids','uuids','udas',
-        'projects','tags','stats','reports','contexts',
-        '_ids','_uuids','_projects','_tags','_urgency','_zshcomp','_aliases',
-    ]);
-    function _isFilterOnly(cmd) {
-        const tokens = cmd.trim().split(/\s+/);
-        // Any expression starting with a bare number is a task-ID reference → command
-        if (/^\d+(-\d+)?(,\d+(-\d+)?)*$/.test(tokens[0])) return false;
-        return !tokens.some(tok => _TW_CMDS.has(tok.toLowerCase()));
-    }
-
     let _cmdMode = false;
 
     function _toggleCmdMode() {
@@ -894,8 +844,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         _cmdHistPos = -1;
         _cmdHistDraft = '';
 
-        // Filter-only expression (no command verb) → raw filter override on List page
-        if (_isFilterOnly(cmd)) {
+        // Filter-only expression (no command word, by task's own list) → raw filter on the List
+        if (TW.commands.isFilterOnly(cmd, await TW.commands.vocab())) {
             inp.value = '';
             setRawFilter(cmd);
             if (window.location.pathname !== '/') {
@@ -1261,7 +1211,9 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     async function openTerminal(cmd) {
         openPty(cmd || '');
     }
-    function offerTerminal(cmd) {
+    // kind: 'shell' for a hook's spooled command line (CONVENTIONS §3), 'task' for a task command.
+    // The pane stays open after it runs, so the result can be read.
+    function offerTerminal(cmd, { kind = 'shell', title = 'Action queued — run in terminal?' } = {}) {
         // Remove any existing offer first
         document.getElementById('tw-terminal-offer')?.remove();
 
@@ -1269,8 +1221,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         el.id = 'tw-terminal-offer';
         el.innerHTML =
             `<div id="tw-terminal-offer-body">` +
-                `<div id="tw-terminal-offer-title">Action queued — run in terminal?</div>` +
-                `<div id="tw-terminal-offer-cmd">${esc(cmd)}</div>` +
+                `<div id="tw-terminal-offer-title">${esc(title)}</div>` +
+                `<div id="tw-terminal-offer-cmd">${esc(kind === 'task' ? 'task ' + cmd : cmd)}</div>` +
                 `<div id="tw-terminal-offer-actions">` +
                     `<button class="tw-offer-btn tw-offer-btn-run">▶ Open in terminal</button>` +
                     `<button class="tw-offer-btn tw-offer-btn-dismiss">Dismiss</button>` +
@@ -1279,7 +1231,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 
         el.querySelector('.tw-offer-btn-run').addEventListener('click', () => {
             el.remove();
-            openTerminal(cmd);
+            openPty(cmd, { kind, autoClose: false });
         });
         el.querySelector('.tw-offer-btn-dismiss').addEventListener('click', () => el.remove());
         document.body.appendChild(el);
@@ -1287,17 +1239,6 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 
     // Expose for page scripts (e.g. to retry a timed-out command in terminal)
     window.twTerminal = { open: openTerminal, offerTerminal };
-
-    async function _initTerminalVisibility() {
-        try {
-            const r = await fetch('/api/terminal/check');
-            const d = await r.json();
-            if (!d.available) {
-                const btn = document.querySelector('.tw-menu-item[data-menu="terminal"]');
-                if (btn) btn.style.display = 'none';
-            }
-        } catch { /* ignore — keep the button visible */ }
-    }
 
     // ── Project tree (the Projects panel and the inline sidebar) ──────────────
     // Rows for each project, indented by depth; a parent folds from its arrow area and picks
@@ -2106,11 +2047,10 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => { init(); _initSSE(); _initKeys(); _initTerminalVisibility(); });
+        document.addEventListener('DOMContentLoaded', () => { init(); _initSSE(); _initKeys(); });
     } else {
         init();
         _initSSE();
         _initKeys();
-        _initTerminalVisibility();
     }
 }());

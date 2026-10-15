@@ -13,7 +13,7 @@ Part of the [awesome-taskwarrior](https://github.com/linuxcaffe/awesome-taskwarr
 - **Command bar** — type any `task` command or filter expression; commands open in an inline PTY terminal so hooks, confirmations, and interactive prompts all work naturally
 - **Hook-aware** — interactive hooks (subtask prompts, hledger-add, etc.) open a live terminal pane instead of hanging or silently failing
 - **Projects and Tags sidebars** — hierarchical project browser with counts; filter-sensitive tag sidebar sorted by frequency
-- **Full task lifecycle** — add, edit, annotate, start, stop, complete, delete; bulk operations with preflight confirmation
+- **Full task lifecycle** — add, edit, annotate, start, stop, complete, delete; bulk operations from the command bar, confirmed in the console as Taskwarrior asks
 - **PWA-ready** — install to your home screen on desktop or Android; works offline for the shell
 - **Taskwarrior 2.6.x** required
 
@@ -25,7 +25,7 @@ Taskwarrior's command-line interface is expressive and fast, but it assumes you'
 
 Most Taskwarrior web interfaces solve the viewing problem but stop there. They show you tasks, but the moment you want to filter by a non-trivial expression, run a report, or trigger a hook, you're back at the terminal anyway.
 
-tw-web doesn't try to hide Taskwarrior behind a simpler model. It exposes it. The filter bar accepts the same attribute modifiers Taskwarrior accepts. The command bar runs real `task` commands in a real PTY — which means your hooks fire, your preflight guards work, and interactive prompts appear right in the browser.
+tw-web doesn't try to hide Taskwarrior behind a simpler model. It exposes it. The filter bar accepts the same attribute modifiers Taskwarrior accepts. The command bar runs real `task` commands in a real PTY — which means your hooks fire, Taskwarrior's own confirmations work, and interactive prompts appear right in the browser.
 
 ---
 
@@ -39,9 +39,9 @@ You can manage your entire task system from a phone, a tablet, or a browser tab 
 
 **PTY console** — a real pseudo-terminal embedded in the page (via WebSocket + xterm.js). Commands run here have a genuine TTY, so Taskwarrior hooks that read from `/dev/tty` work exactly as they do in a real terminal.
 
-**tw_needs_pty** — a signal hooks can emit when they need interactive input. tw-web detects it and opens the PTY console automatically.
+**tw_needs_pty** — a signal hooks can emit when they need interactive input. tw-web detects it on any write (as it does the older `TW_INTERACTIVE_REQUIRED` marker) and opens the PTY console with the same command. A write that hits the 15 s limit, or a hook that queues a command for later, gets an "Open in terminal" offer instead. The contract is [awesome-taskwarrior's CONVENTIONS.md](https://github.com/linuxcaffe/awesome-taskwarrior/blob/main/CONVENTIONS.md).
 
-**Filter mode / Command mode** — the nav bar toggles between structured filter inputs (description, priority, project, tags) and a free-form command input. Filter-only expressions set a raw filter; anything with a command verb opens in the PTY console.
+**Filter mode / Command mode** — the nav bar toggles between structured filter inputs (description, priority, project, tags) and a free-form command input. Filter-only expressions set a raw filter; anything with a command word opens in the PTY console. The command words are Taskwarrior's own (`task _commands` and `task _aliases`), so custom reports and aliases count.
 
 **PWA** — Progressive Web App. Install tw-web to your home screen and it behaves like a native app, with offline shell caching via a service worker.
 
@@ -269,7 +269,11 @@ add Clean the kitchen due:tom   # adds a task
 253 mod project:home            # modifies task 253
 ```
 
-Filter-only expressions (no command verb) are applied as a raw filter on the task list. Everything else opens in the inline PTY console, where hooks and prompts work normally. Press any key to dismiss the console after the command finishes.
+Filter-only expressions are applied as a raw filter on the task list. Anything with a command word, or starting with a task ID, opens in the inline PTY console, where hooks and prompts work normally. Press any key to dismiss the console after the command finishes.
+
+A command word is one Taskwarrior itself would take: a command or report (custom ones too), an alias, or an unambiguous abbreviation of a command at least `abbreviation.minimum` letters long (default 2). So `mod` and `proj` are commands, while `co` is a filter, since it could be `columns`, `config`, `count` and more. Bulk changes ask for confirmation in the console, as they do in a shell (`bulk`, `confirmation`).
+
+**Menu → Terminal** (or `t`) opens the same console with your shell.
 
 ### Completed and deleted tasks
 
@@ -287,7 +291,7 @@ Active development. The interface is stable for daily use. Hook integration (PTY
 
 - [awesome-taskwarrior](https://github.com/linuxcaffe/awesome-taskwarrior) — the ecosystem this is part of; install hooks and extensions with `tw -I <name>`
 - [Taskwarrior docs](https://taskwarrior.org/docs/) — filter syntax, UDAs, hooks
-- [tw-nointeract-preflight-hook](https://github.com/linuxcaffe/tw-nointeract-preflight-hook) — bulk operation guard; pairs well with tw-web's command bar
+- [tw-nointeract-preflight-hook](https://github.com/linuxcaffe/tw-nointeract-preflight-hook) — bulk operation guard for clients without a terminal (tw-web's console is a terminal, so there Taskwarrior confirms bulk changes itself)
 
 ---
 

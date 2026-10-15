@@ -27,8 +27,10 @@ app.py:TW_SPOOL_DIR
 app.py:TW_CLIENT
 app.py:TW_INTERACTIVE_REQUIRED
 app.py:tw_needs_pty
-app.py:tw_preflight
 app.py:def _pty_env
+app.py:def _pty_argv
+app.py:def _hook_signals
+app.py:def _console_cmd
 app.py:_NONINTERACTIVE_VARS
 
 # ── Runtime paths: computed in three places, kept in step (S9) ──────────────────

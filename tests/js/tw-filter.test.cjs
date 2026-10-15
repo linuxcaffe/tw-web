@@ -1,5 +1,5 @@
 // Unit tests for tw-filter.js (TW.filter, TW.sort). Run: node tests/js/tw-filter.test.cjs
-// tests/test_tw_filter.py runs this from pytest, so the pre-commit hook covers it.
+// tests/test_js.py runs this from pytest, so the pre-commit hook covers it.
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');

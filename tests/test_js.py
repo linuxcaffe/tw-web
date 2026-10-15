@@ -1,16 +1,18 @@
-"""tw-filter.js unit tests (tests/js/tw-filter.test.cjs), run in Node."""
+"""The pages' pure-JS unit tests (tests/js/*.test.cjs), run in Node; and tw-filter.js wiring."""
 import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
-TEST = Path(__file__).resolve().parent / 'js' / 'tw-filter.test.cjs'
+JS = Path(__file__).resolve().parent / 'js'
+TEST = JS / 'tw-filter.test.cjs'
 
 
 @pytest.mark.skipif(not shutil.which('node'), reason='node not installed')
-def test_tw_filter_js():
-    out = subprocess.run(['node', str(TEST)], capture_output=True, text=True, timeout=30)
+@pytest.mark.parametrize('test', sorted(JS.glob('*.test.cjs')), ids=lambda p: p.name)
+def test_js(test):
+    out = subprocess.run(['node', str(test)], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stdout + out.stderr
 
 

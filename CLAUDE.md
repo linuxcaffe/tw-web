@@ -28,9 +28,9 @@ Check the plan for the current step before starting work.
 
 | File | Lines | Role |
 |---|---|---|
-| `app.py` | ~1750 | The whole server: guard, settings, `run_task_command`, every `/api/*` route, `/ws/pty`, SSE, static route |
-| `nav.js` | ~2100 | Shared chrome on every page: nav bar, filter/command bar, sidebars, Settings, PTY console, hook prompts |
-| `tw-api.js` | 80 | `TW.store` (the shared task cache), `TW.api.write` (every task write goes through it, so every write empties the cache) and `TW.api.handleWriteResult` (hook signals: PTY, deferred offer, timeout) |
+| `app.py` | ~1670 | The whole server: guard, settings, `run_task_command`, every `/api/*` route, `/ws/pty`, SSE, static route |
+| `nav.js` | ~2050 | Shared chrome on every page: nav bar, filter/command bar, sidebars, Settings, PTY console (`openPty(cmd, {kind})`, `offerTerminal`), hook prompts |
+| `tw-api.js` | 110 | `TW.store` (the shared task cache), `TW.api.write` (every task write goes through it, so every write empties the cache), `TW.api.handleWriteResult` (hook signals: PTY, deferred offer, timeout) and `TW.commands` (command mode's command words, from `/api/commands`) |
 | `tw-filter.js` | 140 | `TW.filter` (the nav bar's filter, priority, project and tags inputs, with modifiers: one set of rules for every view) and `TW.sort` (`PRI_ORDER` 1–6 H M L, the List's sort). Pure functions, unit-tested in Node (`tests/js/`) |
 | `main.js` | ~600 | List view (`TaskWarriorUI`) |
 | `task-card.js` | ~430 | `TaskCardManager`, annotation linkify + launchers |
@@ -45,7 +45,7 @@ Check the plan for the current step before starting work.
 `nav.js` → `tw-api.js` → `tw-filter.js` → `codemirror-bundle.js` → `task-editor.js` → `task-card.js` → `main.js`.
 Every page loads `tw-api.js` right after `nav.js`. A new write from a page uses `TW.api.write`, not `fetch`,
 a new task cache goes through `TW.store`, and a view filters and sorts with `TW.filter`/`TW.sort` (loaded on
-the four view pages; `tests/test_tw_filter.py` checks that a page using them loads them) (consolidation plan, `tw:docs/tw-web-consolidation-plan.md`).
+the four view pages; `tests/test_js.py` checks that a page using them loads them) (consolidation plan, `tw:docs/tw-web-consolidation-plan.md`).
 `codemirror-bundle.js` is built by rollup (`rollup.cm.config.js`) from `codemirror-entry.js`; FullCalendar,
 xterm and Sortable are vendored `.min.js` files. There's no other build step.
 
@@ -82,7 +82,7 @@ deliberate work-in-progress commit with `--no-verify`. Install it once per clone
   `app`, which runs `task` at import time. Never import `app` in a test any other way.
 - **Found a bug? Write the failing test first, watch it fail, then fix.**
 - **A red test must have no side effects.** Stub `subprocess.Popen` (see the `no_spawn` fixture) for any
-  route that launches something: `/api/open`, `/api/launch`, `/api/terminal`. Never call `/api/server/stop`
+  route that launches something: `/api/open`, `/api/launch`. Never call `/api/server/stop`
   from a test: its PID file can point at the live server. To test what a route would send to `task`,
   monkeypatch `run_task_command` (see the `captured` fixture).
 - **`.guards`** lists load-bearing identifiers: the security functions, the `TW_*` contract, the runtime
@@ -132,6 +132,11 @@ deliberate work-in-progress commit with `--no-verify`. Install it once per clone
     is `~/dev/awesome-taskwarrior/CONVENTIONS.md`; `tests/test_contract.py` pins tw-web's side with the
     document's examples. Don't rename or repurpose them. The terminal console (`_pty_env`) clears
     `TW_NOINTERACT`, `TW_WEB`, `TW_SPOOL_DIR` and `TW_PREFLIGHT_*` so hooks can prompt there.
+    **Write routes report hook signals through `_hook_signals(result, args)`** (`needs_pty`, `timed_out`,
+    `deferred_cmd`, each with the command as typed after `task`, `shlex`-quoted), and pages act on them with
+    `TW.api.handleWriteResult`. The console's first message says what to run (`_pty_argv`: kind `task` or
+    `shell`). **Nothing runs a request's text through a shell or opens a desktop terminal.** tw-web doesn't
+    read `tw_preflight`: bulk commands run in the console, where Taskwarrior confirms them itself.
 11. **Service-worker cache:** the pre-commit hook bumps `sw.js` `CACHE` whenever a shell asset is staged.
     Don't bump it by hand. If the hook isn't installed (fresh clone), install it (see Testing).
 12. **Reads never use the CLI's context.** tw-web takes context only from the nav bar (`context=`). In 2.6.2

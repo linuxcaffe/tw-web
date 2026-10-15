@@ -44,7 +44,7 @@ class TaskActionHandler {
                     ? data.warnings.join('\n')
                     : (data.message || `Task ${action} successful`);
                 window.twNav?.showOutput(msg);
-            } else if (!data.terminal_launched && !(data.timed_out && data.cmd)) {
+            } else if (!(data.timed_out && data.cmd)) {
                 window.twNav?.showOutput(data.message || data.error || `Failed to ${action} task`);
             }
         } catch (error) {
