@@ -29,13 +29,13 @@ def test_extension_allowed_on_popup_routes(app_module, path):
 
 
 @pytest.mark.parametrize('path', ['/ws/pty', '/api/commands', '/api/config',
-                                  '/api/launch', '/api/open', '/api/debug', '/api/task/1/done'])
+                                  '/api/launch', '/api/open', '/api/task/1/done'])
 def test_extension_refused_elsewhere(app_module, path):
     assert not app_module._origin_allowed(EXT, 'localhost:5000', path)
 
 
-def test_extension_post_to_debug_refused(client):
-    r = client.post('/api/debug', headers={**LOCAL, 'Origin': EXT}, json={'msg': 'x'})
+def test_extension_post_to_settings_refused(client):
+    r = client.post('/api/config', headers={**LOCAL, 'Origin': EXT}, json={'x': 1})
     assert r.status_code == 403
 
 

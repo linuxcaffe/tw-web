@@ -47,8 +47,8 @@ def test_tailscale_names_allowed(app_module):
 
 # ── S5: Origin check on state-changing requests ──────────────────────────────
 
-def test_cross_origin_post_rejected(client):
-    r = client.post('/api/debug', headers={**LOCAL, 'Origin': EVIL}, json={'msg': 'x'})
+def test_cross_origin_post_rejected(client, captured):
+    r = client.post('/api/task/add', headers={**LOCAL, 'Origin': EVIL}, json={'description': 'x'})
     assert r.status_code == 403
 
 
@@ -58,17 +58,18 @@ def test_cross_origin_bodyless_post_rejected(client):
     assert r.status_code == 403
 
 
-def test_null_origin_rejected(client):
-    r = client.post('/api/debug', headers={**LOCAL, 'Origin': 'null'}, json={'msg': 'x'})
+def test_null_origin_rejected(client, captured):
+    r = client.post('/api/task/add', headers={**LOCAL, 'Origin': 'null'}, json={'description': 'x'})
     assert r.status_code == 403
 
 
 @pytest.mark.parametrize('origin', [None, 'http://localhost:5000'])
-def test_trusted_or_absent_origin_allowed(client, origin):
+def test_trusted_or_absent_origin_allowed(client, captured, origin):
     headers = dict(LOCAL)
     if origin:
         headers['Origin'] = origin
-    assert client.post('/api/debug', headers=headers, json={'msg': 'x'}).status_code == 200
+    assert client.post('/api/task/add', headers=headers, json={'description': 'x'}).status_code == 200
+    assert captured   # it reached the route
 
 
 def test_get_not_origin_checked(client):

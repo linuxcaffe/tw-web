@@ -46,28 +46,9 @@ function calPriClass(pri) {
     return '';
 }
 
-// ── Debug helper (temporary) ──────────────────────────────────────────────────
-function _dbg(msg) {
-    console.error('[cal-debug]', msg);
-    fetch('/api/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ msg: String(msg) }) }).catch(() => {});
-    const el = document.getElementById('cal-debug-banner');
-    if (el) { el.textContent = msg; el.style.display = 'block'; }
-}
-window.onerror = (msg, src, line, col, err) => {
-    _dbg(`JS ERROR: ${msg} @ ${src}:${line}:${col}${err ? ' — ' + err.stack : ''}`);
-};
-// Unhandled promise rejections — log only, don't show banner (SSE/nav churn is benign)
-window.onunhandledrejection = (e) => {
-    const msg = e.reason?.message || String(e.reason);
-    console.warn('[cal-debug] Unhandled promise:', msg);
-    fetch('/api/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ msg: 'Unhandled promise: ' + msg }) }).catch(() => {});
-};
-
 // ── DOMContentLoaded ──────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-    const _step = (name, fn) => { try { fn(); } catch(e) { _dbg(`CRASH in ${name}: ${e.message}\n${e.stack}`); throw e; } };
+    const _step = (name, fn) => { try { fn(); } catch(e) { console.error(`Calendar: ${name} failed`, e); throw e; } };
 
     // Load calendar settings before initialising the calendar
     try {

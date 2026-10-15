@@ -158,3 +158,7 @@ def test_commands_lists_commands_aliases_and_abbreviation(client, app_module, mo
 
 def test_commands_route_is_not_open_to_the_extension(app_module):
     assert not app_module._origin_allowed('moz-extension://abc', 'localhost:5000', '/api/commands')
+
+
+def test_debug_route_is_gone(client):
+    assert client.post('/api/debug', json={'msg': 'x'}, headers=O).status_code in (404, 405)

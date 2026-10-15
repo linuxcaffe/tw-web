@@ -632,13 +632,6 @@ def ws_pty(ws):
     if not shell_mode:
         ws.send('\r\n[done]\r\n')
 
-@app.route('/api/debug', methods=['POST'])
-def api_debug():
-    """Temporary JS error logging endpoint"""
-    data = request.get_json(silent=True) or {}
-    print(f"[JS-DEBUG] {data.get('msg', '(no message)')}", flush=True)
-    return jsonify({'ok': True})
-
 @app.route('/')
 def index():
     """Serve the main HTML page"""
