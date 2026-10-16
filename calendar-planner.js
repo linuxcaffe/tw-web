@@ -127,10 +127,12 @@ function initializeCalendar() {
             endTime:    _calSettings.cal_day_end   || '23:00:00',
         },
         moreLinkClick: (info) => {           // "+N more" → day view with correct button state
-            changeView('day');
-            calendar.gotoDate(info.date);
+            goToDay(info.date);
             return 'stop';
         },
+        navLinks:         true,              // day names (Week), day numbers (Month) open that day
+        navLinkDayClick:  (date) => goToDay(date),
+        navLinkWeekClick: (date) => { changeView('week'); calendar.gotoDate(date); },
 
         eventTimeFormat: {
             hour:           'numeric',
@@ -216,10 +218,15 @@ function setupExternalDrag() {
 // ── Click or drag empty slots → create new task ──────────────────────────────
 // Replaces dateClick: handles both single-slot clicks and dragged ranges.
 // When the user drags a time range, sched_duration is pre-filled from the selection length.
-// An all-day selection (Month, the all-day strip) gives a date only: midnight, no duration.
+// An all-day selection (the all-day strip) gives a date only: midnight, no duration.
+// In Month a click or drag opens Day view instead.
 function handleSelect(info) {
-    if (!taskEditor) return;
     calendar.unselect();   // clear selection highlight before editor opens
+    if (calendar.view.type === 'dayGridMonth') {   // Month navigates; adding happens in Day view
+        goToDay(info.start);
+        return;
+    }
+    if (!taskEditor) return;
 
     const localDT = toLocalISOString(info.start).slice(0, 16);   // datetime-local: no seconds
     const mins    = info.allDay ? 0 : Math.round((info.end - info.start) / 60000);
@@ -403,6 +410,12 @@ function zoomTitle(view) {
     const [slot, start] = _zoomStep(view);
     const mins = parseInt(slot.slice(0, 2)) * 60 + parseInt(slot.slice(3, 5));
     btn.title = `${mins} min rows from ${start.slice(0, 5)}; click again to zoom`;
+}
+
+// Open one day in Day view, with the view buttons in step (Month click, Week day name, "+N more").
+function goToDay(date) {
+    changeView('day');
+    calendar.gotoDate(date);
 }
 
 function changeView(view) {
