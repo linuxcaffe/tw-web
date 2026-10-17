@@ -69,6 +69,11 @@ tw-filter.js:TW.filter =
 tw-filter.js:TW.sort =
 tw-filter.js:function matchesNav
 tw-filter.js:function priRank
+tw-filter.js:function setVirtual
+tw-filter.js:function virtualTerms
+app.py:TW_VIRTUAL_TAGS
+app.py:def get_virtual_tags
+nav.js:async function _syncVtags
 task-editor.js:_formValues
 app.py:def _export_one
 app.py:def _task_filter_args

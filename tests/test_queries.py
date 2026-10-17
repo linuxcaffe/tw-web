@@ -46,7 +46,7 @@ def test_unparseable_raw_filter_is_refused(client, captured, url):
 
 @pytest.mark.parametrize('url', [
     '/api/tasks', '/api/tasks/planned', '/api/tasks/due', '/api/projects', '/api/projects?active=1',
-    '/api/tags', '/api/tags?all=1', '/api/health', '/api/stats',
+    '/api/tags', '/api/tags?all=1', '/api/health', '/api/stats', '/api/vtags?match=DUE',
 ])
 def test_reads_never_use_the_cli_context(client, captured, url):
     client.get(url)

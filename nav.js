@@ -1108,6 +1108,11 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         _updateFilterBar(state);
         bindEvents();
 
+        // Virtual tags: fetch when the tags input names one; refresh as views render
+        document.addEventListener('tw-filter-change', _syncVtags);
+        document.addEventListener('tw-tasks-loaded', _syncVtags);
+        _syncVtags();
+
         // Sync status indicator
         pollSyncStatus();
         setInterval(pollSyncStatus, 60_000);
@@ -1342,18 +1347,56 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         } catch { body.innerHTML = '<div class="tw-panel-error">Failed to load projects</div>'; }
     }
 
+    // ── Virtual tags (+DUE, -BLOCKED…) ────────────────────────────────────────
+    // Not in the export, so task says which tasks have them (/api/vtags). The answer is cached
+    // in TW.store ('vtags', 30 s; every write empties it) and handed to TW.filter. Runs whenever
+    // the filter changes or a view renders; it fetches only when the tags input uses a virtual
+    // tag whose answer is missing or stale, then re-renders. Pages without TW.filter skip it.
+    let _vtLast = null;     // the last answer, any age: names and descriptions for the sidebar
+    let _vtBusy = false;
+    async function _syncVtags() {
+        if (_vtBusy || typeof TW === 'undefined' || !TW.filter) return;
+        if (!_vtLast) {
+            _vtLast = TW.store.read('vtags', () => true, Infinity);
+            if (_vtLast) TW.filter.setVirtual(_vtLast);
+        }
+        const fresh  = TW.store.read('vtags', () => true);
+        const tagsIn = getState().tags || '';
+        // Before the names are known, any upper-case word may be one (the server ignores the rest)
+        const needed = _vtLast ? TW.filter.virtualTerms(tagsIn, _vtLast)
+                               : tagsIn.split(/[\s,:+\-.]+/).filter(w => /^[A-Z]+$/.test(w));
+        if (_vtLast && needed.every(n => fresh && n in fresh.sets)) return;
+        _vtBusy = true;
+        try {
+            const d = await TW.api.get('/api/vtags?match=' + encodeURIComponent(needed.join(',')));
+            if (!d.success) { console.warn('virtual tags:', d.error); return; }
+            const first = !_vtLast;
+            _vtLast = { names: d.names, tags: d.tags, sets: d.uuids || {} };
+            TW.store.save('vtags', _vtLast);
+            TW.filter.setVirtual(_vtLast);
+            document.dispatchEvent(new CustomEvent('tw-vtags-loaded'));
+            if (needed.length || (first && TW.filter.virtualTerms(tagsIn, _vtLast).length)) {
+                document.dispatchEvent(new CustomEvent('tw-filter-change',
+                    { detail: { ...getState(), clientOnly: true } }));
+            }
+        } catch (e) {
+            console.warn('virtual tags:', e);
+        } finally {
+            _vtBusy = false;
+        }
+    }
+
     // ── Tags panel ────────────────────────────────────────────────────────────
-    const _TW_VIRTUAL_TAGS = new Set([
-        'ACTIVE','ANNOTATED','BLOCKED','BLOCKING','CHILD','COMPLETED','DELETED',
-        'DUE','DUETODAY','LATEST','MONTH','NEXT','NOCOLOR','ORPHAN','OVERDUE',
-        'PARENT','PENDING','PRIORITY','PROJECT','QUARTER','READY','RECURRING',
-        'SCHEDULED','TAGGED','TODAY','TOMORROW','UDA','UNBLOCKED','WEEK','YEAR',
-    ]);
+    // The tags the input asks for (TW.filter's reading where the page has it)
+    function _tagTerms(input) {
+        if (typeof TW !== 'undefined' && TW.filter) return TW.filter.tagTerms(input);
+        return (input || '').split(',').map(t => t.trim()).filter(Boolean);
+    }
     function _countTagsFromTasks(tasks) {
         const c = {};
         (tasks || []).forEach(t => {
             (t.tags || []).forEach(tag => {
-                if (tag && !_TW_VIRTUAL_TAGS.has(tag)) c[tag] = (c[tag] || 0) + 1;
+                if (tag) c[tag] = (c[tag] || 0) + 1;
             });
         });
         return c;
@@ -1371,7 +1414,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 `<button class="tw-toggle-btn${mode==='all'?' active':''}" data-mode="all">all</button>` +
                 `<span class="tw-proj-total">${tags.length}</span>` +
             `</div>` +
-            `<button class="tw-pick-item${!selTags.length?' active':''}" data-pick=""><span class="tw-proj-label">All tags</span></button>` +
+            `<button class="tw-pick-item${!curState.tags?' active':''}" data-pick=""><span class="tw-proj-label">All tags</span></button>` +
             `<button class="tw-pick-item${curState.tags==='.none:'?' active':''}" data-pick=".none:"><span class="tw-proj-label">No tags</span></button>`;
         if (tags.length) {
             html += `<div class="tw-pick-section-label">Tags</div>`;
@@ -1380,6 +1423,15 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 const badge = count ? `<span class="tw-proj-count">${count}</span>` : '';
                 html += `<button class="tw-pick-item${selTags.includes(t)?' active':''}" data-pick="${esc(t)}">` +
                         `<span class="tw-proj-label">+${esc(t)}</span>${badge}</button>`;
+            });
+        }
+        // Virtual tags (task works them out; man task's list, less the deprecated CHILD/PARENT)
+        const vtags = (_vtLast?.tags || []).filter(t => !t.deprecated);
+        if (vtags.length) {
+            html += `<div class="tw-pick-section-label">Virtual</div>`;
+            vtags.forEach(t => {
+                html += `<button class="tw-pick-item${selTags.includes(t.name)?' active':''}" data-pick="${esc(t.name)}" title="${esc(t.description)}">` +
+                        `<span class="tw-proj-label">+${esc(t.name)}</span></button>`;
             });
         }
         container.innerHTML = html;
@@ -1398,7 +1450,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 
         function renderPanel() {
             const state = getState();
-            const sel   = (state.tags||'').split(',').map(t=>t.trim()).filter(Boolean);
+            const sel   = _tagTerms(state.tags);
             _renderTagList(body, panelTagCounts, mode, sel, state,
                 m => openTagsPanel(m),
                 pick => { setState({ tags: pick }, { clientOnly: true }); closeMenu(); }
@@ -1422,9 +1474,14 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         // Active mode: refresh when tasks change while panel is open
         const onTasksLoaded = e => { if (mode === 'active') { panelTagCounts = _countTagsFromTasks(e.detail.tasks); renderPanel(); } };
         document.addEventListener('tw-tasks-loaded', onTasksLoaded);
+        document.addEventListener('tw-vtags-loaded', renderPanel);
         // Clean up listener when panel closes (next openPanel call replaces body)
         const obs = new MutationObserver(() => {
-            if (!document.contains(body)) { document.removeEventListener('tw-tasks-loaded', onTasksLoaded); obs.disconnect(); }
+            if (!document.contains(body)) {
+                document.removeEventListener('tw-tasks-loaded', onTasksLoaded);
+                document.removeEventListener('tw-vtags-loaded', renderPanel);
+                obs.disconnect();
+            }
         });
         obs.observe(document.body, { childList: true, subtree: true });
 
@@ -1493,7 +1550,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 
         function render() {
             const state = getState();
-            const sel   = (state.tags||'').split(',').map(t=>t.trim()).filter(Boolean);
+            const sel   = _tagTerms(state.tags);
             _renderTagList(container, tagCounts, mode, sel, state,
                 m => load(m),
                 pick => setState({ tags: pick }, { clientOnly: true })
@@ -1527,6 +1584,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         });
 
         document.addEventListener('tw-filter-change', render);
+        document.addEventListener('tw-vtags-loaded', render);
         await load(mode);
     }
 

@@ -49,6 +49,46 @@ t('navTasks reads twNav.getState()', () => {
     finally { delete ctx.window.twNav; }
 });
 
+// Virtual tags (+DUE, -BLOCKED…): task decides who matches (/api/vtags); TW.filter holds the answer
+const vt = [
+    { uuid: 'u1', description: 'Late rent',  tags: ['home'] },
+    { uuid: 'u2', description: 'Blocked',    tags: ['work'] },
+    { uuid: 'u3', description: 'Free',       tags: [] },
+];
+const V = { names: ['DUE', 'OVERDUE', 'BLOCKED'], sets: { OVERDUE: ['u1'], BLOCKED: ['u2'] } };
+const vpick = (tags, v = V) => vt.filter(x => F.matchesNav(x, { tags }, v)).map(x => x.description);
+t('tags +x is the same as x', () => eq(pick({ tags: '+shop' }), ['Buy milk', 'Call Bob']));
+t('tags -x excludes x', () => eq(pick({ tags: '-shop' }), ['Write spec', 'File taxes']));
+t('tags: +x -y combine, space or comma', () => {
+    eq(pick({ tags: '+shop -phone' }), ['Buy milk']);
+    eq(pick({ tags: 'shop,-phone' }), ['Buy milk']);
+});
+t('virtual tag matches the uuids task gave', () => eq(vpick('OVERDUE'), ['Late rent']));
+t('+virtual is the same', () => eq(vpick('+OVERDUE'), ['Late rent']));
+t('-virtual excludes them', () => eq(vpick('-BLOCKED'), ['Late rent', 'Free']));
+t('.has: and .hasnt: take a virtual tag', () => {
+    eq(vpick('.has:BLOCKED'), ['Blocked']);
+    eq(vpick('.hasnt:BLOCKED'), ['Late rent', 'Free']);
+});
+t('virtual and real tags combine', () => eq(vpick('home OVERDUE'), ['Late rent']));
+t('a known virtual tag not fetched yet matches nothing', () => eq(vpick('DUE'), []));
+t('virtual tags are upper case: lower case is a real tag', () => eq(vpick('overdue'), []));
+t('without the names, an upper-case word is a real tag', () =>
+    eq(F.matchTags(['OVERDUE'], 'OVERDUE', { uuid: 'x' }, { names: [], sets: {} }), true));
+t('virtualTerms: the virtual names an input uses', () => {
+    eq(F.virtualTerms('home +DUE -BLOCKED,work', V), ['DUE', 'BLOCKED']);
+    eq(F.virtualTerms('.hasnt:OVERDUE', V), ['OVERDUE']);
+    eq(F.virtualTerms('.none:', V), []);
+});
+t('tagTerms: the positive terms, for the sidebar highlight', () =>
+    eq(F.tagTerms('home, +DUE -BLOCKED'), ['home', 'DUE']));
+t('navTasks uses the virtual tags set with setVirtual', () => {
+    ctx.window.twNav = { getState: () => ({ tags: '-BLOCKED' }) };
+    F.setVirtual(V);
+    try { eq(F.navTasks(vt).map(x => x.description), ['Late rent', 'Free']); }
+    finally { delete ctx.window.twNav; F.setVirtual({ names: [], sets: {} }); }
+});
+
 const D = state => JSON.parse(JSON.stringify(F.addDefaults(state)));
 t('addDefaults: plain values become defaults', () =>
     eq(D({ project: 'home.garden', priority: 'h', tags: 'next, errand', filter: 'milk' }),
@@ -59,6 +99,11 @@ t('addDefaults: ranges and negatives give nothing', () =>
     eq(D({ project: '.none:', priority: '< M', tags: '.hasnt:x' }), {}));
 t('addDefaults: other modifiers give nothing', () =>
     eq(D({ project: '.startswith:wo', priority: '.any:', tags: '.any:' }), {}));
+t('addDefaults: + tags count, - tags and virtual tags do not', () => {
+    F.setVirtual(V);
+    try { eq(D({ tags: '+errand -phone DUE' }), { tags: ['errand'] }); }
+    finally { F.setVirtual({ names: [], sets: {} }); }
+});
 t('addDefaults: an empty state gives nothing', () => eq(D({}), {}));
 t('addDefaults: an unknown priority is not a default', () => eq(D({ priority: 'Z' }), {}));
 

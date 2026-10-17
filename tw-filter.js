@@ -96,22 +96,53 @@ TW.filter = (() => {
         }
     }
 
-    // Match a task's tags array against a tags filter string.
-    // Supports modifier prefixes: .has: .hasnt: .any: .none:
-    // Without prefix, comma-separated values must ALL be present (AND).
-    function matchTags(taskTags, input) {
+    // Virtual tags (+DUE, +OVERDUE, -BLOCKED…) aren't in the export: task decides which tasks
+    // have them. nav.js asks /api/vtags and hands the answer here: names, the virtual tags
+    // 2.6.2 knows, and sets, {TAG: [uuid…]} for the ones the tags input uses.
+    let _virtual = { names: [], sets: {} };
+    function setVirtual(v) {
+        _virtual = { names: v.names || [], sets: v.sets || {} };
+    }
+    function getVirtual() { return _virtual; }
+
+    // The terms of a tags input without a modifier: "a, +b -c" → [['+','a'], ['+','b'], ['-','c']]
+    function _terms(input) {
+        return input.split(/[\s,]+/).filter(Boolean).map(t =>
+            t[0] === '+' || t[0] === '-' ? [t[0], t.slice(1)] : ['+', t]).filter(([, tag]) => tag);
+    }
+
+    // The tags a filter asks for (not those it excludes): the sidebar's highlight
+    function tagTerms(input) {
+        input = (input || '').trim();
+        const p = parseModifier(input);
+        if (p) return p.mod === 'has' && p.val ? [p.val.trim()] : [];
+        return _terms(input).filter(([sign]) => sign === '+').map(([, tag]) => tag);
+    }
+
+    // The virtual tags an input uses, so nav.js knows which to fetch
+    function virtualTerms(input, v = _virtual) {
+        input = (input || '').trim();
+        const p = parseModifier(input);
+        const tags = p ? (p.val ? [p.val.trim()] : []) : _terms(input).map(([, tag]) => tag);
+        return [...new Set(tags.filter(t => v.names.includes(t)))];
+    }
+
+    // Match a task's tags against a tags filter string. Terms, all of which must hold, are
+    // separated by commas or spaces: "x" or "+x" has x, "-x" hasn't. Or one modifier for the
+    // whole input: .has:x .hasnt:x .any: .none:. A virtual tag (upper case, one of v.names)
+    // matches the tasks task said have it; one not fetched yet matches nothing.
+    function matchTags(taskTags, input, task = {}, v = _virtual) {
+        const has = tag => v.names.includes(tag)
+            ? (v.sets[tag] || []).includes(task.uuid)
+            : taskTags.includes(tag);
         const p = parseModifier(input);
 
-        if (!p) {
-            // default: all comma-separated tags must be present
-            const wanted = input.split(',').map(t => t.trim()).filter(Boolean);
-            return wanted.length === 0 || wanted.every(t => taskTags.includes(t));
-        }
+        if (!p) return _terms(input).every(([sign, tag]) => (sign === '+') === has(tag));
 
         const { mod, val } = p;
         switch (mod) {
-            case 'has':    return taskTags.includes(val);
-            case 'hasnt':  return !taskTags.includes(val);
+            case 'has':    return has(val);
+            case 'hasnt':  return !has(val);
             case 'any':    return taskTags.length > 0;
             case 'none':   return taskTags.length === 0;
             default:       return false;
@@ -119,7 +150,7 @@ TW.filter = (() => {
     }
 
     // Does a task pass the nav state's filter/priority/project/tags inputs? (twNav.getState())
-    function matchesNav(task, state) {
+    function matchesNav(task, state, v = _virtual) {
         const filter   = (state.filter   || '').trim();
         const priority = (state.priority || '').trim();
         const project  = (state.project  || '').trim();
@@ -127,7 +158,7 @@ TW.filter = (() => {
         if (filter   && !matchAttr(task.description || '', filter,   'text')) return false;
         if (priority && !matchAttr(task.priority    || '', priority, 'ord'))  return false;
         if (project  && !matchAttr(task.project     || '', project,  'text')) return false;
-        if (tags     && !matchTags(task.tags        || [], tags))             return false;
+        if (tags     && !matchTags(task.tags        || [], tags, task, v))    return false;
         return true;
     }
 
@@ -140,7 +171,7 @@ TW.filter = (() => {
 
     // Defaults for a new task from the nav state: the project, priority and tags it names, so a
     // run of related tasks needs no retyping. A plain value or .is:/.has: names one value;
-    // ranges, negatives and other modifiers name none. The description search is never one.
+    // ranges, negatives and other modifiers name none; "+x -y" gives x. The description search is never one.
     function addDefaults(state) {
         const out = {};
         const one = (input, mod) => {
@@ -153,10 +184,12 @@ TW.filter = (() => {
         if (project) out.project = project;
         const pri = one(state.priority, 'is').toUpperCase();
         if (pri && TW.sort.PRI_ORDER.includes(pri)) out.priority = pri;
-        const tags = one(state.tags, 'has').split(',').map(t => t.trim()).filter(Boolean);
+        // Tags: the ones asked for, less virtual ones (task won't add those)
+        const tags = tagTerms(state.tags).filter(t => !_virtual.names.includes(t));
         if (tags.length) out.tags = tags;
         return out;
     }
 
-    return { parseModifier, matchAttr, matchTags, matchesNav, navTasks, addDefaults };
+    return { parseModifier, matchAttr, matchTags, matchesNav, navTasks, addDefaults,
+             setVirtual, getVirtual, tagTerms, virtualTerms };
 })();

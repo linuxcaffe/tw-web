@@ -21,12 +21,44 @@ from datetime import datetime
 import tempfile
 from config import DEVELOPER_MODE, DEBUG_FILE
 
-TW_VIRTUAL_TAGS = {
-    'ACTIVE','ANNOTATED','BLOCKED','BLOCKING','CHILD','COMPLETED','DELETED',
-    'DUE','DUETODAY','LATEST','MONTH','NEXT','NOCOLOR','ORPHAN','OVERDUE',
-    'PARENT','PENDING','PRIORITY','PROJECT','QUARTER','READY','RECURRING',
-    'SCHEDULED','TAGGED','TODAY','TOMORROW','UDA','UNBLOCKED','WEEK','YEAR',
+# Taskwarrior 2.6.2's virtual tags, as `man task` lists them. They aren't stored or exported;
+# task works them out from other fields (tests/test_virtual_tags.py checks the list against task).
+TW_VIRTUAL_TAG_HELP = {
+    'ACTIVE':    'Matches if the task is started',
+    'ANNOTATED': 'Matches if the task has annotations',
+    'BLOCKED':   'Matches if the task is blocked',
+    'BLOCKING':  'Matches if the task is blocking',
+    'CHILD':     'Matches if the task has a parent (deprecated in 2.6.0)',
+    'COMPLETED': 'Matches if the task has completed status',
+    'DELETED':   'Matches if the task has deleted status',
+    'DUE':       'Matches if the task is due',
+    'INSTANCE':  'Matches if the task is a recurrent instance',
+    'LATEST':    'Matches if the task is the newest added task',
+    'MONTH':     'Matches if the task is due this month',
+    'ORPHAN':    'Matches if the task has any orphaned UDA values',
+    'OVERDUE':   'Matches if the task is overdue',
+    'PARENT':    'Matches if the task is a parent (deprecated in 2.6.0)',
+    'PENDING':   'Matches if the task has pending status',
+    'PRIORITY':  'Matches if the task has a priority',
+    'PROJECT':   'Matches if the task has a project',
+    'QUARTER':   'Matches if the task is due this quarter',
+    'READY':     'Matches if the task is actionable',
+    'SCHEDULED': 'Matches if the task is scheduled',
+    'TAGGED':    'Matches if the task has tags',
+    'TEMPLATE':  'Matches if the task is a recurrence template',
+    'TODAY':     'Matches if the task is due today',
+    'TOMORROW':  'Matches if the task is due sometime tomorrow',
+    'UDA':       'Matches if the task has any UDA values',
+    'UNBLOCKED': 'Matches if the task is not blocked',
+    'UNTIL':     'Matches if the task expires',
+    'WAITING':   'Matches if the task is waiting',
+    'WEEK':      'Matches if the task is due this week',
+    'YEAR':      'Matches if the task is due this year',
+    'YESTERDAY': 'Matches if the task was due sometime yesterday',
 }
+TW_VIRTUAL_DEPRECATED = {'CHILD', 'PARENT'}   # INSTANCE and TEMPLATE replace them
+# Every name task reads as virtual: the binary also takes DUETODAY (= TODAY), unlisted
+TW_VIRTUAL_TAGS = set(TW_VIRTUAL_TAG_HELP) | {'DUETODAY'}
 
 # Accepts a UUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx) or a plain integer task ID
 _TASK_ID_RE = re.compile(
@@ -898,6 +930,28 @@ def get_tags():
         tags = sorted(counts.keys())
         return jsonify({'success': True, 'tags': tags, 'counts': counts})
     return jsonify({'success': False, 'error': result['stderr']}), 500
+
+@app.route('/api/vtags')
+def get_virtual_tags():
+    """The virtual tags, with man task's descriptions, for the Tags sidebar.
+    ?match=DUE,OVERDUE also gives {TAG: [uuid…]}: the tasks task says have each one (all
+    statuses; the page intersects with what it shows). Unknown names are ignored, so nothing
+    from the request reaches task but a name from TW_VIRTUAL_TAGS.
+    """
+    tags = [{'name': n, 'description': d, 'deprecated': n in TW_VIRTUAL_DEPRECATED}
+            for n, d in sorted(TW_VIRTUAL_TAG_HELP.items())]
+    out = {'success': True, 'tags': tags, 'names': sorted(TW_VIRTUAL_TAGS)}
+    wanted = dict.fromkeys(n.strip() for n in request.args.get('match', '').split(','))
+    names = [n for n in wanted if n in TW_VIRTUAL_TAGS]
+    if names:
+        out['uuids'] = {}
+        for name in names:
+            result = run_task_command(['task', 'rc.context=none', f'+{name}', '_uuids'], readonly=True)
+            if not result['success']:
+                return jsonify({'success': False,
+                                'error': _task_error(f'Failed to read +{name}', result)}), 500
+            out['uuids'][name] = result['stdout'].split()
+    return jsonify(out)
 
 @app.route('/api/extension/info')
 def extension_info():
