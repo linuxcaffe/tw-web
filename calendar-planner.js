@@ -145,7 +145,11 @@ function initializeCalendar() {
         eventContent: renderEventContent,
 
         // Callbacks
-        eventClick:   (info) => showEventModal(info.event),
+        eventClick:   (info) => { if (!info.event.extendedProps?.layer) showEventModal(info.event); },
+        eventDidMount: (info) => {           // a layer item (holiday) says what it is on hover
+            const p = info.event.extendedProps;
+            if (p?.layer) info.el.title = info.event.title + (p.detail ? ` (${p.detail})` : '');
+        },
         eventDrop:    handleEventDrop,
         eventResize:  handleEventResize,
         eventReceive: handleEventReceive,
@@ -156,6 +160,7 @@ function initializeCalendar() {
         eventsSet: () => scheduleMarkers(),
     });
 
+    calendar.addEventSource(layerEventSource());
     calendar.render();
     setupExternalDrag();
     zoomTitle('week');
@@ -538,6 +543,31 @@ function processTasksForCalendar(scheduledTasks) {
     dueTasks.forEach(task =>       { const e = createCalendarEvent(task, 'due');       if (e) events.push(e); });
 
     _calEventSource = calendar.addEventSource(events);
+}
+
+// ── Layers: things that aren't tasks (TW.layers: holidays) ─────────────────────
+// Their own event source, separate from the tasks' (_calEventSource): FullCalendar asks for the
+// visible range. All-day, never editable, not counted, not narrowed by the nav filter; a click
+// does nothing (eventClick), hover gives the title and detail (eventDidMount).
+function layerEventSource() {
+    const key = TW.layers.dayKey;
+    const iso = k => `${k.slice(0, 4)}-${k.slice(4, 6)}-${k.slice(6, 8)}`;
+    return {
+        id: 'tw-layers',
+        events(info, success) {
+            const last = new Date(info.end); last.setDate(last.getDate() - 1);   // FC's end is exclusive
+            TW.layers.fetch(key(info.start), key(last), _calSettings).then(items => success(items.map(it => ({
+                id:            `layer-${it.layer}-${it.start}-${it.title}`,
+                title:         it.title,
+                start:         iso(it.start),
+                end:           iso(TW.layers.addDays(it.end, 1)),
+                allDay:        true,
+                editable:      false,
+                classNames:    ['tw-layer', `tw-layer-${it.layer}`],
+                extendedProps: { layer: it.layer, detail: it.detail || '' },
+            })))).catch(() => success([]));
+        },
+    };
 }
 
 // ── Event object factory ───────────────────────────────────────────────────────

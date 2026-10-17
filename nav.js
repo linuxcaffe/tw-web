@@ -1792,6 +1792,20 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             dl.appendChild(dlLine);
             dl.appendChild(_note('A cyan stripe in the time column from sunrise to sunset; hover the column for the times. A place in this browser\'s time zone; west and south are negative (Toronto 43.65, −79.38).'));
             bd.appendChild(dl);
+
+            // Holidays: the taskrc's holiday.* entries (tw-holidata writes them), Calendar and Agenda
+            const hd = _mk('div', { cls: 'tw-settings-row stack' });
+            hd.appendChild(_mk('div', { cls: 'tw-settings-label', text: 'Holidays' }));
+            const hdLine = _mk('div', { css: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' });
+            const hdOn = _mk('input', { type: 'checkbox', id: 'tws-cal-holidays', checked: cfg.cal_holidays !== false,
+                                        title: 'Show holidays in the Calendar and the Agenda' });
+            const hdDays = _inp('tws-agenda-holiday-days', 'number', { min: 0, max: 366, step: 1,
+                                value: cfg.agenda_holiday_days ?? 30, css: 'width:70px',
+                                title: 'Agenda: a holiday with no tasks gets its own line this many days ahead' });
+            hdLine.append(hdOn, dim('Agenda lines for'), hdDays, dim('days ahead'));
+            hd.appendChild(hdLine);
+            hd.appendChild(_note('From the taskrc\'s holiday.* entries (tw-holidata: holidata init). The Agenda also shows them on the date lines of days with tasks, however far ahead.'));
+            bd.appendChild(hd);
         }));
 
         // Terminal
@@ -1855,6 +1869,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             const calLat    = parseFloat(form.querySelector('#tws-cal-lat').value);
             const calLon    = parseFloat(form.querySelector('#tws-cal-lon').value);
             const calDaylight = form.querySelector('#tws-cal-daylight').checked;
+            const calHolidays = form.querySelector('#tws-cal-holidays').checked;
+            const hdDaysVal   = parseInt(form.querySelector('#tws-agenda-holiday-days').value, 10);
             const calZoom   = {};
             ['week', 'day'].forEach(view => {
                 const lines = [...form.querySelectorAll(`.tws-zoom-step[data-view="${view}"]`)];
@@ -1887,6 +1903,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                         cal_default_view:     calView,
                         ...(calZoom.week && calZoom.day ? { cal_zoom: calZoom } : {}),
                         cal_daylight:         calDaylight,
+                        cal_holidays:         calHolidays,
+                        ...(isNaN(hdDaysVal) ? {} : { agenda_holiday_days: hdDaysVal }),
                         ...(isNaN(calLat) ? {} : { cal_latitude: calLat }),
                         ...(isNaN(calLon) ? {} : { cal_longitude: calLon }),
                         pty_height:           isNaN(ptyHeight) ? 240 : ptyHeight,

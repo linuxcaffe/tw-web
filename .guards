@@ -84,3 +84,10 @@ nav.js:async function _syncVtags
 task-editor.js:_formValues
 app.py:def _export_one
 app.py:def _task_filter_args
+
+# ── Calendar layers: non-task items (holidays from the taskrc; plan tw:docs/tw-holidays-and-layers-plan.md) ──
+app.py:def get_holidays
+tw-layers.js:TW.layers =
+tw-layers.js:function byDay
+calendar-planner.js:function layerEventSource
+agenda.js:function agendaLayerDays

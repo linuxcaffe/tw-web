@@ -145,6 +145,11 @@ _SETTINGS_SCHEMA = {
                               'validate': lambda v: -90 <= v <= 90},
     'cal_longitude':        {'type': float, 'default': -79.38,
                               'validate': lambda v: -180 <= v <= 180},
+    # Holidays from the taskrc (/api/holidays) in the Calendar and the Agenda; the Agenda gives a
+    # holiday with no tasks its own date line up to this many days ahead (further if tasks are)
+    'cal_holidays':         {'type': None, 'default': True, 'coerce': _valid_bool},
+    'agenda_holiday_days':  {'type': int,  'default': 30,
+                              'validate': lambda v: 0 <= v <= 366},
     'pty_height':           {'type': int,  'default': 240,
                               'validate': lambda v: 60 <= v <= 1200},
     'pty_cwd':              {'type': str,  'default': '',
@@ -970,6 +975,62 @@ def get_virtual_tags():
                                 'error': _task_error(f'Failed to read +{name}', result)}), 500
             out['uuids'][name] = result['stdout'].split()
     return jsonify(out)
+
+_HOLIDAY_RE = re.compile(r'^holiday\.([^.=]+)\.(name|date|start|end|type|region)=(.*)$')
+_DATEFMT_PARTS = {'Y': r'(?P<Y>\d{4})', 'y': r'(?P<y>\d{2})', 'M': r'(?P<M>\d{2})',
+                  'm': r'(?P<M>\d{1,2})', 'D': r'(?P<D>\d{2})', 'd': r'(?P<D>\d{1,2})'}
+
+
+def _holiday_date_parser(fmt):
+    """dateformat.holiday (2.6.2's letters Y y M m D d; anything non-alphabetic is literal)
+    → a function from a value to YYYYMMDD, or None when the value doesn't fit."""
+    if any(ch.isalpha() and ch not in _DATEFMT_PARTS for ch in fmt):
+        return lambda v: None
+    rx = re.compile('^' + ''.join(_DATEFMT_PARTS.get(ch, re.escape(ch)) for ch in fmt) + '$')
+    def parse(value):
+        m = rx.match(value.strip())
+        if not m:
+            return None
+        g = m.groupdict()
+        year = int(g['Y']) if g.get('Y') else 2000 + int(g.get('y') or 0)
+        try:
+            return datetime(year, int(g['M']), int(g['D'])).strftime('%Y%m%d')
+        except (KeyError, TypeError, ValueError):
+            return None
+    return parse
+
+
+@app.route('/api/holidays')
+def get_holidays():
+    """The CLI's holidays: holiday.<key>.name with .date (or .start/.end), as `task calendar`
+    shows them; tw-holidata writes them and adds .type/.region. tw-web never fetches them.
+    ?start=YYYYMMDD&end=YYYYMMDD (inclusive, both optional) keeps those that overlap."""
+    start, end = request.args.get('start', ''), request.args.get('end', '')
+    if any(v and not re.fullmatch(r'\d{8}', v) for v in (start, end)):
+        return jsonify({'success': False, 'error': 'start and end are YYYYMMDD'}), 400
+    result = run_task_command(['task', 'rc.context=none', '_show'], readonly=True)
+    if not result['success']:
+        return jsonify({'success': False, 'error': _task_error('Failed to read holidays', result)}), 500
+    fmt, entries = 'YMD', {}
+    for line in result['stdout'].splitlines():
+        if line.startswith('dateformat.holiday='):
+            fmt = line.split('=', 1)[1].strip() or 'YMD'
+        m = _HOLIDAY_RE.match(line)
+        if m:
+            entries.setdefault(m.group(1), {})[m.group(2)] = m.group(3).strip()
+    parse = _holiday_date_parser(fmt)
+    out = []
+    for e in entries.values():
+        first = parse(e.get('start') or e.get('date') or '')
+        last = parse(e.get('end') or e.get('date') or '') or first
+        if not first or not e.get('name') or last < first:
+            continue
+        if (start and last < start) or (end and first > end):
+            continue
+        out.append({'start': first, 'end': last, 'title': e['name'],
+                    'type': e.get('type', ''), 'region': e.get('region', '')})
+    out.sort(key=lambda h: (h['start'], h['title']))
+    return jsonify({'success': True, 'holidays': out})
 
 @app.route('/api/extension/info')
 def extension_info():

@@ -2,6 +2,8 @@
 
 let taskCardManager;
 let taskEditor;
+let _renderId = 0;        // a newer render makes an older one's late layers draw nothing
+let _agendaCfg = null;    // /api/config, once per page: cal_holidays, agenda_holiday_days
 
 document.addEventListener('DOMContentLoaded', () => {
     taskEditor = new TaskEditor({
@@ -148,12 +150,46 @@ function renderAgenda(scheduled, due) {
         groups.get(key).push(task);
     });
 
+    // Layers (TW.layers: holidays) put their names on the date lines; a layer that makes bars
+    // (holidays) adds a line for a day with no tasks, from today to the later of the last task
+    // shown and agenda_holiday_days ahead. History views only annotate the lines they have.
+    const todayKey = dayKey(new Date());
+    const myRender = ++_renderId;
+    const draw = layers => {
+        if (myRender === _renderId) drawAgenda(container, groups, layers, todayKey, isHistory, filtered.length, total);
+    };
+    agendaLayerDays([...groups.keys()].filter(k => k !== 'none'), todayKey, isHistory)
+        .then(draw, err => { console.warn('[agenda] layers:', err); draw({ byDay: new Map(), bars: new Set() }); });
+}
+
+// {byDay: Map day → layer items, bars: Set of days that get a line without tasks}
+async function agendaLayerDays(taskKeys, todayKey, isHistory) {
+    const none = { byDay: new Map(), bars: new Set() };
+    if (!TW.layers) return none;
+    _agendaCfg = _agendaCfg || fetch('/api/config').then(r => r.json()).catch(() => ({}));
+    const cfg = await _agendaCfg;
+    if (!TW.layers.enabled(cfg).length) return none;
+    const sorted = [...taskKeys].sort();
+    const ahead  = TW.layers.addDays(todayKey, Math.max(0, cfg.agenda_holiday_days ?? 30));
+    const from   = sorted[0] && sorted[0] < todayKey ? sorted[0] : todayKey;
+    const last   = sorted[sorted.length - 1];
+    const to     = isHistory ? (last || todayKey) : (last && last > ahead ? last : ahead);
+    const byDay  = TW.layers.byDay(await TW.layers.fetch(isHistory ? (sorted[0] || todayKey) : from, to, cfg));
+    const bars   = new Set();
+    if (!isHistory) {
+        for (const [day, items] of byDay) {
+            if (day >= todayKey && items.some(it => TW.layers.get(it.layer)?.makesBars)) bars.add(day);
+        }
+    }
+    return { byDay, bars };
+}
+
+function drawAgenda(container, groups, layers, todayKey, isHistory, shown, total) {
     // There's always a TODAY bar, in date order, except in the history views (past dates,
     // newest first). With nothing shown for today it says so.
-    const todayKey = dayKey(new Date());
     let   todayDone = isHistory;
     const addToday = () => {
-        container.appendChild(dateHeader(todayKey, isHistory));
+        container.appendChild(dateHeader(todayKey, isHistory, layers.byDay.get(todayKey)));
         const nothing = document.createElement('div');
         nothing.className = 'agenda-nothing';
         nothing.textContent = 'Nothing due or scheduled';
@@ -161,17 +197,30 @@ function renderAgenda(scheduled, due) {
         todayDone = true;
     };
 
+    // The task days in their order, with the layer-only days merged in by date (not in history)
+    let keys = [...groups.keys()];
+    if (!isHistory && layers.bars.size) {
+        const extra = [...layers.bars].filter(k => !groups.has(k));
+        keys = [...keys.filter(k => k === 'none'), ...[...keys.filter(k => k !== 'none'), ...extra].sort()];
+    }
+
     container.innerHTML = '';
     const allLookup = new Map((window._twAllTasks || []).map(t => [t.uuid, t]));
-    groups.forEach((tasks, key) => {
+    keys.forEach(key => {
         if (!todayDone && key !== 'none' && key > todayKey) addToday();
+        const tasks = groups.get(key);
+        if (!tasks) {                                   // a holiday with no tasks
+            if (key === todayKey) { addToday(); return; }
+            container.appendChild(dateHeader(key, isHistory, layers.byDay.get(key)));
+            return;
+        }
         if (key === todayKey) todayDone = true;
-        container.appendChild(dateHeader(key, isHistory));
+        container.appendChild(dateHeader(key, isHistory, layers.byDay.get(key)));
         tasks.forEach(task => taskCardManager.appendWithDeps(container, task, allLookup));
     });
     if (!todayDone) addToday();
 
-    if (filtered.length === 0 && (isHistory || total > 0)) {
+    if (shown === 0 && (isHistory || total > 0)) {
         container.insertAdjacentHTML('beforeend', total === 0
             ? '<div class="empty-state"><p>No scheduled or due tasks.</p></div>'
             : '<div class="empty-state"><p>No tasks match the current filter.</p></div>');
@@ -188,12 +237,20 @@ function localDayKey(ts) {
     return dayKey(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])));
 }
 
-// A date line: centred and quiet; only "(overdue)" is red. A click opens that day in the Calendar.
-function dateHeader(key, isHistory) {
+// A date line: centred and quiet; only "(overdue)" is red; a holiday's name follows the date.
+// A click opens that day in the Calendar.
+function dateHeader(key, isHistory, layerItems) {
     const { label, overdue, today } = formatDateKey(key, isHistory);
     const header = document.createElement('div');
     header.className = 'agenda-date-header';
     header.textContent = label;
+    for (const it of layerItems || []) {
+        const name = document.createElement('span');
+        name.className = `agenda-layer agenda-layer-${it.layer}`;
+        name.textContent = ` · ${it.title}`;
+        if (it.detail) name.title = it.detail;
+        header.appendChild(name);
+    }
     if (overdue) {
         const mark = document.createElement('span');
         mark.className = 'agenda-overdue';

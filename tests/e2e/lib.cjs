@@ -52,6 +52,25 @@ function task(...args) {
     return execFileSync('task', ['rc.verbose=nothing', ...args], { encoding: 'utf8', env: process.env });
 }
 
+// Holidays as tw-holidata writes them, appended to the scratch taskrc for one check and taken
+// out again after it (run.py re-seeds the data between checks, not the taskrc).
+// days: [[name, offsetFromToday, lastOffset?]] or [[name, 'YYYYMMDD']]
+async function withHolidays(days, fn) {
+    guard();
+    const rc = process.env.TASKRC;
+    const before = fs.readFileSync(rc, 'utf8');
+    const key = n => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n);
+        return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; };
+    const lines = days.flatMap(([name, a, b], i) => {
+        const k = `holiday.hde2e${i}`;
+        const first = typeof a === 'string' ? a : key(a);
+        return b === undefined ? [`${k}.name=${name}`, `${k}.date=${first}`, `${k}.region=E2E`]
+                               : [`${k}.name=${name}`, `${k}.start=${first}`, `${k}.end=${key(b)}`];
+    });
+    fs.writeFileSync(rc, before + lines.join('\n') + '\n');
+    try { return await fn(key); } finally { fs.writeFileSync(rc, before); }
+}
+
 function exportOne(filter) {
     return JSON.parse(task(filter, 'export'))[0];
 }
@@ -81,4 +100,4 @@ function check(fn) {
         });
 }
 
-module.exports = { check, expect, task, exportOne, B, sleep, cardTexts };
+module.exports = { check, expect, task, exportOne, B, sleep, cardTexts, withHolidays };

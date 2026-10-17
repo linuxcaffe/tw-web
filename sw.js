@@ -1,12 +1,12 @@
 // tw-web service worker — minimal shell cache for PWA installability
 // API calls always go to network; only app shell assets are cached.
 
-const CACHE = 'tw-web-v201';
+const CACHE = 'tw-web-v202';
 const SHELL = [
     '/', '/index.html', '/styles.css',
     '/nav.js', '/tw-api.js', '/tw-filter.js', '/main.js', '/task-card.js', '/task-editor.js', '/task-editor-templates.html',
     '/agenda.html', '/agenda.js',
-    '/calendar-planner.html', '/calendar-planner.js', '/calendar-planner.css', '/sun.js',
+    '/calendar-planner.html', '/calendar-planner.js', '/calendar-planner.css', '/sun.js', '/tw-layers.js',
     '/fullcalendar.min.js', '/fullcalendar.min.css',
     '/kanban.html', '/about.html', '/help.html',
     '/xterm.js', '/xterm.css',

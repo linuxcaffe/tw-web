@@ -223,8 +223,12 @@ uda.priority.values=1,2,3,4,5,6,H,M,L
 |------|-----|---------------|
 | List | `/` | Filterable task list; card or list layout |
 | Kanban | `/kanban.html` | Tasks as cards in `state` UDA columns |
-| Agenda | `/agenda.html` | Scheduled and due tasks in chronological order |
-| Calendar | `/calendar-planner.html` | Day/week/month views; drag tasks onto dates and times; a cyan stripe in the time column marks sunrise to sunset |
+| Agenda | `/agenda.html` | Scheduled and due tasks in chronological order; holidays on the date lines, with a line of their own up to 30 days ahead (Settings) |
+| Calendar | `/calendar-planner.html` | Day/week/month views; drag tasks onto dates and times; a cyan stripe in the time column marks sunrise to sunset; holidays as amber all-day bars |
+
+### Holidays
+
+The Calendar and the Agenda show the holidays your taskrc defines (`holiday.<name>.name` with `.date`, or `.start`/`.end`), the same ones `task calendar` shows. tw-web reads them with `task _show` and never fetches them itself. [tw-holidata](https://github.com/linuxcaffe/tw-holidata) writes them from holidata.net for your locale and region (`tw -I holidata`, then `holidata init --locale en-CA --regions ON`). They can't be moved or opened, aren't counted, and ignore the nav filter. Settings → Calendar → Holidays turns them off and sets how far ahead the Agenda gives a holiday with no tasks its own line.
 
 ### Keyboard shortcuts
 

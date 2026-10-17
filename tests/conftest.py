@@ -23,6 +23,14 @@ _tmp = Path(tempfile.mkdtemp(prefix='tw-web-test-'))
     'hooks=off\n'
     'confirmation=no\n'
     'verbose=nothing\n'
+    # Holidays as tw-holidata writes them (tests/test_holidays.py reads them back)
+    'holiday.hd20261012a.name=Thanksgiving Day\n'
+    'holiday.hd20261012a.date=20261012\n'
+    'holiday.hd20261012a.type=V\n'
+    'holiday.hd20261012a.region=ON\n'
+    'holiday.hd20261224a.name=Winter Break\n'
+    'holiday.hd20261224a.start=20261224\n'
+    'holiday.hd20261224a.end=20261226\n'
 )
 os.environ['TASKRC'] = str(_tmp / 'taskrc')
 os.environ['TASKDATA'] = str(_tmp / 'data')
