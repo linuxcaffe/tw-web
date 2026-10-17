@@ -1387,6 +1387,16 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     }
 
     // ── Tags panel ────────────────────────────────────────────────────────────
+    // The virtual tags' names and descriptions, for the virtual mode on any page
+    async function _vtEnsureNames() {
+        if (_vtLast) return;
+        if (typeof TW !== 'undefined' && TW.filter) return _syncVtags();
+        try {
+            const d = await fetch('/api/vtags').then(r => r.json());
+            if (d.success && !_vtLast) _vtLast = { names: d.names, tags: d.tags, sets: {} };
+        } catch {}
+    }
+
     // The tags the input asks for (TW.filter's reading where the page has it)
     function _tagTerms(input) {
         if (typeof TW !== 'undefined' && TW.filter) return TW.filter.tagTerms(input);
@@ -1402,36 +1412,34 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         return c;
     }
 
-    // Shared tag-render helper (used by both panel and sidebar)
+    // Shared tag-render helper (used by both panel and sidebar). Modes: active and all list real
+    // tags; virtual lists task's virtual tags (man task's list, less the deprecated CHILD/PARENT)
+    // with their descriptions as tooltips, no counts.
     function _renderTagList(container, tagCounts, mode, selTags, curState, onMode, onPick) {
         const tags = Object.keys(tagCounts).sort((a, b) => {
             const d = (tagCounts[b]||0) - (tagCounts[a]||0);
             return d !== 0 ? d : a.localeCompare(b);
         });
+        const vtags = (_vtLast?.tags || []).filter(t => !t.deprecated);
+        const btn = m => `<button class="tw-toggle-btn${mode===m?' active':''}" data-mode="${m}">${m}</button>`;
         let html =
-            `<div class="tw-toggle-bar">` +
-                `<button class="tw-toggle-btn${mode==='active'?' active':''}" data-mode="active">active</button>` +
-                `<button class="tw-toggle-btn${mode==='all'?' active':''}" data-mode="all">all</button>` +
-                `<span class="tw-proj-total">${tags.length}</span>` +
+            `<div class="tw-toggle-bar">` + btn('active') + btn('all') + btn('virtual') +
+                `<span class="tw-proj-total">${mode === 'virtual' ? vtags.length : tags.length}</span>` +
             `</div>` +
             `<button class="tw-pick-item${!curState.tags?' active':''}" data-pick=""><span class="tw-proj-label">All tags</span></button>` +
             `<button class="tw-pick-item${curState.tags==='.none:'?' active':''}" data-pick=".none:"><span class="tw-proj-label">No tags</span></button>`;
-        if (tags.length) {
+        if (mode === 'virtual') {
+            vtags.forEach(t => {
+                html += `<button class="tw-pick-item${selTags.includes(t.name)?' active':''}" data-pick="${esc(t.name)}" title="${esc(t.description)}">` +
+                        `<span class="tw-proj-label">+${esc(t.name)}</span></button>`;
+            });
+        } else if (tags.length) {
             html += `<div class="tw-pick-section-label">Tags</div>`;
             tags.forEach(t => {
                 const count = tagCounts[t] || 0;
                 const badge = count ? `<span class="tw-proj-count">${count}</span>` : '';
                 html += `<button class="tw-pick-item${selTags.includes(t)?' active':''}" data-pick="${esc(t)}">` +
                         `<span class="tw-proj-label">+${esc(t)}</span>${badge}</button>`;
-            });
-        }
-        // Virtual tags (task works them out; man task's list, less the deprecated CHILD/PARENT)
-        const vtags = (_vtLast?.tags || []).filter(t => !t.deprecated);
-        if (vtags.length) {
-            html += `<div class="tw-pick-section-label">Virtual</div>`;
-            vtags.forEach(t => {
-                html += `<button class="tw-pick-item${selTags.includes(t.name)?' active':''}" data-pick="${esc(t.name)}" title="${esc(t.description)}">` +
-                        `<span class="tw-proj-label">+${esc(t.name)}</span></button>`;
             });
         }
         container.innerHTML = html;
@@ -1464,6 +1472,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                     const d = await fetch('/api/tags?all=1').then(r => r.json());
                     panelTagCounts = d.counts || {};
                 } catch { body.innerHTML = '<div class="tw-panel-error">Failed to load tags</div>'; return; }
+            } else if (mode === 'virtual') {
+                await _vtEnsureNames();
             } else {
                 if (window._twLastTasks) panelTagCounts = _countTagsFromTasks(window._twLastTasks);
             }
@@ -1567,6 +1577,9 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                     tagCounts = d.counts || {};
                     render();
                 } catch { container.innerHTML = '<div class="tw-panel-error">Failed to load</div>'; }
+            } else if (mode === 'virtual') {
+                await _vtEnsureNames();
+                render();
             } else {
                 // active mode: seed from last known filtered tasks
                 if (window._twLastTasks) tagCounts = _countTagsFromTasks(window._twLastTasks);
