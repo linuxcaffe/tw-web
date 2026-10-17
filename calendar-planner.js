@@ -151,7 +151,8 @@ function initializeCalendar() {
         eventReceive: handleEventReceive,
         select:       handleSelect,          // drag/click to create — replaces dateClick
 
-        datesSet:  () => { updateCalendarTitle(); scheduleMarkers(); },
+        datesSet:  () => { updateCalendarTitle(); scheduleMarkers(); scheduleDaylight(); },
+        slotLabelDidMount: () => scheduleDaylight(),   // new rows after a zoom step
         eventsSet: () => scheduleMarkers(),
     });
 
@@ -830,6 +831,36 @@ function setupOffscreenMarkers() {
     document.getElementById('calendar').addEventListener('scroll', scheduleMarkers, true);
     window.addEventListener('scroll', scheduleMarkers, { passive: true });
     window.addEventListener('resize', scheduleMarkers);
+}
+
+// ── Daylight in the time column ───────────────────────────────────────────────
+// The time labels are tinted blue in daylight, fading through civil twilight (TW.sun, for the
+// settings' place; default Toronto). Day view uses its day; Week the middle of the week, since
+// sunrise moves 2–3 minutes in a week. Each label cell gets its stretch of the curve, with a
+// stop at any of the sun's times inside it, so the tint is right at every zoom step.
+const DAYLIGHT_RGB = '74, 144, 226', DAYLIGHT_ALPHA = 0.22;
+let _daylightFrame = 0;
+function scheduleDaylight() {
+    cancelAnimationFrame(_daylightFrame);
+    _daylightFrame = requestAnimationFrame(paintDaylight);
+}
+function paintDaylight() {
+    const cells = [...document.querySelectorAll('#calendar td.fc-timegrid-slot-label[data-time]')];
+    if (!cells.length) return;
+    const v   = calendar.view;
+    const day = v.type === 'timeGridWeek' ? new Date(v.currentStart.getTime() + 3 * 864e5) : v.currentStart;
+    const sun = _calSettings.cal_daylight === false ? null
+        : TW.sun.times(day, _calSettings.cal_latitude ?? 43.65, _calSettings.cal_longitude ?? -79.38);
+    const mins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    cells.forEach((td, i) => {
+        const a = mins(td.dataset.time);
+        const b = i + 1 < cells.length ? mins(cells[i + 1].dataset.time) : 1440;
+        const pts = sun ? [a, ...[sun.dawn, sun.sunrise, sun.sunset, sun.dusk].filter(m => m > a && m < b), b] : [];
+        if (pts.every(m => TW.sun.tint(m, sun) === 0)) { td.style.backgroundImage = ''; return; }
+        const stops = pts.map(m => `rgba(${DAYLIGHT_RGB}, ${(DAYLIGHT_ALPHA * TW.sun.tint(m, sun)).toFixed(3)}) ` +
+                                   `${((m - a) / (b - a) * 100).toFixed(1)}%`);
+        td.style.backgroundImage = `linear-gradient(${stops.join(', ')})`;
+    });
 }
 
 function scheduleMarkers() {

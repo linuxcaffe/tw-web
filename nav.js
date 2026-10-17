@@ -1778,6 +1778,20 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 row.appendChild(_note(`Click ${view === 'week' ? 'Week' : 'Day'} again to step through these; ◉ is where it opens. All 24 hours scroll.`));
                 bd.appendChild(row);
             });
+
+            // Daylight: the time column tinted from sunrise to sunset, fading through twilight
+            const dl = _mk('div', { cls: 'tw-settings-row stack' });
+            dl.appendChild(_mk('div', { cls: 'tw-settings-label', text: 'Daylight' }));
+            const dlLine = _mk('div', { css: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' });
+            const dlOn = _mk('input', { type: 'checkbox', id: 'tws-cal-daylight', checked: cfg.cal_daylight !== false,
+                                        title: 'Tint daylight hours in the time column' });
+            const lat = _inp('tws-cal-lat', 'number', { min: -90,  max: 90,  step: 0.01, value: cfg.cal_latitude  ?? 43.65,  css: 'width:90px', title: 'Latitude (north +)' });
+            const lon = _inp('tws-cal-lon', 'number', { min: -180, max: 180, step: 0.01, value: cfg.cal_longitude ?? -79.38, css: 'width:90px', title: 'Longitude (east +, west −)' });
+            const dim = t => _mk('span', { css: 'color:rgba(255,255,255,0.5);font-size:0.8rem', text: t });
+            dlLine.append(dlOn, dim('at'), lat, dim('°N'), lon, dim('°E'));
+            dl.appendChild(dlLine);
+            dl.appendChild(_note('Tints the time column from sunrise to sunset, fading through twilight. A place in this browser\'s time zone; west and south are negative (Toronto 43.65, −79.38).'));
+            bd.appendChild(dl);
         }));
 
         // Terminal
@@ -1838,6 +1852,9 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             const calStart  = form.querySelector('#tws-cal-start').value;
             const calEnd    = form.querySelector('#tws-cal-end').value;
             const calView   = form.querySelector('#tws-cal-view').value;
+            const calLat    = parseFloat(form.querySelector('#tws-cal-lat').value);
+            const calLon    = parseFloat(form.querySelector('#tws-cal-lon').value);
+            const calDaylight = form.querySelector('#tws-cal-daylight').checked;
             const calZoom   = {};
             ['week', 'day'].forEach(view => {
                 const lines = [...form.querySelectorAll(`.tws-zoom-step[data-view="${view}"]`)];
@@ -1869,6 +1886,9 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                         cal_day_end:          calEnd,
                         cal_default_view:     calView,
                         ...(calZoom.week && calZoom.day ? { cal_zoom: calZoom } : {}),
+                        cal_daylight:         calDaylight,
+                        ...(isNaN(calLat) ? {} : { cal_latitude: calLat }),
+                        ...(isNaN(calLon) ? {} : { cal_longitude: calLon }),
                         pty_height:           isNaN(ptyHeight) ? 240 : ptyHeight,
                         pty_cwd:              ptyCwd,
                         pty_init:             ptyInit,

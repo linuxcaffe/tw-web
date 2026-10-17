@@ -71,6 +71,8 @@ tw-filter.js:function matchesNav
 tw-filter.js:function priRank
 tw-filter.js:function setVirtual
 tw-filter.js:function virtualTerms
+sun.js:TW.sun =
+calendar-planner.js:function paintDaylight
 app.py:TW_VIRTUAL_TAGS
 app.py:def get_virtual_tags
 nav.js:async function _syncVtags

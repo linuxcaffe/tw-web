@@ -223,7 +223,7 @@ uda.priority.values=1,2,3,4,5,6,H,M,L
 | List | `/` | Filterable task list; card or list layout |
 | Kanban | `/kanban.html` | Tasks as cards in `state` UDA columns |
 | Agenda | `/agenda.html` | Scheduled and due tasks in chronological order |
-| Calendar | `/calendar-planner.html` | Week/month view; drag tasks onto dates |
+| Calendar | `/calendar-planner.html` | Day/week/month views; drag tasks onto dates and times; daylight tinted in the time column |
 
 ### Keyboard shortcuts
 

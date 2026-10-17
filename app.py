@@ -116,6 +116,16 @@ def _valid_zoom(v):
         out[view] = {'steps': norm, 'default': default}
     return out
 
+def _valid_bool(v):
+    """A JSON boolean, or the strings a form might send."""
+    if isinstance(v, bool):
+        return v
+    if str(v).strip().lower() in ('true', '1', 'yes', 'on'):
+        return True
+    if str(v).strip().lower() in ('false', '0', 'no', 'off'):
+        return False
+    raise ValueError(f'not a yes/no value: {v!r}')
+
 _SETTINGS_SCHEMA = {
     'notification_timeout': {'type': int,  'default': 3000,
                               'validate': lambda v: v >= 0},
@@ -127,6 +137,12 @@ _SETTINGS_SCHEMA = {
     'cal_default_view':     {'type': str,  'default': 'timeGridWeek',
                               'validate': lambda v: v in _CAL_VIEWS},
     'cal_zoom':             {'type': None, 'default': _CAL_ZOOM_DEFAULT, 'coerce': _valid_zoom},
+    # The Calendar's time column tints daylight (sun.js) for this place; default Toronto
+    'cal_daylight':         {'type': None, 'default': True, 'coerce': _valid_bool},
+    'cal_latitude':         {'type': float, 'default': 43.65,
+                              'validate': lambda v: -90 <= v <= 90},
+    'cal_longitude':        {'type': float, 'default': -79.38,
+                              'validate': lambda v: -180 <= v <= 180},
     'pty_height':           {'type': int,  'default': 240,
                               'validate': lambda v: 60 <= v <= 1200},
     'pty_cwd':              {'type': str,  'default': '',
