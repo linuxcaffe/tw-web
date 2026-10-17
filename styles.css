@@ -1163,12 +1163,13 @@ a.ann-link:hover { text-decoration: underline; }
     font-size: 0.8rem;
     font-weight: 600;
     letter-spacing: 0.04em;
+    text-align: center;
     color: var(--text-muted, #888);
     padding: 0.9rem 0 0.3rem;
     border-bottom: 1px solid var(--border-color, #e0e0e0);
     margin-bottom: 0.5rem;
 }
-.agenda-date-header.overdue {
+.agenda-overdue {
     color: #dc3545;
 }
 .agenda-date-header.today {
@@ -1179,6 +1180,13 @@ a.ann-link:hover { text-decoration: underline; }
     padding: 0.4rem 0.75rem;
     margin-bottom: 0.75rem;
     letter-spacing: 0.08em;
+}
+.agenda-nothing {
+    text-align: center;
+    font-size: 0.85rem;
+    font-style: italic;
+    color: var(--text-muted, #888);
+    padding: 0 0 0.75rem;
 }
 .empty-state {
     text-align: center;

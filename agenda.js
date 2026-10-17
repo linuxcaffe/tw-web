@@ -140,41 +140,76 @@ function renderAgenda(scheduled, due) {
         }).catch(() => {});
     }
 
-    if (filtered.length === 0) {
-        container.innerHTML = total === 0
-            ? '<div class="empty-state"><p>No scheduled or due tasks.</p></div>'
-            : '<div class="empty-state"><p>No tasks match the current filter.</p></div>';
-        return;
-    }
-
-    // Group by calendar day
+    // Group by local calendar day (task's dates are UTC: 20:00 EDT is already tomorrow there)
     const groups = new Map();
     filtered.forEach(task => {
-        const key = (task._date || '').slice(0, 8) || 'none';
+        const key = localDayKey(task._date);
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(task);
     });
 
-    container.innerHTML = '';
-    groups.forEach((tasks, key) => {
-        const { label, overdue, today } = formatDateKey(key, isHistory);
-        const header = document.createElement('div');
-        header.className = 'agenda-date-header';
-        header.textContent = label;
-        if (overdue) header.classList.add('overdue');
-        if (today)   header.classList.add('today');
-        if (key !== 'none') {
-            header.style.cursor = 'pointer';
-            header.title = 'Open in Calendar Day view';
-            header.addEventListener('click', () => {
-                window.location.href = `/calendar-planner.html?date=${key}&view=day`;
-            });
-        }
-        container.appendChild(header);
+    // There's always a TODAY bar, in date order, except in the history views (past dates,
+    // newest first). With nothing shown for today it says so.
+    const todayKey = dayKey(new Date());
+    let   todayDone = isHistory;
+    const addToday = () => {
+        container.appendChild(dateHeader(todayKey, isHistory));
+        const nothing = document.createElement('div');
+        nothing.className = 'agenda-nothing';
+        nothing.textContent = 'Nothing due or scheduled';
+        container.appendChild(nothing);
+        todayDone = true;
+    };
 
-        const allLookup = new Map((window._twAllTasks || []).map(t => [t.uuid, t]));
+    container.innerHTML = '';
+    const allLookup = new Map((window._twAllTasks || []).map(t => [t.uuid, t]));
+    groups.forEach((tasks, key) => {
+        if (!todayDone && key !== 'none' && key > todayKey) addToday();
+        if (key === todayKey) todayDone = true;
+        container.appendChild(dateHeader(key, isHistory));
         tasks.forEach(task => taskCardManager.appendWithDeps(container, task, allLookup));
     });
+    if (!todayDone) addToday();
+
+    if (filtered.length === 0 && (isHistory || total > 0)) {
+        container.insertAdjacentHTML('beforeend', total === 0
+            ? '<div class="empty-state"><p>No scheduled or due tasks.</p></div>'
+            : '<div class="empty-state"><p>No tasks match the current filter.</p></div>');
+    }
+}
+
+// YYYYMMDD of a local date; of a task's UTC timestamp (20261018T000000Z), its local day
+function dayKey(d) {
+    return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+}
+function localDayKey(ts) {
+    const m = (ts || '').match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+    if (!m) return (ts || '').slice(0, 8) || 'none';
+    return dayKey(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])));
+}
+
+// A date line: centred and quiet; only "(overdue)" is red. A click opens that day in the Calendar.
+function dateHeader(key, isHistory) {
+    const { label, overdue, today } = formatDateKey(key, isHistory);
+    const header = document.createElement('div');
+    header.className = 'agenda-date-header';
+    header.textContent = label;
+    if (overdue) {
+        const mark = document.createElement('span');
+        mark.className = 'agenda-overdue';
+        mark.textContent = '(overdue)';
+        header.append(' ', mark);
+        header.classList.add('overdue');
+    }
+    if (today) header.classList.add('today');
+    if (key !== 'none') {
+        header.style.cursor = 'pointer';
+        header.title = 'Open in Calendar Day view';
+        header.addEventListener('click', () => {
+            window.location.href = `/calendar-planner.html?date=${key}&view=day`;
+        });
+    }
+    return header;
 }
 
 function formatDateKey(key, isHistory = false) {
@@ -197,7 +232,7 @@ function formatDateKey(key, isHistory = false) {
 
     if (diff < 0)          return isHistory
                                ? { label: datePart,                       overdue: false, today: false }
-                               : { label: `${datePart} (overdue)`,        overdue: true,  today: false };
+                               : { label: datePart,                       overdue: true,  today: false };
     if (diff === 0)        return { label: `TODAY - ${datePart}`,      overdue: false, today: true  };
     if (diff === 86400000) return { label: `TOMORROW - ${datePart}`,   overdue: false, today: false };
 
