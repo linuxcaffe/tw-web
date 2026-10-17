@@ -63,6 +63,11 @@ check(async pg => {
   check starts from it. Times like `scheduled:today+10h` mean today 10:00, so they stay inside the
   calendar's current week.
 - Make the bug show up as an `expect`, not a timeout: wait for what is there either way, then assert.
+- **Holidays, moon phases, seasons:** the seed taskrc has none (the Agenda checks count date lines).
+  Wrap a check in `withHolidays([[name, dayOffset, lastOffset?, {kind, time}?], …], async key => …)`:
+  it appends `holiday.*` entries to the scratch taskrc and restores it afterwards.
+- **Red against main's views:** for a page fix, copy the touched view files aside, `git show main:<file> >
+  <file>`, run the new check (it must fail), then copy them back.
 - Bug checks go in `tests/e2e/xfail.txt` until the fix. Read the `xfail` reason line in the output, so a
   check doesn't count as reproducing the bug when it failed for another reason.
 - Playwright is borrowed from `~/dev/nb-web-tests/e2e/node_modules` (or `$TW_E2E_PLAYWRIGHT`); tw-web has
