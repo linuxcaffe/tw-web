@@ -91,3 +91,4 @@ tw-layers.js:TW.layers =
 tw-layers.js:function byDay
 calendar-planner.js:function layerEventSource
 agenda.js:function agendaLayerDays
+calendar-planner.js:function paintLayerMarks

@@ -23,7 +23,7 @@ _tmp = Path(tempfile.mkdtemp(prefix='tw-web-test-'))
     'hooks=off\n'
     'confirmation=no\n'
     'verbose=nothing\n'
-    # Holidays as tw-holidata writes them (tests/test_holidays.py reads them back)
+    # Holidays as tw-events writes them (tests/test_holidays.py reads them back)
     'holiday.hd20261012a.name=Thanksgiving Day\n'
     'holiday.hd20261012a.date=20261012\n'
     'holiday.hd20261012a.type=V\n'
@@ -31,6 +31,11 @@ _tmp = Path(tempfile.mkdtemp(prefix='tw-web-test-'))
     'holiday.hd20261224a.name=Winter Break\n'
     'holiday.hd20261224a.start=20261224\n'
     'holiday.hd20261224a.end=20261226\n'
+    # The sky, as tw-events writes it: .kind and .at (the moment, UTC)
+    'holiday.mn20261026a.name=Full Moon\n'
+    'holiday.mn20261026a.date=20261026\n'
+    'holiday.mn20261026a.kind=moon\n'
+    'holiday.mn20261026a.at=20261026T041142Z\n'
 )
 os.environ['TASKRC'] = str(_tmp / 'taskrc')
 os.environ['TASKDATA'] = str(_tmp / 'data')

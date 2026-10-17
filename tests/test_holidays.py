@@ -1,4 +1,4 @@
-"""/api/holidays: the CLI's holiday.* entries (tw-holidata writes them), read with `task _show`.
+"""/api/holidays: the CLI's holiday.* entries (tw-events writes them), read with `task _show`.
 
 tw-web never fetches holidays itself: the taskrc is the source, so `task calendar` and tw-web
 show the same days (tw:docs/tw-holidays-and-layers-plan.md).
@@ -18,9 +18,12 @@ def fake_show(app_module, monkeypatch, text):
 def test_reads_the_real_taskrc(client):
     r = client.get('/api/holidays?start=20261001&end=20261231').get_json()
     assert r['success']
+    H = {'kind': 'holiday', 'at': ''}
     assert r['holidays'] == [
-        {'start': '20261012', 'end': '20261012', 'title': 'Thanksgiving Day', 'type': 'V', 'region': 'ON'},
-        {'start': '20261224', 'end': '20261226', 'title': 'Winter Break', 'type': '', 'region': ''},
+        {'start': '20261012', 'end': '20261012', 'title': 'Thanksgiving Day', 'type': 'V', 'region': 'ON', **H},
+        {'start': '20261026', 'end': '20261026', 'title': 'Full Moon', 'type': '', 'region': '',
+         'kind': 'moon', 'at': '20261026T041142Z'},
+        {'start': '20261224', 'end': '20261226', 'title': 'Winter Break', 'type': '', 'region': '', **H},
     ]
 
 
@@ -31,10 +34,10 @@ def test_read_only_without_context(client, app_module, monkeypatch):
 
 
 @pytest.mark.parametrize('start,end,titles', [
-    ('20261013', '20261223', []),
+    ('20261013', '20261223', ['Full Moon']),
     ('20261226', '20261231', ['Winter Break']),          # a range overlapping the start
     ('20261012', '20261012', ['Thanksgiving Day']),
-    ('', '', ['Thanksgiving Day', 'Winter Break']),
+    ('', '', ['Thanksgiving Day', 'Full Moon', 'Winter Break']),
 ])
 def test_range_filter(client, start, end, titles):
     r = client.get(f'/api/holidays?start={start}&end={end}').get_json()
@@ -57,7 +60,7 @@ def test_dateformat_holiday_and_any_key(client, app_module, monkeypatch):
     ]))
     r = client.get('/api/holidays').get_json()
     assert r['holidays'] == [{'start': '20270101', 'end': '20270101', 'title': 'Neujahr',
-                              'type': '', 'region': ''}]
+                              'type': '', 'region': '', 'kind': 'holiday', 'at': ''}]
 
 
 def test_short_letters(client, app_module, monkeypatch):
@@ -82,6 +85,7 @@ def settings_file(app_module, monkeypatch, tmp_path):
 def test_setting_defaults(client, settings_file):
     cfg = client.get('/api/config').get_json()
     assert cfg['cal_holidays'] is True and cfg['agenda_holiday_days'] == 30
+    assert cfg['cal_moon'] is True and cfg['cal_seasons'] is True
 
 
 def test_setting_save(client, settings_file):
@@ -92,7 +96,7 @@ def test_setting_save(client, settings_file):
     assert cfg['cal_holidays'] is False and cfg['agenda_holiday_days'] == 60
 
 
-@pytest.mark.parametrize('patch', [{'cal_holidays': 'maybe'}, {'agenda_holiday_days': -1},
+@pytest.mark.parametrize('patch', [{'cal_holidays': 'maybe'}, {'cal_moon': 'maybe'}, {'cal_seasons': 2}, {'agenda_holiday_days': -1},
                                    {'agenda_holiday_days': 400}])
 def test_setting_refused(client, settings_file, patch):
     assert client.post('/api/config', json=patch, headers=ORIGIN).status_code == 400

@@ -237,7 +237,8 @@ function localDayKey(ts) {
     return dayKey(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])));
 }
 
-// A date line: centred and quiet; only "(overdue)" is red; a holiday's name follows the date.
+// A date line: centred and quiet; only "(overdue)" is red; a holiday's name follows the date, and
+// so do the moon's phases and the seasons, with their icon and time.
 // A click opens that day in the Calendar.
 function dateHeader(key, isHistory, layerItems) {
     const { label, overdue, today } = formatDateKey(key, isHistory);
@@ -247,7 +248,7 @@ function dateHeader(key, isHistory, layerItems) {
     for (const it of layerItems || []) {
         const name = document.createElement('span');
         name.className = `agenda-layer agenda-layer-${it.layer}`;
-        name.textContent = ` · ${it.title}`;
+        name.textContent = ` · ${it.icon ? it.icon + ' ' : ''}${it.title}${it.time ? ' ' + it.time : ''}`;
         if (it.detail) name.title = it.detail;
         header.appendChild(name);
     }

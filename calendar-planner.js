@@ -155,9 +155,9 @@ function initializeCalendar() {
         eventReceive: handleEventReceive,
         select:       handleSelect,          // drag/click to create — replaces dateClick
 
-        datesSet:  () => { updateCalendarTitle(); scheduleMarkers(); scheduleDaylight(); },
-        slotLabelDidMount: () => scheduleDaylight(),   // a rebuilt grid needs the stripe again
-        eventsSet: () => scheduleMarkers(),
+        datesSet:  () => { updateCalendarTitle(); scheduleMarkers(); scheduleDaylight(); layersFollowView(); },
+        slotLabelDidMount: () => { scheduleDaylight(); scheduleLayerMarks(); },   // a rebuilt grid needs them again
+        eventsSet: () => { scheduleMarkers(); scheduleLayerMarks(); },
     });
 
     calendar.addEventSource(layerEventSource());
@@ -545,10 +545,15 @@ function processTasksForCalendar(scheduledTasks) {
     _calEventSource = calendar.addEventSource(events);
 }
 
-// ── Layers: things that aren't tasks (TW.layers: holidays) ─────────────────────
+// ── Layers: things that aren't tasks (TW.layers: holidays, the moon, the seasons) ──
 // Their own event source, separate from the tasks' (_calEventSource): FullCalendar asks for the
 // visible range. All-day, never editable, not counted, not narrowed by the nav filter; a click
-// does nothing (eventClick), hover gives the title and detail (eventDidMount).
+// does nothing (eventClick), hover gives the title and detail (eventDidMount). A moment (a moon
+// phase, a solstice) is a chip with its icon in Month, and a mark at its time in Week and Day
+// (paintLayerMarks), where the all-day row stays for holidays.
+let _layerMoments = [];   // the moments in the visible range, for the marks
+let _layerGrid    = null; // was the last fetch for a time grid? (Month ↔ Week/Day refetches)
+
 function layerEventSource() {
     const key = TW.layers.dayKey;
     const iso = k => `${k.slice(0, 4)}-${k.slice(4, 6)}-${k.slice(6, 8)}`;
@@ -556,18 +561,60 @@ function layerEventSource() {
         id: 'tw-layers',
         events(info, success) {
             const last = new Date(info.end); last.setDate(last.getDate() - 1);   // FC's end is exclusive
-            TW.layers.fetch(key(info.start), key(last), _calSettings).then(items => success(items.map(it => ({
-                id:            `layer-${it.layer}-${it.start}-${it.title}`,
-                title:         it.title,
-                start:         iso(it.start),
-                end:           iso(TW.layers.addDays(it.end, 1)),
-                allDay:        true,
-                editable:      false,
-                classNames:    ['tw-layer', `tw-layer-${it.layer}`],
-                extendedProps: { layer: it.layer, detail: it.detail || '' },
-            })))).catch(() => success([]));
+            const grid = calendar.view.type.startsWith('timeGrid');
+            _layerGrid = grid;
+            TW.layers.fetch(key(info.start), key(last), _calSettings).then(items => {
+                _layerMoments = items.filter(it => it.at);
+                scheduleLayerMarks();
+                success(items.filter(it => !(grid && it.at)).map(it => ({
+                    id:            `layer-${it.layer}-${it.start}-${it.title}`,
+                    title:         it.icon ? `${it.icon} ${it.title}` : it.title,
+                    start:         iso(it.start),
+                    end:           iso(TW.layers.addDays(it.end, 1)),
+                    allDay:        true,
+                    editable:      false,
+                    classNames:    ['tw-layer', `tw-layer-${it.layer}`, ...(it.at ? ['tw-layer-moment'] : [])],
+                    extendedProps: { layer: it.layer, detail: it.detail || '' },
+                })));
+            }).catch(() => success([]));
         },
     };
+}
+
+// A view change between Month and Week/Day that keeps the range (it rarely does) still needs the
+// moments moved between chips and marks.
+function layersFollowView() {
+    const grid = calendar.view.type.startsWith('timeGrid');
+    if (_layerGrid !== null && grid !== _layerGrid) calendar.getEventSourceById('tw-layers')?.refetch();
+    scheduleLayerMarks();
+}
+
+let _layerMarkFrame = 0;
+function scheduleLayerMarks() {
+    cancelAnimationFrame(_layerMarkFrame);
+    _layerMarkFrame = requestAnimationFrame(paintLayerMarks);
+}
+// Week/Day: a dashed line across the moment's day column at its time, with its icon at the right;
+// hover the icon for the name and time. Placed by percentage of the 24-hour grid, like the
+// daylight stripe, so zoom steps don't move it.
+function paintLayerMarks() {
+    document.querySelectorAll('#calendar .tw-sky-mark').forEach(el => el.remove());
+    if (!calendar?.view.type.startsWith('timeGrid')) return;
+    const pad = n => String(n).padStart(2, '0');
+    for (const it of _layerMoments) {
+        const d = it.at;
+        const frame = document.querySelector(`#calendar .fc-timegrid-col[data-date="${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}"] .fc-timegrid-col-frame`);
+        if (!frame) continue;
+        const mark = document.createElement('div');
+        mark.className = `tw-sky-mark tw-sky-${it.layer}`;
+        mark.style.top = `${((d.getHours() * 60 + d.getMinutes()) / 14.4).toFixed(3)}%`;
+        const icon = document.createElement('span');
+        icon.className   = 'tw-sky-icon';
+        icon.textContent = it.icon || '•';
+        icon.title       = `${it.title} ${it.time}`;
+        mark.appendChild(icon);
+        frame.appendChild(mark);
+    }
 }
 
 // ── Event object factory ───────────────────────────────────────────────────────

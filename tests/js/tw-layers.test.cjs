@@ -8,7 +8,11 @@ const vm = require('vm');
 
 const calls = [];
 const ctx = { TW: { api: { get: async url => { calls.push(url); return { success: true, holidays: [
-    { start: '20261012', end: '20261012', title: 'Thanksgiving Day', type: 'V', region: 'ON' }] }; } } },
+    { start: '20261012', end: '20261012', title: 'Thanksgiving Day', type: 'V', region: 'ON', kind: 'holiday', at: '' },
+    // 04:11 UTC: still the 25th in Toronto, whatever day tw-events wrote
+    { start: '20261026', end: '20261026', title: 'Full Moon', type: '', region: '', kind: 'moon', at: '20261026T041142Z' },
+    { start: '20261221', end: '20261221', title: 'December Solstice', type: '', region: '', kind: 'season', at: '20261221T205006Z' },
+] }; } } },
     Date, Math, Promise, console: { warn() {} } };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', '..', 'tw-layers.js'), 'utf8'), ctx);
@@ -31,7 +35,6 @@ t('byDay spreads a range over its days, clipped', () => {
 });
 
 t('byDay orders days, then layers by registration, then titles', () => {
-    L.register({ id: 'moon', items: async () => [] });
     const m = L.byDay([
         { start: '20261012', title: 'Full moon', layer: 'moon' },
         { start: '20261012', title: 'Zed Day', layer: 'holidays' },
@@ -42,18 +45,32 @@ t('byDay orders days, then layers by registration, then titles', () => {
     eq(m.get('20261012').map(i => i.title), ['Alpha Day', 'Zed Day', 'Full moon']);
 });
 
-t('fetch: enabled layers only, each item tagged; a failing layer gives nothing', async () => {
-    L.register({ id: 'moon', items: async () => { throw new Error('no moon'); } });
-    const items = await L.fetch('20261001', '20261031', {});
-    eq(items.map(i => [i.layer, i.title, i.detail, i.end]),
-           [['holidays', 'Thanksgiving Day', 'ON · V', '20261012']]);
-    eq(await L.fetch('20261001', '20261031', { cal_holidays: false }), []);
+t('fetch: one request, three layers by kind; a moment falls on its local day', async () => {
+    calls.length = 0;
+    const items = await L.fetch('20261001', '20261231', {});
+    eq(items.map(i => [i.layer, i.title, i.start, i.icon || '', i.time || '']), [
+        ['holidays', 'Thanksgiving Day', '20261012', '', ''],
+        ['moon', 'Full Moon', '20261026', '🌕', '00:11'],          // Toronto (EDT)
+        ['seasons', 'December Solstice', '20261221', '☀️', '15:50'], // Toronto (EST)
+    ]);
+    eq(calls, ['/api/holidays?start=20261001&end=20261231']);
+    eq(items[1].at, '2026-10-26T04:11:42.000Z');
 });
 
-t('holidays: one request per range per page', async () => {
+t('each layer has its own switch', async () => {
+    eq((await L.fetch('20261001', '20261231', { cal_moon: false, cal_seasons: false })).map(i => i.layer), ['holidays']);
+    eq((await L.fetch('20261001', '20261231', { cal_holidays: false })).map(i => i.layer), ['moon', 'seasons']);
+});
+
+t('a failing layer gives nothing; the others still come', async () => {
+    L.register({ id: 'broken', items: async () => { throw new Error('no'); } });
+    eq((await L.fetch('20261001', '20261031', {})).map(i => i.layer), ['holidays', 'moon']);
+});
+
+t('one request per range per page, shared by the layers', async () => {
     calls.length = 0;
     await L.get('holidays').items('20261101', '20261130');
-    await L.get('holidays').items('20261101', '20261130');
+    await L.get('moon').items('20261101', '20261130');
     eq(calls, ['/api/holidays?start=20261101&end=20261130']);
 });
 

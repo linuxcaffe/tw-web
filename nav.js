@@ -1793,7 +1793,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             dl.appendChild(_note('A cyan stripe in the time column from sunrise to sunset; hover the column for the times. A place in this browser\'s time zone; west and south are negative (Toronto 43.65, −79.38).'));
             bd.appendChild(dl);
 
-            // Holidays: the taskrc's holiday.* entries (tw-holidata writes them), Calendar and Agenda
+            // Holidays: the taskrc's holiday.* entries (tw-events writes them), Calendar and Agenda
             const hd = _mk('div', { cls: 'tw-settings-row stack' });
             hd.appendChild(_mk('div', { cls: 'tw-settings-label', text: 'Holidays' }));
             const hdLine = _mk('div', { css: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' });
@@ -1804,8 +1804,21 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                                 title: 'Agenda: a holiday with no tasks gets its own line this many days ahead' });
             hdLine.append(hdOn, dim('Agenda lines for'), hdDays, dim('days ahead'));
             hd.appendChild(hdLine);
-            hd.appendChild(_note('From the taskrc\'s holiday.* entries (tw-holidata: holidata init). The Agenda also shows them on the date lines of days with tasks, however far ahead.'));
+            hd.appendChild(_note('From the taskrc\'s holiday.* entries (tw-events: events init). The Agenda also shows them on the date lines of days with tasks, however far ahead.'));
             bd.appendChild(hd);
+
+            // The moon's phases and the seasons: tw-events' sky.rc (events.moon, events.seasons)
+            const sk = _mk('div', { cls: 'tw-settings-row stack' });
+            sk.appendChild(_mk('div', { cls: 'tw-settings-label', text: 'Moon & seasons' }));
+            const skLine = _mk('div', { css: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' });
+            const moonOn = _mk('input', { type: 'checkbox', id: 'tws-cal-moon', checked: cfg.cal_moon !== false,
+                                          title: "Show the moon's phases" });
+            const seasOn = _mk('input', { type: 'checkbox', id: 'tws-cal-seasons', checked: cfg.cal_seasons !== false,
+                                          title: 'Show the solstices and equinoxes' });
+            skLine.append(moonOn, dim('moon phases'), seasOn, dim('solstices & equinoxes'));
+            sk.appendChild(skLine);
+            sk.appendChild(_note('A mark at their time in Week and Day, an icon in Month, on the Agenda\'s date lines. tw-events computes them: events init --moon yes --seasons yes.'));
+            bd.appendChild(sk);
         }));
 
         // Terminal
@@ -1870,6 +1883,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             const calLon    = parseFloat(form.querySelector('#tws-cal-lon').value);
             const calDaylight = form.querySelector('#tws-cal-daylight').checked;
             const calHolidays = form.querySelector('#tws-cal-holidays').checked;
+            const calMoon     = form.querySelector('#tws-cal-moon').checked;
+            const calSeasons  = form.querySelector('#tws-cal-seasons').checked;
             const hdDaysVal   = parseInt(form.querySelector('#tws-agenda-holiday-days').value, 10);
             const calZoom   = {};
             ['week', 'day'].forEach(view => {
@@ -1904,6 +1919,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                         ...(calZoom.week && calZoom.day ? { cal_zoom: calZoom } : {}),
                         cal_daylight:         calDaylight,
                         cal_holidays:         calHolidays,
+                        cal_moon:             calMoon,
+                        cal_seasons:          calSeasons,
                         ...(isNaN(hdDaysVal) ? {} : { agenda_holiday_days: hdDaysVal }),
                         ...(isNaN(calLat) ? {} : { cal_latitude: calLat }),
                         ...(isNaN(calLon) ? {} : { cal_longitude: calLon }),

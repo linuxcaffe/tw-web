@@ -559,9 +559,24 @@ body.cal-page .app-container {
     z-index: 2; pointer-events: none;
 }
 
-/* Layer items (TW.layers): holidays as quiet all-day bars; no grab cursor, they don't move */
+/* Layer items (TW.layers): holidays as quiet all-day bars; no grab cursor, they don't move.
+   Moments (moon, seasons): a plain chip in Month; in Week/Day a dashed mark at their time. */
 .fc .tw-layer-holidays, .fc .tw-layer-holidays .fc-event-main {
     background: var(--tw-holiday-bg); border-color: var(--tw-holiday-border); color: var(--tw-holiday-text);
 }
 .fc .tw-layer { cursor: default; }
 .fc .tw-layer .fc-ev-title { font-style: italic; }
+.fc .tw-layer-moment, .fc .tw-layer-moment .fc-event-main {
+    background: transparent; border-color: transparent; color: var(--tw-sky-text);
+}
+.fc .tw-layer-moment .fc-ev-title { font-style: normal; }
+.tw-sky-mark {
+    position: absolute; left: 0; right: 0; height: 0;
+    border-top: 1px dashed var(--tw-sky-line);
+    z-index: 3; pointer-events: none;
+}
+.tw-sky-icon {
+    position: absolute; right: 2px; top: -0.65em;
+    font-size: 0.75rem; line-height: 1;
+    pointer-events: auto; cursor: default;
+}

@@ -148,6 +148,8 @@ _SETTINGS_SCHEMA = {
     # Holidays from the taskrc (/api/holidays) in the Calendar and the Agenda; the Agenda gives a
     # holiday with no tasks its own date line up to this many days ahead (further if tasks are)
     'cal_holidays':         {'type': None, 'default': True, 'coerce': _valid_bool},
+    'cal_moon':             {'type': None, 'default': True, 'coerce': _valid_bool},   # tw-events' sky.rc
+    'cal_seasons':          {'type': None, 'default': True, 'coerce': _valid_bool},
     'agenda_holiday_days':  {'type': int,  'default': 30,
                               'validate': lambda v: 0 <= v <= 366},
     'pty_height':           {'type': int,  'default': 240,
@@ -976,7 +978,7 @@ def get_virtual_tags():
             out['uuids'][name] = result['stdout'].split()
     return jsonify(out)
 
-_HOLIDAY_RE = re.compile(r'^holiday\.([^.=]+)\.(name|date|start|end|type|region)=(.*)$')
+_HOLIDAY_RE = re.compile(r'^holiday\.([^.=]+)\.(name|date|start|end|type|region|kind|at)=(.*)$')
 _DATEFMT_PARTS = {'Y': r'(?P<Y>\d{4})', 'y': r'(?P<y>\d{2})', 'M': r'(?P<M>\d{2})',
                   'm': r'(?P<M>\d{1,2})', 'D': r'(?P<D>\d{2})', 'd': r'(?P<D>\d{1,2})'}
 
@@ -1003,7 +1005,9 @@ def _holiday_date_parser(fmt):
 @app.route('/api/holidays')
 def get_holidays():
     """The CLI's holidays: holiday.<key>.name with .date (or .start/.end), as `task calendar`
-    shows them; tw-holidata writes them and adds .type/.region. tw-web never fetches them.
+    shows them. tw-events writes them and adds .type/.region; its moon phases and seasons are
+    holiday entries too, with .kind (moon, season; else holiday) and .at (the moment, UTC).
+    tw-web never fetches or computes them.
     ?start=YYYYMMDD&end=YYYYMMDD (inclusive, both optional) keeps those that overlap."""
     start, end = request.args.get('start', ''), request.args.get('end', '')
     if any(v and not re.fullmatch(r'\d{8}', v) for v in (start, end)):
@@ -1028,7 +1032,8 @@ def get_holidays():
         if (start and last < start) or (end and first > end):
             continue
         out.append({'start': first, 'end': last, 'title': e['name'],
-                    'type': e.get('type', ''), 'region': e.get('region', '')})
+                    'type': e.get('type', ''), 'region': e.get('region', ''),
+                    'kind': e.get('kind') or 'holiday', 'at': e.get('at', '')})
     out.sort(key=lambda h: (h['start'], h['title']))
     return jsonify({'success': True, 'holidays': out})
 
