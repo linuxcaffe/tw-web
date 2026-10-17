@@ -401,7 +401,9 @@ function applyZoom(view) {
     const opts = zoomOptions(_zoomStep(view));
     calendar.setOption('slotDuration', opts.slotDuration);
     calendar.setOption('snapDuration', opts.snapDuration);
-    requestAnimationFrame(() => calendar.scrollToTime(opts.scrollTime));
+    // FullCalendar keeps the label cells a new row size shares (07:00 at 30 and at 60 min), so no
+    // mount event fires for them: repaint the daylight once it has redrawn
+    requestAnimationFrame(() => { calendar.scrollToTime(opts.scrollTime); paintDaylight(); });
     zoomTitle(view);
 }
 
