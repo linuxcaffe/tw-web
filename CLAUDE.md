@@ -29,13 +29,13 @@ Doc changes owed or made are tracked in `tw:docs/tw-web-doc-updates.md`: add a l
 
 | File | Lines | Role |
 |---|---|---|
-| `app.py` | ~1670 | The whole server: guard, settings, `run_task_command`, every `/api/*` route, `/ws/pty`, SSE, static route |
-| `nav.js` | ~2050 | Shared chrome on every page: nav bar, filter/command bar, sidebars, Settings, PTY console (`openPty(cmd, {kind})`, `offerTerminal`), hook prompts |
-| `tw-api.js` | 110 | `TW.store` (the shared task cache), `TW.api.write` (every task write goes through it, so every write empties the cache), `TW.api.handleWriteResult` (hook signals: PTY, deferred offer, timeout) and `TW.commands` (command mode's command words, from `/api/commands`) |
-| `tw-filter.js` | 190 | `TW.filter` (the nav bar's filter, priority, project and tags inputs, with modifiers: one set of rules for every view; virtual tags like `+OVERDUE` match the UUIDs `task` gives `/api/vtags`, fetched by nav.js `_syncVtags` and cached in `TW.store`) and `TW.sort` (`PRI_ORDER` 1–6 H M L, the List's sort). Pure functions, unit-tested in Node (`tests/js/`) |
-| `main.js` | ~600 | List view (`TaskWarriorUI`) |
-| `task-card.js` | ~430 | `TaskCardManager`, annotation linkify + launchers |
-| `task-editor.js` | ~1000 | `TaskEditor` add/edit modal. An edit re-reads the task on open and sends only the fields the user changed (`_formValues` snapshots); a save with no changes sends nothing. A new task starts from the nav filter's project, priority and tags (`TW.filter.addDefaults`); the project field suggests the Projects sidebar's list |
+| `app.py` | ~1760 | The whole server: guard, settings, `run_task_command`, every `/api/*` route, `/ws/pty`, SSE, static route |
+| `nav.js` | ~2180 | Shared chrome on every page: nav bar, filter/command bar, sidebars, Settings, PTY console (`openPty(cmd, {kind})`, `offerTerminal`), hook prompts |
+| `tw-api.js` | 115 | `TW.store` (the shared task cache), `TW.api.write` (every task write goes through it, so every write empties the cache), `TW.api.handleWriteResult` (hook signals: PTY, deferred offer, timeout) and `TW.commands` (command mode's command words, from `/api/commands`) |
+| `tw-filter.js` | 195 | `TW.filter` (the nav bar's filter, priority, project and tags inputs, with modifiers: one set of rules for every view; virtual tags like `+OVERDUE` match the UUIDs `task` gives `/api/vtags`, fetched by nav.js `_syncVtags` and cached in `TW.store`) and `TW.sort` (`PRI_ORDER` 1–6 H M L, the List's sort). Pure functions, unit-tested in Node (`tests/js/`) |
+| `main.js` | ~410 | List view (`TaskWarriorUI`) |
+| `task-card.js` | ~410 | `TaskCardManager`, annotation linkify + launchers |
+| `task-editor.js` | ~930 | `TaskEditor` add/edit modal. An edit re-reads the task on open and sends only the fields the user changed (`_formValues` snapshots); a save with no changes sends nothing. A new task starts from the nav filter's project, priority and tags (`TW.filter.addDefaults`); the project field suggests the Projects sidebar's list |
 | `kanban.js`, `agenda.js`, `calendar-planner.js` | | The other three views, each with its own `.html` page |
 | `sun.js` | 40 | `TW.sun`: sunrise, sunset and civil twilight for a date and place (the Calendar's cyan daylight stripe, `cal_daylight`/`cal_latitude`/`cal_longitude`). Pure, unit-tested in Node (`tests/js/sun.test.cjs`) |
 | `sw.js` | 50 | Service worker shell cache (`CACHE = 'tw-web-vN'`) |

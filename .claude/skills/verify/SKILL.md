@@ -69,6 +69,17 @@ check(async pg => {
   no install of its own.
 - Use substrings that are unique among the seeds: `hasText: 'eta home due'` also matched "beta home due".
 
+### One-off probes and screenshots
+
+`run.py` prints only pass/fail per check, so a throwaway probe writes what it finds to a file:
+drop `tests/e2e/zz-<name>.check.cjs` (`fs.writeFileSync` to the scratchpad, or
+`pg.screenshot({ path })`), run `python3 tests/e2e/run.py zz-<name>`, read the file, delete the
+check. A probe that found a real bug becomes a proper check instead (red first).
+
+**Browser engine:** the harness has Playwright's Chromium only, but the user's PWA runs in Epiphany
+(WebKit). A layout bug that won't reproduce here may be WebKit's (known bug 15, sticky headers);
+`npx playwright install webkit` (~100 MB, `~/.cache/ms-playwright`) is the next step, not yet done.
+
 ## Traps (each one happened)
 
 - **Fixed ports collide.** 5099 is nb-web's e2e port and was taken. `scratch-server.sh` asks the OS for a
