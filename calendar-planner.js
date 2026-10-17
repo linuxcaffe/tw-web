@@ -347,6 +347,7 @@ function minsToISO(mins) {
 
 // ── Navigation ────────────────────────────────────────────────────────────────
 function setupEventListeners() {
+    window.twNav?.narrow?.addEventListener('change', updateCalendarTitle);   // the year comes and goes
     document.getElementById('prev-btn').addEventListener('click',  () => { calendar.prev();  updateCalendarTitle(); });
     document.getElementById('next-btn').addEventListener('click',  () => { calendar.next();  updateCalendarTitle(); });
     document.getElementById('today-btn').addEventListener('click', () => { calendar.today(); updateCalendarTitle(); });
@@ -445,9 +446,23 @@ function changeView(view) {
     updateCalendarTitle();
 }
 
+// The title above the calendar. Narrow (twNav.narrow, where the brand reads "Task"), Day and
+// Week drop the year so both arrows fit: "October 17", "Oct 12 – 18".
 function updateCalendarTitle() {
     const titleEl = document.getElementById('calendar-title');
-    if (titleEl) titleEl.textContent = calendar.view.title;
+    if (titleEl) {
+        const v = calendar.view;
+        let text = v.title;
+        if (window.twNav?.narrow?.matches) {
+            if (v.type === 'timeGridDay') {
+                text = calendar.formatDate(v.currentStart, { month: 'long', day: 'numeric' });
+            } else if (v.type === 'timeGridWeek') {
+                const last = new Date(v.currentEnd.getTime() - 86400000);
+                text = calendar.formatRange(v.currentStart, last, { month: 'short', day: 'numeric' });
+            }
+        }
+        titleEl.textContent = text;
+    }
 
     const todayBtn = document.getElementById('today-btn');
     if (todayBtn) {

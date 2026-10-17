@@ -2,7 +2,7 @@
  * tw-web shared chrome — two-bar responsive layout.
  * Inject with: <script src="/nav.js"></script> in <head> (synchronous).
  *
- * Bar 1 (nav-bar): [logo→menu] [Task(warrior)→refresh] List Kanban Day Planner Calendar
+ * Bar 1 (nav-bar): [logo→menu] [Task(warrior)→refresh] List Kanban Agenda Calendar
  *                  | [filter..][×] [pri..][×] [project..][×] [tags..][×] [count/total][+]
  * Bar 2 (btn-bar): [ctx buttons]  |  [Pending] [Recurring] [Waiting] [Completed] [Deleted]
  * Bar 3 (filter-bar): active filter summary — hidden when nothing active
@@ -232,7 +232,9 @@
 
     window.twNav = { getState, setState, stateToParams, setCount, setGrandTotal, getGrandTotal,
                      openSyncDialog, initProjectsSidebar, initTagsSidebar, showNotification, showOutput,
-                     setRawFilter, clearRawFilter, openPty };
+                     setRawFilter, clearRawFilter, openPty,
+                     // matches at BREAK, where the bars stack and the brand reads "Task"
+                     narrow: window.matchMedia(`(max-width: ${BREAK}px)`) };
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     function activePage() {
