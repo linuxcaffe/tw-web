@@ -37,7 +37,7 @@ Doc changes owed or made are tracked in `tw:docs/tw-web-doc-updates.md`: add a l
 | `task-card.js` | ~430 | `TaskCardManager`, annotation linkify + launchers |
 | `task-editor.js` | ~1000 | `TaskEditor` add/edit modal. An edit re-reads the task on open and sends only the fields the user changed (`_formValues` snapshots); a save with no changes sends nothing. A new task starts from the nav filter's project, priority and tags (`TW.filter.addDefaults`); the project field suggests the Projects sidebar's list |
 | `kanban.js`, `agenda.js`, `calendar-planner.js` | | The other three views, each with its own `.html` page |
-| `sun.js` | 50 | `TW.sun`: sunrise, sunset and civil twilight for a date and place (Calendar's daylight tint, `cal_daylight`/`cal_latitude`/`cal_longitude`). Pure, unit-tested in Node (`tests/js/sun.test.cjs`) |
+| `sun.js` | 40 | `TW.sun`: sunrise, sunset and civil twilight for a date and place (the Calendar's cyan daylight stripe, `cal_daylight`/`cal_latitude`/`cal_longitude`). Pure, unit-tested in Node (`tests/js/sun.test.cjs`) |
 | `sw.js` | 50 | Service worker shell cache (`CACHE = 'tw-web-vN'`) |
 | `tw-web-launch.sh` | | How the user runs it: Flask + Epiphany PWA; `--clean` wipes SW caches and restarts |
 | `tw-web-native-host.py` | | Firefox native-messaging host (start/stop/status) for `firefox/` |

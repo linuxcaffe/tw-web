@@ -41,12 +41,4 @@ t('polar night: no daylight', () => {
     const s = S.times(new Date(2026, 11, 21), 80, -75);
     assert.ok(s.sunrise === s.sunset, JSON.stringify(s));
 });
-t('tint: 0 at night, 1 in daylight, ramps through twilight', () => {
-    const s = { dawn: 400, sunrise: 440, sunset: 1000, dusk: 1040 };
-    assert.strictEqual(S.tint(300, s), 0);
-    assert.strictEqual(S.tint(420, s), 0.5);
-    assert.strictEqual(S.tint(700, s), 1);
-    assert.strictEqual(S.tint(1030, s), 0.25);
-    assert.strictEqual(S.tint(1100, s), 0);
-});
 console.log(`sun: ${n} passed`);

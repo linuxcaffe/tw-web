@@ -152,7 +152,7 @@ function initializeCalendar() {
         select:       handleSelect,          // drag/click to create — replaces dateClick
 
         datesSet:  () => { updateCalendarTitle(); scheduleMarkers(); scheduleDaylight(); },
-        slotLabelDidMount: () => scheduleDaylight(),   // new rows after a zoom step
+        slotLabelDidMount: () => scheduleDaylight(),   // a rebuilt grid needs the stripe again
         eventsSet: () => scheduleMarkers(),
     });
 
@@ -402,7 +402,7 @@ function applyZoom(view) {
     calendar.setOption('slotDuration', opts.slotDuration);
     calendar.setOption('snapDuration', opts.snapDuration);
     // FullCalendar keeps the label cells a new row size shares (07:00 at 30 and at 60 min), so no
-    // mount event fires for them: repaint the daylight once it has redrawn
+    // mount event fires: check the daylight stripe once it has redrawn
     requestAnimationFrame(() => { calendar.scrollToTime(opts.scrollTime); paintDaylight(); });
     zoomTitle(view);
 }
@@ -836,33 +836,42 @@ function setupOffscreenMarkers() {
 }
 
 // ── Daylight in the time column ───────────────────────────────────────────────
-// The time labels are tinted blue in daylight, fading through civil twilight (TW.sun, for the
-// settings' place; default Toronto). Day view uses its day; Week the middle of the week, since
-// sunrise moves 2–3 minutes in a week. Each label cell gets its stretch of the curve, with a
-// stop at any of the sun's times inside it, so the tint is right at every zoom step.
-const DAYLIGHT_RGB = '74, 144, 226', DAYLIGHT_ALPHA = 0.22;
+// A cyan stripe down the left edge of the time column, from sunrise to sunset (TW.sun, for the
+// settings' place; default Toronto). Nothing goes behind the hour labels: a tint there made them
+// hard to read. The grid always draws all 24 hours, so the stripe is placed by percentage and a
+// zoom step, which only changes row heights, can't move it. Day view uses its day; Week the
+// middle of the week (sunrise moves 2–3 minutes in a week). Hovering the column gives the times.
+// FullCalendar rebuilds the grid on a view change, so paintDaylight finds or makes the stripe.
 let _daylightFrame = 0;
 function scheduleDaylight() {
     cancelAnimationFrame(_daylightFrame);
     _daylightFrame = requestAnimationFrame(paintDaylight);
 }
 function paintDaylight() {
-    const cells = [...document.querySelectorAll('#calendar td.fc-timegrid-slot-label[data-time]')];
-    if (!cells.length) return;
-    const v   = calendar.view;
-    const day = v.type === 'timeGridWeek' ? new Date(v.currentStart.getTime() + 3 * 864e5) : v.currentStart;
-    const sun = _calSettings.cal_daylight === false ? null
-        : TW.sun.times(day, _calSettings.cal_latitude ?? 43.65, _calSettings.cal_longitude ?? -79.38);
-    const mins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-    cells.forEach((td, i) => {
-        const a = mins(td.dataset.time);
-        const b = i + 1 < cells.length ? mins(cells[i + 1].dataset.time) : 1440;
-        const pts = sun ? [a, ...[sun.dawn, sun.sunrise, sun.sunset, sun.dusk].filter(m => m > a && m < b), b] : [];
-        if (pts.every(m => TW.sun.tint(m, sun) === 0)) { td.style.backgroundImage = ''; return; }
-        const stops = pts.map(m => `rgba(${DAYLIGHT_RGB}, ${(DAYLIGHT_ALPHA * TW.sun.tint(m, sun)).toFixed(3)}) ` +
-                                   `${((m - a) / (b - a) * 100).toFixed(1)}%`);
-        td.style.backgroundImage = `linear-gradient(${stops.join(', ')})`;
-    });
+    const slots = document.querySelector('#calendar .fc-timegrid-slots');
+    const axis  = document.querySelector('#calendar .fc-timegrid-cols td.fc-timegrid-axis');
+    let stripe  = slots?.querySelector(':scope > .tw-daylight');
+    const v     = calendar.view;
+    const day   = v.type === 'timeGridWeek' ? new Date(v.currentStart.getTime() + 3 * 864e5) : v.currentStart;
+    const sun   = slots && _calSettings.cal_daylight !== false
+        ? TW.sun.times(day, _calSettings.cal_latitude ?? 43.65, _calSettings.cal_longitude ?? -79.38) : null;
+    if (!sun || sun.sunrise >= sun.sunset) {   // off, or polar night
+        stripe?.remove();
+        if (axis) axis.title = '';
+        return;
+    }
+    if (!stripe) {
+        stripe = document.createElement('div');
+        stripe.className = 'tw-daylight';
+        slots.prepend(stripe);
+    }
+    stripe.style.top    = `${(sun.sunrise / 14.4).toFixed(3)}%`;
+    stripe.style.height = `${((sun.sunset - sun.sunrise) / 14.4).toFixed(3)}%`;
+
+    const clock = m => { m = Math.round(m); const h = Math.floor(m / 60) % 12 || 12;
+                         return `${h}:${String(m % 60).padStart(2, '0')}`; };
+    if (axis) axis.title = `Sunrise ${clock(sun.sunrise)} · Sunset ${clock(sun.sunset)}` +
+                           (v.type === 'timeGridWeek' ? ' (mid-week)' : '');
 }
 
 function scheduleMarkers() {

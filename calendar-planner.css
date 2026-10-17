@@ -548,3 +548,13 @@ body.cal-page .app-container {
 [data-theme="dark"] .fc-scroller::-webkit-scrollbar-track  { background: #22272e; }
 [data-theme="dark"] .tasks-container::-webkit-scrollbar-thumb,
 [data-theme="dark"] .fc-scroller::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.15); }
+
+/* ── Daylight in the time column (calendar-planner.js paintDaylight) ─────── */
+/* A cyan stripe (scheduled events are blue) at the column's left edge, clear of the right-aligned
+   hour labels; top and height are set as percentages of the 24-hour grid */
+.tw-daylight {
+    position: absolute; left: 0; width: 4px;
+    background: #00bcd4;
+    border-radius: 2px;
+    z-index: 2; pointer-events: none;
+}

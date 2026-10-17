@@ -1,26 +1,23 @@
-// The daylight tint stays right through repeated zoom steps (user, 2026-10-17: "on repeated
-// zooming, the gradient falls apart"). After each click on Day, every time label's tint must match
-// the sun for the stretch it now covers: its first and last stops are the tint at its two ends.
+// The daylight stripe stays right through repeated zoom steps (user, 2026-10-17: "on repeated
+// zooming, the gradient falls apart"). At every step its ends must sit in the label rows that
+// hold sunrise and sunset.
 const { check, expect, B, sleep } = require('./lib.cjs');
 const TORONTO = { cal_daylight: true, cal_latitude: 43.65, cal_longitude: -79.38 };
 
-// [time, slot, want start, want end, got stops] for every label whose tint is wrong
-const wrong = pg => pg.evaluate(() => {
+const state = pg => pg.evaluate(() => {
     const v = calendar.view;
     const day = v.type === 'timeGridWeek' ? new Date(v.currentStart.getTime() + 3 * 864e5) : v.currentStart;
     const sun = TW.sun.times(day, _calSettings.cal_latitude, _calSettings.cal_longitude);
+    const el = document.querySelector('#calendar .tw-daylight');
     const tds = [...document.querySelectorAll('#calendar td.fc-timegrid-slot-label[data-time]')];
     const mins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-    const out = [];
-    tds.forEach((td, i) => {
-        const a = mins(td.dataset.time), b = i + 1 < tds.length ? mins(tds[i + 1].dataset.time) : 1440;
-        const got = [...getComputedStyle(td).backgroundImage.matchAll(/rgba\([^)]*,\s*([\d.]+)\)/g)].map(m => +m[1]);
-        const want = [0.22 * TW.sun.tint(a, sun), 0.22 * TW.sun.tint(b, sun)];
-        const first = got.length ? got[0] : 0, last = got.length ? got[got.length - 1] : 0;
-        if (Math.abs(first - want[0]) > 0.01 || Math.abs(last - want[1]) > 0.01)
-            out.push([td.dataset.time.slice(0, 5), b - a, want.map(x => +x.toFixed(3)), got]);
-    });
-    return { n: tds.length, out };
+    const rowAt = y => {   // [from, to] minutes of the label row at y
+        const i = tds.findIndex(td => { const r = td.getBoundingClientRect(); return y >= r.top - 0.5 && y < r.bottom + 0.5; });
+        return i < 0 ? null : [mins(tds[i].dataset.time), i + 1 < tds.length ? mins(tds[i + 1].dataset.time) : 1440];
+    };
+    if (!el) return { rows: tds.length, missing: true };
+    const r = el.getBoundingClientRect();
+    return { rows: tds.length, sun: [sun.sunrise, sun.sunset], top: rowAt(r.top + 0.5), bottom: rowAt(r.bottom - 0.5) };
 });
 
 check(async pg => {
@@ -35,9 +32,12 @@ check(async pg => {
         await pg.click(`.view-btn[data-view="${view}"]`);   // Day again is a zoom step; Week switches
         await sleep(600);
         for (let step = 0; step <= 6; step++) {
-            const w = await wrong(pg);
-            expect(w.out.length === 0, `${view} zoom step ${step} (${w.n} rows): ${w.out.length} wrong, ` +
-                                       `e.g. ${JSON.stringify(w.out.slice(0, 3))}`);
+            const s = await state(pg);
+            const at = `${view} zoom step ${step} (${s.rows} rows)`;
+            expect(!s.missing, `${at}: no stripe`);
+            const [rise, set] = s.sun;
+            expect(s.top && s.top[0] <= rise && rise < s.top[1], `${at}: stripe starts in row ${JSON.stringify(s.top)}, sunrise ${Math.round(rise)}`);
+            expect(s.bottom && s.bottom[0] <= set && set < s.bottom[1], `${at}: stripe ends in row ${JSON.stringify(s.bottom)}, sunset ${Math.round(set)}`);
             await pg.click(`.view-btn[data-view="${view}"]`);   // the next zoom step
             await sleep(600);
         }

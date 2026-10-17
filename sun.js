@@ -2,7 +2,7 @@
 // date and place, as minutes after local midnight. Loads after tw-api.js, which declares TW.
 // Pure functions: tests/js/sun.test.cjs runs them in Node.
 //
-// The usual approximation (within a few minutes, plenty for a tint): the sun's declination from
+// The usual approximation (within a few minutes, plenty for a stripe): the sun's declination from
 // the day of the year, the hour angle at which it crosses an altitude, and solar noon from the
 // longitude, the browser's UTC offset for that day (DST included) and the equation of time.
 TW.sun = (() => {
@@ -35,14 +35,5 @@ TW.sun = (() => {
         return { dawn: from(c), sunrise: from(s), sunset: to(s), dusk: to(c) };
     }
 
-    // How light it is at minute m: 0 at night, 1 between sunrise and sunset, a straight ramp
-    // through twilight
-    function tint(m, s) {
-        if (m <= s.dawn || m >= s.dusk) return 0;
-        if (m < s.sunrise) return (m - s.dawn) / (s.sunrise - s.dawn);
-        if (m > s.sunset)  return (s.dusk - m) / (s.dusk - s.sunset);
-        return 1;
-    }
-
-    return { times, tint };
+    return { times };
 })();
