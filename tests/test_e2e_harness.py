@@ -17,7 +17,8 @@ run = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(run)
 
 SCRATCH = {'TW_WEB_PORT': '40123', 'TASKRC': '/tmp/tw-web-scratch.abc/taskrc',
-           'TASKDATA': '/tmp/tw-web-scratch.abc/data'}
+           'TASKDATA': '/tmp/tw-web-scratch.abc/data',
+           'TW_WEB_SETTINGS': '/tmp/tw-web-scratch.abc/settings.json'}
 
 
 def test_runner_accepts_a_scratch_server():
@@ -29,13 +30,18 @@ def test_runner_accepts_a_scratch_server():
     {'TW_WEB_PORT': ''},
     {'TASKRC': str(Path.home() / '.taskrc')},
     {'TASKDATA': str(Path.home() / '.task')},
+    # A check that saves settings would write the folder's own settings.json (the live one, run
+    # from ~/dev/tw-web): the scratch server must have its own
+    {'TW_WEB_SETTINGS': ''},
+    {'TW_WEB_SETTINGS': str(Path.home() / 'dev' / 'tw-web' / 'settings.json')},
 ])
 def test_runner_refuses_anything_else(patch):
     assert not run.safe({**SCRATCH, **patch})
 
 
 @pytest.mark.skipif(not shutil.which('node'), reason='node not installed')
-@pytest.mark.parametrize('patch', [{'TW_WEB_PORT': '5000'}, {'TASKRC': str(Path.home() / '.taskrc')}])
+@pytest.mark.parametrize('patch', [{'TW_WEB_PORT': '5000'}, {'TASKRC': str(Path.home() / '.taskrc')},
+                                   {'TW_WEB_SETTINGS': ''}])
 def test_a_check_refuses_before_opening_a_page(patch):
     env = {k: v for k, v in os.environ.items() if k not in SCRATCH}
     env.update({**SCRATCH, **patch})

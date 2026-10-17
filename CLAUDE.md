@@ -96,10 +96,11 @@ deliberate work-in-progress commit with `--no-verify`. Install it once per clone
   A cross-page use that is fine by design goes in its `ALLOWED` table with the reason.
 - **Checking a change on a real server:** follow the **`verify` skill** (`.claude/skills/verify/`).
   `.tools/scratch-server.sh up|env|probe|down` runs the worktree's `app.py` against a throwaway database
-  on a free port and stops exactly that server. It also covers the headless-browser check.
+  and settings file (`TW_WEB_SETTINGS`) on a free port and stops exactly that server. It also covers the headless-browser check.
 - **Page checks** live in `tests/e2e/*.check.cjs` (helpers in `lib.cjs`). `run.py` brings up a scratch
   server, re-seeds the throwaway database before each check and always brings it down; both it and `lib.cjs`
-  refuse port 5000 and `~/.task`. A check that reproduces a known bug is listed in `tests/e2e/xfail.txt`;
+  refuse port 5000, `~/.task` and a server without its own settings file (a check that saves Settings
+  would otherwise write the folder's `settings.json`). A check that reproduces a known bug is listed in `tests/e2e/xfail.txt`;
   fixing the bug turns it into an XPASS, which fails the run until its line is removed. A page fix starts
   with a check here, just as a server fix starts with a pytest. The pre-commit hook doesn't run them (too
   slow); run them before merging a page change.

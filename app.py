@@ -70,7 +70,9 @@ def _valid_task_id(task_id):
     return bool(_TASK_ID_RE.match(str(task_id)))
 
 # ── Settings (settings.json > config.py > hardcoded defaults) ─────────────────
-_SETTINGS_PATH = Path(__file__).parent / 'settings.json'
+# TW_WEB_SETTINGS moves it: the scratch server keeps its own, so a page check that saves
+# settings never writes the folder's (the live one, run from ~/dev/tw-web)
+_SETTINGS_PATH = Path(os.environ.get('TW_WEB_SETTINGS') or Path(__file__).parent / 'settings.json')
 
 def _valid_hour(v):
     """Accept 'HH:MM' or plain int/float hours, return 'HH:MM:00'."""

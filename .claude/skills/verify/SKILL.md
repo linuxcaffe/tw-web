@@ -20,14 +20,14 @@ cd ~/dev/tw-web-<topic>
 python3 -m pytest -q tests/
 python3 .tools/check-guards.py && python3 .tools/check-refs.py   # the hook runs these too
 
-# 3. Real server from the worktree, against a throwaway database, on a free port
+# 3. Real server from the worktree, against a throwaway database and settings file, on a free port
 .tools/scratch-server.sh up            # prints http://localhost:<port>
-eval "$(.tools/scratch-server.sh env)" # TASKRC/TASKDATA/TW_WEB_PORT for seeding
+eval "$(.tools/scratch-server.sh env)" # TASKRC/TASKDATA/TW_WEB_PORT/TW_WEB_SETTINGS for seeding
 task add 'seed task' project:demo      # goes to the throwaway db (check the "TASKRC override" line)
 curl -s localhost:$TW_WEB_PORT/api/tasks
 .tools/scratch-server.sh probe         # taskutil web probe: 11/11 expected (no Tailscale bind here)
 .tools/scratch-server.sh down          # stops exactly that server, deletes the data
-unset TASKRC TASKDATA TW_WEB_PORT      # or later `task` commands hit the deleted db
+unset TASKRC TASKDATA TW_WEB_PORT TW_WEB_SETTINGS   # or later `task` commands hit the deleted db
 
 # 4. Merge and clean up
 git -C ~/dev/tw-web merge --ff-only <topic>    # live server reloads now

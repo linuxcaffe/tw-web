@@ -183,6 +183,7 @@ def test_guard_deleting_the_request_guard_is_caught(tmp_path):
     guarded = {line.split(':', 1)[0] for line in (REPO / '.guards').read_text().splitlines()
                if line.strip() and not line.startswith('#')}
     for f in guarded:
+        (tmp_path / f).parent.mkdir(parents=True, exist_ok=True)   # .tools/, tests/e2e/
         shutil.copy(REPO / f, tmp_path / f)
     app = (tmp_path / 'app.py').read_text().replace('def _guard_request', 'def _guard_request_disabled')
     (tmp_path / 'app.py').write_text(app)

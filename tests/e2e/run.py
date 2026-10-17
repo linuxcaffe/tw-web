@@ -69,7 +69,8 @@ def safe(env):
     home_task = str(Path.home() / '.task')
     return (env.get('TW_WEB_PORT') not in (None, '', '5000')
             and '/tw-web-scratch.' in env.get('TASKRC', '')
-            and not env.get('TASKDATA', '').startswith(home_task))
+            and not env.get('TASKDATA', '').startswith(home_task)
+            and '/tw-web-scratch.' in env.get('TW_WEB_SETTINGS', ''))   # its own settings.json
 
 
 def reseed(env):

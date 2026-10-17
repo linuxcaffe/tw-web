@@ -43,6 +43,11 @@ tw-web-launch.sh:config check
 tw-web-native-host.py:RUN_DIR
 tw-web-native-host.py:def stop_tw_web_procs
 
+# ── Test isolation: the scratch server's own settings file ───────────────────
+app.py:TW_WEB_SETTINGS
+.tools/scratch-server.sh:TW_WEB_SETTINGS
+tests/e2e/lib.cjs:TW_WEB_SETTINGS
+
 # ── Shared chrome every page calls (nav.js) ───────────────────────────────────
 nav.js:window.twNav
 nav.js:window.twTerminal

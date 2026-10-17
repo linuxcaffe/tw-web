@@ -83,6 +83,7 @@ tw-web has no login, and its terminal pane is a real shell — so it only listen
 | `TW_WEB_PORT=N` | Port (default 5000) |
 | `TW_WEB_DEBUG=1` | Werkzeug debugger — refused unless listening on localhost only |
 | `TW_WEB_HOST=0.0.0.0` | Every network, including café Wi-Fi. Prints a warning; not recommended. |
+| `TW_WEB_SETTINGS=path` | Settings file (default `settings.json` next to `app.py`). The test scratch server uses its own. |
 
 Whatever the binding, the server refuses requests for unknown hostnames (DNS rebinding) and refuses writes and terminal connections from other websites.
 

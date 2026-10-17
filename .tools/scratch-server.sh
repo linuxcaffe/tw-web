@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scratch-server.sh — run tw-web from a working folder against a throwaway task
-# database, on a free port, and stop exactly that server afterwards.
+# database and settings file, on a free port, and stop exactly that server afterwards.
 #
 #   .tools/scratch-server.sh up   [DIR]   start (DIR defaults to the current folder)
 #   .tools/scratch-server.sh env  [DIR]   print exports for seeding: eval "$(… env)"; task add …
@@ -28,7 +28,7 @@ up)
     printf 'data.location=%s/data\nhooks=off\nconfirmation=no\n' "$TMP" > "$TMP/taskrc"
     PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
     (cd "$DIR" && exec env TASKRC="$TMP/taskrc" TASKDATA="$TMP/data" XDG_RUNTIME_DIR="$TMP/run" \
-        TW_WEB_PORT="$PORT" python3 app.py > "$TMP/server.log" 2>&1) &
+        TW_WEB_SETTINGS="$TMP/settings.json" TW_WEB_PORT="$PORT" python3 app.py > "$TMP/server.log" 2>&1) &
     PID=$!
     printf 'TMP=%q\nPORT=%q\nPID=%q\n' "$TMP" "$PORT" "$PID" > "$STATE"
     for _ in $(seq 1 40); do
@@ -40,7 +40,8 @@ up)
     ;;
 env)
     load
-    printf 'export TASKRC=%q TASKDATA=%q TW_WEB_PORT=%q\n' "$TMP/taskrc" "$TMP/data" "$PORT"
+    printf 'export TASKRC=%q TASKDATA=%q TW_WEB_PORT=%q TW_WEB_SETTINGS=%q\n' \
+        "$TMP/taskrc" "$TMP/data" "$PORT" "$TMP/settings.json"
     ;;
 probe)
     load

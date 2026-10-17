@@ -37,8 +37,9 @@ function guard() {
     const port = process.env.TW_WEB_PORT || '';
     const rc   = process.env.TASKRC || '';
     const data = process.env.TASKDATA || '';
+    const sets = process.env.TW_WEB_SETTINGS || '';   // its own settings.json, not the folder's
     if (!port || port === '5000' || !rc.includes('/tw-web-scratch.') ||
-        data.startsWith(path.join(os.homedir(), '.task'))) {
+        data.startsWith(path.join(os.homedir(), '.task')) || !sets.includes('/tw-web-scratch.')) {
         throw new Error(`not a scratch server (port ${port}, TASKRC ${rc}); run through tests/e2e/run.py`);
     }
 }
