@@ -73,7 +73,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
-    _step('initializeCalendar', () => initializeCalendar());
+    _step('initializeCalendar', () => {
+        initializeCalendar();
+        showView({ timeGridDay: 'day', dayGridMonth: 'month' }[calendar.view.type] || 'week');
+    });
     _step('setupEventListeners', () => setupEventListeners());
     _step('initSidebarControls', () => initSidebarControls());
     _step('loadTasks', () => loadTasks());
@@ -446,12 +449,17 @@ function changeView(view) {
         if (isTimegrid) applyZoom(view);
     }
 
-    document.getElementById('calendar').dataset.view = view;
+    showView(view);
     scheduleMarkers();
+    updateCalendarTitle();
+}
+
+// The view buttons and #calendar's data-view follow the view shown (the page's markup says Week)
+function showView(view) {
+    document.getElementById('calendar').dataset.view = view;
     document.querySelectorAll('.view-btn[data-view]').forEach(btn =>
         btn.classList.toggle('active', btn.dataset.view === view)
     );
-    updateCalendarTitle();
 }
 
 // The title above the calendar. Narrow (twNav.narrow, where the brand reads "Task"), Day and
