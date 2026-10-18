@@ -486,10 +486,11 @@ function loadTasks() {
     const navState    = window.twNav ? window.twNav.getState() : {};
     const context     = (navState.context || '').trim();
     const ctxParam    = context ? '&context=' + encodeURIComponent(context) : '';
-    // Drag-list: always pending, blind to the status bar
+    // Drag-list: always pending, in the context, blind to the status bar
     const params      = 'status=pending' + ctxParam;
-    // Calendar events: follow the status bar (completed, deleted, waiting, recurring all visible)
-    const calParams   = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(',')) + ctxParam;
+    // Calendar events: follow the status bar only (completed, deleted, waiting, recurring all
+    // visible), never the context or the nav filter
+    const calParams   = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(','));
 
     // Serve from cache when clean and fresh — skips all three fetches
     const cached = _readCache(params, calParams);
@@ -764,7 +765,7 @@ class CalendarTaskActionHandler extends TaskActionHandler {
 
 // ── Sidebar: filter + display ─────────────────────────────────────────────────
 function applyFiltersAndDisplay() {
-    // Nav counter: dated tasks shown (status + context) / the status-only total, as on the List
+    // Nav counter: dated tasks shown / the status-only total (both status-only)
     const navState      = window.twNav ? window.twNav.getState() : {};
     const calParams     = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(','));
     const calendarTasks = [...allTasks.filter(t => t.scheduled), ...dueTasks];
