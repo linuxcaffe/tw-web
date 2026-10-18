@@ -817,6 +817,31 @@ def _task_filter_args(params):
     return args + _build_task_filter(statuses)
 
 
+# A tag name 2.6.2 reads as a `+tag`/`-tag` term. It takes others ($-13, a-b, 1x, a:b …) for
+# description words, and in `modify` bare words replace the description, so those go as one
+# whole-list `tags:` attribute, which takes any name. Erring narrow costs nothing: a plain name
+# this misses still works through `tags:`.
+_PLAIN_TAG_RE = re.compile(r'(?!\d)[\w.]+')
+# What a tag can't hold: a comma splits the list; a space or `"` breaks task's own export
+_BAD_TAG_RE = re.compile(r'[\s,"]')
+
+
+def _tag_args(add, remove=(), current=None):
+    """argv terms for a write's tag changes: `-t`/`+t`, or `tags:<the whole list>` when a name
+    isn't a plain tag term. current: the task's tags now (modify). Raises ValueError for a name
+    a tag can't hold."""
+    add    = [str(t).strip() for t in add    if t and str(t).strip()]
+    remove = [str(t).strip() for t in remove if t and str(t).strip()]
+    bad = next((t for t in add if _BAD_TAG_RE.search(t)), None)
+    if bad:
+        raise ValueError(f'A tag can\'t contain a space, a comma or a quote: {bad}')
+    if all(_PLAIN_TAG_RE.fullmatch(t) for t in add + remove):
+        return [f'-{t}' for t in remove] + [f'+{t}' for t in add]
+    tags = [t for t in (current or []) if t not in remove]
+    tags += [t for t in add if t not in tags]
+    return ['tags:' + ','.join(tags)]
+
+
 def _build_task_filter(statuses):
     """TW filter args for status ids; several are OR'd in parentheses."""
     STATUS_MAP = {
@@ -1148,13 +1173,13 @@ def add_bookmark():
     if not title or not url:
         return jsonify({'success': False, 'error': 'title and url are required'}), 400
 
-    args = ['task', 'add', '+bkmk']
+    args = ['task', 'add']
     if data.get('project'):
         args.append(f'project:{data["project"].strip()}')
-    for tag in (data.get('tags') or '').split():
-        tag = tag.lstrip('+')
-        if tag:
-            args.append(f'+{tag}')
+    try:
+        args += _tag_args(['bkmk'] + [t.lstrip('+') for t in (data.get('tags') or '').split()])
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
 
     args += ['--', title]   # free text last, after `--` (S11)
     add_result = run_task_command(args)
@@ -1340,14 +1365,19 @@ def modify_task(task_id):
     if 'description' in data and data['description']:
         modifications.append(f'description:{data["description"]}')
 
-    if 'tags_remove' in data:
-        for tag in data['tags_remove']:
-            if tag and str(tag).strip():
-                modifications.append(f'-{str(tag).strip()}')
-    if 'tags_add' in data:
-        for tag in data['tags_add']:
-            if tag and str(tag).strip():
-                modifications.append(f'+{str(tag).strip()}')
+    tags_add, tags_remove = data.get('tags_add') or [], data.get('tags_remove') or []
+    if tags_add or tags_remove:
+        try:
+            terms = _tag_args(tags_add, tags_remove)
+            if terms and terms[0].startswith('tags:'):   # a whole list: it needs the tags now
+                current = run_task_command(['task', task_id, 'export'], readonly=True)
+                found = json.loads(current['stdout']) if current['success'] else []
+                if not found:
+                    return jsonify({'success': False, 'message': 'Task not found'}), 404
+                terms = _tag_args(tags_add, tags_remove, found[0].get('tags'))
+        except ValueError as e:
+            return jsonify({'success': False, 'message': str(e), 'error': str(e)}), 400
+        modifications += terms
 
     if 'due' in data:
         modifications.append(f'due:{data["due"]}' if data['due'] else 'due:')
@@ -1503,10 +1533,11 @@ def add_task():
 
     args = ['task', 'add']
 
-    if data.get('tags'):
-        if isinstance(data['tags'], list):
-            for tag in data['tags']:
-                args.append(f'+{tag}')
+    if isinstance(data.get('tags'), list):
+        try:
+            args += _tag_args(data['tags'])
+        except ValueError as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
 
     if data.get('due'):
         args.append(f'due:{data["due"]}')
@@ -1582,10 +1613,11 @@ def log_task():
 
     args = ['task', 'log']
 
-    if data.get('tags'):
-        if isinstance(data['tags'], list):
-            for tag in data['tags']:
-                args.append(f'+{tag}')
+    if isinstance(data.get('tags'), list):
+        try:
+            args += _tag_args(data['tags'])
+        except ValueError as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
     if data.get('due'):
         args.append(f'due:{data["due"]}')
     if data.get('scheduled'):
