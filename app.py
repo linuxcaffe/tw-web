@@ -612,12 +612,12 @@ def run_task_command(args, readonly=False, extra_overrides=None, extra_env=None)
             'returncode': -1
         }
 
-def run_command(args, timeout=TASK_TIMEOUT):
+def run_command(args, timeout=TASK_TIMEOUT, env=None):
     """Run an arbitrary command (not task). Returns same dict as run_task_command."""
     try:
         result = subprocess.run(
             args, capture_output=True, text=True,
-            env=_TW_ENV, timeout=timeout
+            env={**_TW_ENV, **(env or {})}, timeout=timeout
         )
         return {
             'success': result.returncode == 0,
@@ -1864,7 +1864,10 @@ def edit_annotation(task_id):
     })
 
 def _task_dir():
-    return Path(os.environ.get('TW_TASK_DIR') or Path.home() / '.task')
+    """The task folder: the fleet's TW_TASK_DIR, else the TASKDATA task itself is told to use (a scratch
+    server's, a test's), else ~/.task. Never ~/.task when the data is elsewhere: scratch servers did
+    once, and every page-check run synced the real repo (2026-10-22)."""
+    return Path(os.environ.get('TW_TASK_DIR') or os.environ.get('TASKDATA') or Path.home() / '.task')
 
 def _gittw():
     """gittw's path: on PATH, or in the task dir's scripts/ (a widget-started server's PATH lacks it)."""
@@ -1874,10 +1877,14 @@ def _gittw():
     candidate = _task_dir() / 'scripts' / 'gittw'
     return str(candidate) if os.access(candidate, os.X_OK) else None
 
+def _gittw_env():
+    """gittw works on TW_TASK_DIR, else ~/.task: tell it the folder tw-web means."""
+    return {'TW_TASK_DIR': str(_task_dir())}
+
 def _gittw_status(gittw, fetch=False):
     """gittw status --json: station, incoming by station, behind, stations last seen. None on failure."""
     args = [gittw, 'status'] + (['--fetch'] if fetch else []) + ['--json']
-    r = run_command(args, timeout=FETCH_TIMEOUT if fetch else TASK_TIMEOUT)
+    r = run_command(args, timeout=FETCH_TIMEOUT if fetch else TASK_TIMEOUT, env=_gittw_env())
     try:
         return json.loads(r['stdout']) if r['success'] else None
     except ValueError:
@@ -1955,7 +1962,8 @@ def _sync_now(message=''):
         return {**result, 'pulled': {}}
     with _data_lock.exclusive():
         old = _git_head(td)
-        result = run_command([gittw, 'sync'] + (['-m', message] if message else []), timeout=SYNC_TIMEOUT)
+        result = run_command([gittw, 'sync'] + (['-m', message] if message else []), timeout=SYNC_TIMEOUT,
+                             env=_gittw_env())
     pulled = {}
     if result['success'] and old:
         st = _gittw_status(gittw) or {}
@@ -2032,7 +2040,7 @@ def sync_info():
 @app.route('/api/sync/log')
 def sync_log():
     """Return recent git log for the task directory."""
-    task_dir = Path.home() / '.task'
+    task_dir = _task_dir()
     if not (task_dir / '.git').exists():
         return jsonify({'success': False, 'log': 'No git repository in ~/.task'})
     r = subprocess.run(

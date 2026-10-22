@@ -27,7 +27,7 @@ def gittw(app_module, monkeypatch, tmp_path):
     monkeypatch.setattr(app_module, '_task_dir', lambda: tmp_path)
     monkeypatch.setattr(app_module, '_SETTINGS_PATH', tmp_path / 'settings.json')
     (tmp_path / '.git').mkdir()
-    def fake(args, timeout=None):
+    def fake(args, timeout=None, env=None):
         calls.append((list(args), timeout))
         if args[1:3] == ['status', '--json'] or args[1:4] == ['status', '--fetch', '--json']:
             return {'success': True, 'stdout': json.dumps(STATUS), 'stderr': '', 'returncode': 0}
@@ -241,3 +241,29 @@ def test_status_says_when_the_repo_is_stuck_mid_rebase(client, gittw, tmp_path):
     assert client.get('/api/sync/status', headers=LOCAL).get_json()['rebase_stopped'] is False
     (tmp_path / '.git' / 'rebase-merge').mkdir()
     assert client.get('/api/sync/status', headers=LOCAL).get_json()['rebase_stopped'] is True
+
+
+# ── the task folder is the one task uses: never ~/.task from a scratch server or a test ──
+# (2026-10-22: scratch servers had TASKDATA set but synced ~/.task: every page-check run made a real sync)
+
+def test_task_dir_follows_taskdata(app_module, monkeypatch, tmp_path):
+    monkeypatch.delenv('TW_TASK_DIR', raising=False)
+    monkeypatch.setenv('TASKDATA', str(tmp_path / 'data'))
+    assert app_module._task_dir() == tmp_path / 'data'
+    monkeypatch.setenv('TW_TASK_DIR', str(tmp_path / 'tw'))
+    assert app_module._task_dir() == tmp_path / 'tw', 'TW_TASK_DIR (the fleet\'s name for it) wins'
+
+
+def test_tests_never_resolve_to_the_real_task_dir(app_module):
+    from pathlib import Path
+    assert app_module._task_dir() != Path.home() / '.task'
+    assert not app_module._auto_sync_enabled(), 'no automatic sync in a test'
+
+
+def test_gittw_is_told_which_folder(client, gittw, app_module, monkeypatch, tmp_path):
+    seen = []
+    real = app_module.run_command
+    monkeypatch.setattr(app_module, 'run_command', lambda args, timeout=None, env=None:
+                        (seen.append(env), real(args, timeout))[1])
+    client.post('/api/sync', headers=TRUSTED, json={})
+    assert seen and all(e and e.get('TW_TASK_DIR') == str(tmp_path) for e in seen)

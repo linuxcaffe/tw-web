@@ -39,6 +39,7 @@ _tmp = Path(tempfile.mkdtemp(prefix='tw-web-test-'))
 )
 os.environ['TASKRC'] = str(_tmp / 'taskrc')
 os.environ['TASKDATA'] = str(_tmp / 'data')
+os.environ['TW_TASK_DIR'] = str(_tmp / 'data')   # the task folder for sync: not a git repo, so no sync
 # Private runtime dir (hook prompts, spool, PID) — never the live server's.
 (_tmp / 'run').mkdir(mode=0o700)
 os.environ['XDG_RUNTIME_DIR'] = str(_tmp / 'run')

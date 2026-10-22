@@ -27,7 +27,7 @@ up)
     mkdir -m 700 "$TMP/data" "$TMP/run"
     printf 'data.location=%s/data\nhooks=off\nconfirmation=no\n' "$TMP" > "$TMP/taskrc"
     PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
-    (cd "$DIR" && exec env TASKRC="$TMP/taskrc" TASKDATA="$TMP/data" XDG_RUNTIME_DIR="$TMP/run" \
+    (cd "$DIR" && exec env TASKRC="$TMP/taskrc" TASKDATA="$TMP/data" TW_TASK_DIR="$TMP/data" XDG_RUNTIME_DIR="$TMP/run" \
         TW_WEB_SETTINGS="$TMP/settings.json" TW_WEB_PORT="$PORT" python3 app.py > "$TMP/server.log" 2>&1) &
     PID=$!
     printf 'TMP=%q\nPORT=%q\nPID=%q\n' "$TMP" "$PORT" "$PID" > "$STATE"
