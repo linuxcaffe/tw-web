@@ -480,7 +480,7 @@ class TaskEditor {
                             this.onSaveError(d.message || 'Failed to revert task');
                         }
                     } catch (e) {
-                        this.onSaveError('Network error: ' + e.message);
+                        this.onSaveError(TW.api.networkError(e));
                     }
                 };
             }
@@ -605,7 +605,7 @@ class TaskEditor {
                 this.onSaveError(data.error || data.message || (isEdit ? 'Failed to update task' : 'Failed to add task'));
             }
         } catch (error) {
-            this.onSaveError('Network error: ' + error.message);
+            this.onSaveError(TW.api.networkError(error));
         }
     }
 
@@ -647,7 +647,7 @@ class TaskEditor {
                 this.onSaveError(data.error || 'Failed to log task');
             }
         } catch (error) {
-            this.onSaveError('Network error: ' + error.message);
+            this.onSaveError(TW.api.networkError(error));
         }
     }
 

@@ -8,6 +8,8 @@
  *   TW.api.get(url)                   GET, parsed JSON
  *   TW.api.write(method, url, body?)  POST/PUT/DELETE, parsed JSON; always invalidates the cache
  *   TW.api.handleWriteResult(data)    act on a write's hook signals; returns true if the PTY took over
+ *   TW.api.networkError(e)            the message for a fetch that threw; when nothing answered, says
+ *                                     so and asks nav.js to check the server (its banner)
  *   TW.commands.vocab()               task's commands and aliases (/api/commands), fetched once per page
  *   TW.commands.isFilterOnly(cmd, v)  command mode: true when cmd has no command word (a raw filter)
  *
@@ -57,7 +59,7 @@ const TW = (() => {
             r = await fetch(url, opts);
         } catch (e) {
             invalidate();
-            return { success: false, error: 'Network error: ' + e.message };
+            return { success: false, error: networkError(e) };
         }
         invalidate();
         try {
@@ -65,6 +67,19 @@ const TW = (() => {
         } catch {
             return { success: false, error: `Bad response from server (HTTP ${r.status})` };
         }
+    }
+
+    // fetch throws a TypeError when nothing answered ("Failed to fetch", "NetworkError when attempting
+    // to fetch resource", "Load failed"): the server has stopped, or (Tailscale) can't be reached.
+    // The browser's own words say neither, so say it, and let nav.js check and show its banner.
+    const NO_ANSWER = "tw-web server isn't answering";
+    function networkError(e) {
+        if (e && e.name === 'TypeError') {
+            if (typeof document !== 'undefined') document.dispatchEvent(new CustomEvent('tw-server-check'));
+            return NO_ANSWER;
+        }
+        if (e && e.name === 'AbortError') return 'No answer from the server in time';
+        return 'Network error: ' + (e && e.message || e);
     }
 
     // The signals a write result can carry (app.py _hook_signals), handled the same way wherever
@@ -109,6 +124,6 @@ const TW = (() => {
         return !tokens.some(tok => isCommandWord(tok, v));
     }
 
-    return { store: { read, save, invalidate }, api: { get, write, handleWriteResult },
+    return { store: { read, save, invalidate }, api: { get, write, handleWriteResult, networkError, NO_ANSWER },
              commands: { vocab, isCommandWord, isFilterOnly } };
 })();

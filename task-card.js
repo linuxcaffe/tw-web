@@ -48,7 +48,7 @@ class TaskActionHandler {
                 window.twNav?.showOutput(data.message || data.error || `Failed to ${action} task`);
             }
         } catch (error) {
-            window.twNav?.showOutput('Network error: ' + error.message);
+            window.twNav?.showOutput(TW.api.networkError(error));
         }
     }
     

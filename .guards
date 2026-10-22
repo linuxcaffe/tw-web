@@ -93,3 +93,13 @@ tw-layers.js:function byDay
 calendar-planner.js:function layerEventSource
 agenda.js:function agendaLayerDays
 calendar-planner.js:function paintLayerMarks
+
+# ── Server health on a phone (Android plan, step 7): termux-exec, ping, banner, restart ──
+app.py:def _termux_preload
+app.py:'/api/ping'
+app.py:'/api/server/restart'
+app.py:def _restart_soon
+tw-api.js:networkError
+nav.js:tw-server-check
+nav.js:function _initServerWatch
+nav.js:_TERMUX_INTENT

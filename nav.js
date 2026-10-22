@@ -639,6 +639,23 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 }
 .notif-close:hover { color: #fff; }
 
+/* server banner: the server stopped answering (_initServerWatch) */
+#tw-server-banner {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10001;
+    display: none; align-items: center; flex-wrap: wrap; gap: 8px 12px;
+    padding: 8px 16px; background: #b03a2e; color: #fff; font-size: 14px; line-height: 1.4;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+#tw-server-banner.show { display: flex; }
+#tw-server-banner.restarting { background: #2980b9; }
+#tw-server-banner .tw-sb-text { flex: 1 1 220px; }
+#tw-server-banner .tw-sb-hint { opacity: 0.85; font-size: 12px; }
+#tw-server-banner button, #tw-server-banner a {
+    background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 4px; padding: 4px 10px; font-size: 13px; cursor: pointer; text-decoration: none;
+}
+#tw-server-banner button:hover, #tw-server-banner a:hover { background: rgba(255,255,255,0.28); }
+
 /* responsive — stack both bars at BREAK */
 @media (max-width: ${BREAK}px) {
     #tw-nav-bar {
@@ -1837,6 +1854,24 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             bd.appendChild(_row('Init script', ptyInit, _note('Commands run on every shell open (one per line)')));
         }));
 
+        // Server: restart or stop it (stop was only in the Firefox popup)
+        form.appendChild(_section('server', 'Server', bd => {
+            const since = _note('');
+            fetch('/api/ping', { cache: 'no-store' }).then(r => r.json()).then(d => {
+                const t = new Date(d.started * 1000);
+                since.textContent = 'Running since ' + t.toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+            }).catch(() => {});
+            const restart = _mk('button', { type: 'button', cls: 'tw-pick-item', text: 'Restart server' });
+            const stop    = _mk('button', { type: 'button', cls: 'tw-pick-item', text: 'Stop server' });
+            restart.addEventListener('click', () => _serverControl('restart'));
+            stop.addEventListener('click', () => _serverControl('stop'));
+            const btns = _mk('div', { css: 'display:flex;gap:8px;flex-wrap:wrap' });
+            btns.append(restart, stop);
+            bd.appendChild(_row('tw-web server', since, btns,
+                _note('Restart: a fresh server with the current code; the page reconnects by itself. ' +
+                      'Stop: it stays stopped until you start it again.')));
+        }));
+
         // Annotation launchers
         let launchersEl;
         form.appendChild(_section('launchers', 'Annotation launchers', bd => {
@@ -1937,7 +1972,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                     status.textContent = 'Saved';
                     setTimeout(() => { status.textContent = ''; }, 2000);
                 } else { status.textContent = d.error || 'Error'; }
-            } catch { status.textContent = 'Network error'; }
+            } catch (e) { status.textContent = TW.api.networkError(e); }
         });
     }
 
@@ -2133,9 +2168,111 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 }
             } catch (_) {}
         };
-        es.onerror = () => {
-            // Browser auto-reconnects — no action needed
-        };
+        // The stream drops when the server stops: check at once (the browser reconnects by itself)
+        es.onerror = () => _serverCheck();
+    }
+
+    // ── Server watch ──────────────────────────────────────────────────────────
+    // A server that stopped answering gets a banner instead of "Failed to fetch" in a corner: on
+    // a phone, Android stops Termux when it likes. Checked on load, every 30 s while the page is
+    // visible, when it becomes visible again, when the event stream drops and when a fetch finds no
+    // one (TW.api.networkError). While it's down, every 5 s; when it's back, the view reloads.
+    const _PING_EVERY = 30_000, _PING_DOWN = 5_000;
+    const _LAST_KEY = 'tw-server-last', _TERMUX_KEY = 'tw-server-termux';
+    // Opens Termux, whose ~/.bashrc starts tw-web (mobilize's autostart block)
+    const _TERMUX_INTENT = 'intent:#Intent;action=android.intent.action.MAIN;' +
+                           'category=android.intent.category.LAUNCHER;package=com.termux;end';
+    let _serverDown = false, _restarting = false, _pinging = false, _pingTimer = null;
+
+    function _lsGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+    function _lsSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+
+    async function _serverCheck() {
+        if (_pinging) return;
+        _pinging = true;
+        let ok = false;
+        try {
+            const r = await fetch('/api/ping', { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+            const d = await r.json();
+            ok = !!d.ok;
+            if (ok) {
+                _lsSet(_LAST_KEY, String(Date.now()));
+                _lsSet(_TERMUX_KEY, d.termux ? '1' : '0');
+            }
+        } catch {}
+        _pinging = false;
+        if (ok && _serverDown) _serverBack();
+        else if (!ok) _serverLost();
+        _schedulePing();
+    }
+
+    function _schedulePing() {
+        clearTimeout(_pingTimer);
+        if (document.visibilityState !== 'visible') return;
+        _pingTimer = setTimeout(_serverCheck, _serverDown ? _PING_DOWN : _PING_EVERY);
+    }
+
+    function _serverLost() {
+        _serverDown = true;
+        const b = document.getElementById('tw-server-banner');
+        if (!b) return;
+        const last = parseInt(_lsGet(_LAST_KEY) || '0');
+        const when = last ? new Date(last).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        const termux = _lsGet(_TERMUX_KEY) === '1';
+        b.classList.toggle('restarting', _restarting);
+        b.querySelector('.tw-sb-text').textContent = _restarting ? 'Restarting the tw-web server…'
+            : "tw-web server isn't answering" + (when ? ` (last reached ${when})` : '') + '.';
+        b.querySelector('.tw-sb-hint').textContent = _restarting ? ''
+            : termux ? 'Android may have stopped it. Open Termux to start it again.'
+                     : 'It may have stopped: start it again (tw-web-launch.sh).';
+        b.querySelector('.tw-sb-start').style.display = (termux && !_restarting) ? '' : 'none';
+        b.classList.add('show');
+    }
+
+    function _serverBack() {
+        const wasRestart = _restarting;
+        _serverDown = false;
+        _restarting = false;
+        document.getElementById('tw-server-banner')?.classList.remove('show');
+        TW.store.invalidate();
+        document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
+        showNotification(wasRestart ? 'Server restarted' : 'Server is back', 'success');
+    }
+
+    function _initServerWatch() {
+        const b = document.createElement('div');
+        b.id = 'tw-server-banner';
+        b.setAttribute('role', 'alert');
+        b.innerHTML =
+            `<span class="tw-sb-text"></span>` +
+            `<span class="tw-sb-hint"></span>` +
+            `<a class="tw-sb-start" href="${_TERMUX_INTENT}">Open Termux</a>` +
+            `<button type="button" class="tw-sb-retry">Retry</button>`;
+        document.body.appendChild(b);
+        b.querySelector('.tw-sb-retry').addEventListener('click', _serverCheck);
+        document.addEventListener('tw-server-check', _serverCheck);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') _serverCheck(); else clearTimeout(_pingTimer);
+        });
+        _serverCheck();
+    }
+
+    // Settings → Server: restart (the reloader starts a fresh server) or stop it
+    async function _serverControl(action) {
+        if (action === 'stop' && !confirm('Stop the tw-web server?\n\nThis page stops working until it is ' +
+                (_lsGet(_TERMUX_KEY) === '1' ? 'started again (open Termux, or tap the widget).'
+                                              : 'started again (tw-web-launch.sh).'))) return;
+        let d;
+        try {
+            const r = await fetch(`/api/server/${action}`, { method: 'POST' });
+            d = await r.json();
+        } catch (e) { showNotification(TW.api.networkError(e), 'error'); return; }
+        if (!d.success) { showNotification(d.error || `Could not ${action} the server`, 'error'); return; }
+        if (action === 'restart') {
+            _restarting = true;
+            _serverLost();
+        }
+        setTimeout(_serverCheck, 1500);
     }
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────────
@@ -2201,10 +2338,11 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => { init(); _initSSE(); _initKeys(); });
+        document.addEventListener('DOMContentLoaded', () => { init(); _initSSE(); _initKeys(); _initServerWatch(); });
     } else {
         init();
         _initSSE();
         _initKeys();
+        _initServerWatch();
     }
 }());

@@ -259,7 +259,7 @@ class TaskWarriorUI {
             }
 
         } catch (error) {
-            this.showError('Network error: ' + error.message);
+            this.showError(TW.api.networkError(error));
         } finally {
             this.showLoading(false);
         }

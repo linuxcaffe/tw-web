@@ -54,4 +54,24 @@ t('isFilterOnly: a leading ID or ID list is a command', () => {
 t('isFilterOnly: without the vocabulary, the console decides', () => assert.ok(!C.isFilterOnly('project:work', null)));
 
 
+// ── TW.api.networkError: "Failed to fetch" says what happened (step 7, item 1) ─
+const checks = [];
+ctx.document = { dispatchEvent(ev) { checks.push(ev.type); } };
+ctx.CustomEvent = class { constructor(type) { this.type = type; } };
+const A = ctx.TW.api;
+function err(name, message) { const e = new Error(message); e.name = name; return e; }
+
+t('no answer (Chrome, Firefox, Safari): the server isn\'t answering, and nav.js is asked to check', () => {
+    for (const m of ['Failed to fetch', 'NetworkError when attempting to fetch resource.', 'Load failed']) {
+        assert.strictEqual(A.networkError(err('TypeError', m)), "tw-web server isn't answering");
+    }
+    assert.deepStrictEqual(checks, ['tw-server-check', 'tw-server-check', 'tw-server-check']);
+});
+t('a timeout and other errors keep their own words, and ask for no check', () => {
+    checks.length = 0;
+    assert.strictEqual(A.networkError(err('AbortError', 'aborted')), 'No answer from the server in time');
+    assert.strictEqual(A.networkError(err('SyntaxError', 'bad JSON')), 'Network error: bad JSON');
+    assert.deepStrictEqual(checks, []);
+});
+
 console.log(`tw-api commands: ${n} passed`);

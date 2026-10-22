@@ -422,6 +422,26 @@ def _get_recurrence_filter():
 
 RECURRING_FILTER = _get_recurrence_filter()
 
+def _is_termux(env):
+    return 'TERMUX_VERSION' in env or env.get('PREFIX', '').startswith('/data/data/com.termux')
+
+def _termux_preload(env):
+    """On Termux, the termux-exec library LD_PRELOAD should name when it's missing, else None.
+    termux-exec is what makes `#!/usr/bin/env python3` work on Android. A Termux session sets it;
+    a server started by Termux:Widget doesn't have it, and then every hook fails "No such file
+    or directory" (s5, 2026-10-22)."""
+    if env.get('LD_PRELOAD') or not _is_termux(env):
+        return None
+    lib = Path(env.get('PREFIX', '/data/data/com.termux/files/usr')) / 'lib'
+    for name in ('libtermux-exec-ld-preload.so', 'libtermux-exec.so'):
+        if (lib / name).is_file():
+            return str(lib / name)
+    return None
+
+# Every subprocess (task, hooks, the console, launchers) inherits this
+if _preload := _termux_preload(os.environ):
+    os.environ['LD_PRELOAD'] = _preload
+
 # Environment passed to every task/hook subprocess.
 # Fleet-wide non-interactive client conventions:
 #   TW_WEB=1        — legacy; kept for existing hooks
@@ -1084,6 +1104,25 @@ def server_health():
         'pending_count': count,
         'tw_version': version,
     })
+
+@app.route('/api/ping')
+def server_ping():
+    """The page's "is the server there?": cheap, runs no task command."""
+    return jsonify({'ok': True, 'termux': _is_termux(os.environ), 'started': _START_TIME})
+
+def _restart_soon():
+    """Exit the serving process with code 3 after the response has gone out: Werkzeug's reloader
+    (the parent process) then starts a fresh one, as it does when a file changes."""
+    threading.Timer(0.3, os._exit, (3,)).start()
+
+@app.route('/api/server/restart', methods=['POST'])
+def server_restart():
+    """Restart the server: new code, cleared state. The reloader's parent keeps the port and its
+    environment, so the page reconnects on its own after a few seconds."""
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        return jsonify({'success': False, 'error': 'Not running under the reloader: restart it by hand'}), 409
+    _restart_soon()
+    return jsonify({'success': True})
 
 @app.route('/api/server/stop', methods=['POST'])
 def server_stop():
