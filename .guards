@@ -115,3 +115,9 @@ app.py:def _pulled_since
 app.py:def _opener
 nav.js:function _renderSyncStatus
 nav.js:'synced'
+
+# ── Updates: the menu's pill (tw-web's own checkout) ──
+app.py:def _version_info
+app.py:'/api/update'
+app.py:def _update_check_loop
+nav.js:function _applyUpdate

@@ -136,6 +136,12 @@ reached 13:42)", with Retry, and on a phone **Open Termux** (opening Termux star
 page checks every 30 seconds while it's on screen, and reloads the view when the server is back.
 **Settings → Server** restarts it (a fresh server, the page reconnects by itself) or stops it.
 
+**Updates:** the menu shows tw-web's version under the logo (`v2.0.0-27`: the last release and
+the commits since; the app cache's number is its tooltip). The server checks for new commits about
+once an hour; when there are some, a pill appears there, **Update (3 new)**, listing them on hover.
+Tapping it pulls them (fast-forward only, and only on `main` with no local edits) and reloads the
+page onto the new version. Updating by hand still works: `git pull` in the tw-web folder.
+
 On Termux tw-web sets `LD_PRELOAD` to Termux's termux-exec when it's missing (as when Termux:Widget
 starts it), so hooks starting `#!/usr/bin/env python3` work however the server was started.
 

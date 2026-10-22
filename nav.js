@@ -515,6 +515,12 @@
 .tw-menu-header img  { height: 58px; width: 58px; }
 .tw-menu-header span { color: #fff; font-size: 15px; font-weight: 600; letter-spacing: 0.03em; }
 #tw-cache-ver { font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.04em; margin-top: -2px; }
+#tw-update-pill {
+    font-size: 11px; font-weight: 600; color: #1a1a1a; background: #f0b429; border: none;
+    border-radius: 10px; padding: 2px 10px; margin-top: -2px; cursor: pointer;
+}
+#tw-update-pill:hover { background: #f7c948; }
+#tw-update-pill:disabled { opacity: 0.6; cursor: default; }
 .tw-menu-items { flex: 1; padding: 8px 0; overflow-y: auto; }
 .tw-menu-item {
     display: block; width: 100%; text-align: left; padding: 11px 20px;
@@ -886,6 +892,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     function openMenu() {
         document.getElementById('tw-side-menu').classList.add('open');
         document.getElementById('tw-menu-backdrop').classList.add('open');
+        _checkVersion();
         if (_kbNav) {
             // Focus first visible menu item so arrow keys work immediately
             requestAnimationFrame(() => {
@@ -1045,6 +1052,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 `<img src="/logo-192.png" alt="tw-web">` +
                 `<span>tw-web</span>` +
                 `<span id="tw-cache-ver"></span>` +
+                `<button type="button" id="tw-update-pill" style="display:none"></button>` +
             `</div>` +
             `<nav class="tw-menu-items" id="tw-menu-list">` +
                 MENU_ITEMS.map(item =>
@@ -1059,14 +1067,20 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 `<div id="tw-panel-body" class="tw-panel-body"></div>` +
             `</div>`;
 
-        // Show active SW cache version under the menu logo (dev aid)
+        // Under the menu logo: tw-web's version (the app cache's number as its tooltip), and the
+        // update pill when the server has fetched newer commits (_checkVersion)
         if ('caches' in window) {
             caches.keys().then(keys => {
                 const v = keys.find(k => k.startsWith('tw-web-v'));
                 const el = document.getElementById('tw-cache-ver');
-                if (el) el.textContent = v ? v.replace('tw-web-', '') : '';
+                if (el) el.title = v ? 'app cache ' + v.replace('tw-web-', '') : '';
             }).catch(() => {});
         }
+        sideMenu.querySelector('#tw-update-pill').addEventListener('click', e => {   // not in the page yet
+            e.stopPropagation();          // the header itself is a button
+            _applyUpdate();
+        });
+        _checkVersion();
 
         const backdrop = document.createElement('div');
         backdrop.id = 'tw-menu-backdrop';
@@ -2318,6 +2332,56 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             if (document.visibilityState === 'visible') _serverCheck(); else clearTimeout(_pingTimer);
         });
         _serverCheck();
+    }
+
+    // ── Updates: the pill under the menu logo ─────────────────────────────────
+    let _versionInfo = null;
+    async function _checkVersion() {
+        try {
+            _versionInfo = await (await fetch('/api/version', { cache: 'no-store' })).json();
+        } catch { return; }
+        const v = _versionInfo, ver = document.getElementById('tw-cache-ver');
+        const pill = document.getElementById('tw-update-pill');
+        if (ver && v.version) ver.textContent = v.version;
+        if (!pill) return;
+        const show = v.behind > 0;
+        pill.style.display = show ? '' : 'none';
+        if (!show) return;
+        pill.textContent = `Update (${v.behind} new)`;
+        pill.title = v.subjects.join('\n') + (v.can_update ? '' : `\n\nCan't update here: ${v.reason}`);
+        pill.disabled = !v.can_update;
+    }
+
+    async function _applyUpdate() {
+        const v = _versionInfo;
+        if (!v || !v.can_update) return;
+        if (!confirm(`Update tw-web (${v.behind} new)?\n\n` + v.subjects.slice(0, 12).map(s => '• ' + s).join('\n'))) return;
+        const pill = document.getElementById('tw-update-pill');
+        pill.disabled = true;
+        pill.textContent = 'Updating…';
+        let d;
+        try {
+            d = await (await fetch('/api/update', { method: 'POST' })).json();
+        } catch (e) { showNotification(TW.api.networkError(e), 'error'); pill.disabled = false; return; }
+        if (!d.success) { showNotification(d.error || 'Update failed', 'error'); _checkVersion(); return; }
+        // The server restarts by itself when Python files changed; then the service worker fetches
+        // the new shell (it takes over open pages at once) and the page reloads onto it.
+        _restarting = true;
+        _serverLost();
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        await sleep(2000);
+        for (let i = 0; i < 40; i++) {
+            try { if ((await (await fetch('/api/ping', { cache: 'no-store' })).json()).ok) break; } catch {}
+            await sleep(500);
+        }
+        try {
+            const reg = await navigator.serviceWorker?.getRegistration();
+            if (reg) {
+                await reg.update();
+                for (let i = 0; i < 40 && (reg.installing || reg.waiting); i++) await sleep(200);
+            }
+        } catch {}
+        location.reload();
     }
 
     // Settings → Server: restart (the reloader starts a fresh server) or stop it

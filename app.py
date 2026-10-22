@@ -1192,6 +1192,63 @@ def server_restart():
     _restart_soon()
     return jsonify({'success': True})
 
+# ── Updates (the menu's pill): tw-web's own git checkout ─────────────────────
+# The server fetches its upstream now and then; /api/version says how far behind it is, and
+# /api/update pulls (fast-forward only, on main, with no local edits, so work in progress is safe).
+_WEB_DIR = Path(__file__).resolve().parent
+UPDATE_CHECK_EVERY = 3600
+_update_state = {'checked': None, 'ok': None}
+
+def _web_git(*args, timeout=TASK_TIMEOUT):
+    try:
+        r = subprocess.run(['git', '-C', str(_WEB_DIR), *args], capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return r.stdout.strip() if r.returncode == 0 else None
+
+def _fetch_web():
+    """Fetch tw-web's upstream (network). True when it worked."""
+    ok = _web_git('fetch', '-q', timeout=FETCH_TIMEOUT) is not None
+    _update_state.update(checked=time.time(), ok=ok)
+    return ok
+
+def _version_info():
+    described = _web_git('describe', '--tags', '--always')
+    if described is None:
+        return {'version': None, 'behind': 0, 'subjects': [], 'can_update': False,
+                'reason': 'not a git checkout', 'checked': _update_state['checked']}
+    # v2.0.0-27-g5627e03 → v2.0.0-27 (the commit hash says nothing to a reader)
+    version = re.sub(r'-g[0-9a-f]+$', '', described)
+    branch = _web_git('rev-parse', '--abbrev-ref', 'HEAD') or ''
+    behind = int(_web_git('rev-list', '--count', 'HEAD..@{u}') or 0)
+    subjects = (_web_git('log', '--format=%s', '-20', 'HEAD..@{u}') or '').splitlines() if behind else []
+    edits = _web_git('status', '--porcelain', '--untracked-files=no')
+    reason = ('' if branch == 'main' and edits == '' else
+              f'on branch {branch}, not main' if branch != 'main' else 'there are local changes')
+    return {'version': version, 'behind': behind, 'subjects': subjects, 'can_update': not reason,
+            'reason': reason, 'checked': _update_state['checked']}
+
+def _update_check_loop():
+    time.sleep(60)
+    while True:
+        _fetch_web()
+        time.sleep(UPDATE_CHECK_EVERY)
+
+@app.route('/api/version')
+def web_version():
+    return jsonify(_version_info())
+
+@app.route('/api/update', methods=['POST'])
+def web_update():
+    """git pull --ff-only. The reloader restarts the server when Python files change; the page
+    then reloads (and its service worker fetches the new shell)."""
+    info = _version_info()
+    if not info['can_update']:
+        return jsonify({'success': False, 'error': f"Can't update: {info['reason']}"}), 409
+    if _web_git('pull', '--ff-only', '-q', timeout=SYNC_TIMEOUT) is None:
+        return jsonify({'success': False, 'error': 'git pull failed (offline, or not a fast-forward)'}), 502
+    return jsonify({'success': True, 'version': _version_info()['version']})
+
 @app.route('/api/server/stop', methods=['POST'])
 def server_stop():
     """Shut down the Flask server. Kills the reloader parent via PID file."""
@@ -2076,6 +2133,7 @@ if __name__ == '__main__':
     # and releases them.
     if not opts['use_reloader'] or is_running_from_reloader():
         threading.Thread(target=_auto_sync_loop, daemon=True, name='auto-sync').start()
+        threading.Thread(target=_update_check_loop, daemon=True, name='update-check').start()
         for extra in opts['binds'][1:]:
             srv = make_server(extra, port, app, threaded=True)
             threading.Thread(target=srv.serve_forever, daemon=True, name=f'serve-{extra}').start()
