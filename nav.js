@@ -1751,6 +1751,10 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             bd.appendChild(_row('Notification timeout', notif, _note('ms — 0 = manual dismiss only')));
             const kanban = _inp('tws-kanban', 'text', { value: (cfg.kanban_columns || []).join(', ') });
             bd.appendChild(_row('Kanban columns', kanban, _note('Comma-separated, in order')));
+            const auto = _mk('input', { type: 'checkbox', id: 'tws-sync-auto', checked: cfg.sync_auto !== false });
+            bd.appendChild(_row('Sync automatically', auto,
+                _note('With gittw: soon after the server starts, a minute after your last change, and every ' +
+                      '15 minutes (5 after a failed try, as when offline). Changes from other stations show up by themselves.')));
         }));
 
         // Calendar
@@ -1947,6 +1951,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         notification_timeout: notifVal,
+                        sync_auto:            form.querySelector('#tws-sync-auto').checked,
                         kanban_columns:       kanbanVal,
                         cal_day_start:        calStart,
                         cal_day_end:          calEnd,
@@ -1977,6 +1982,65 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     }
 
     // ── Sync dialog ───────────────────────────────────────────────────────────
+    // "3 min ago" from an ISO time or epoch seconds
+    function _ago(when) {
+        const t = typeof when === 'number' ? when * 1000 : Date.parse(when);
+        if (isNaN(t)) return String(when);
+        const s = Math.max(0, (Date.now() - t) / 1000);
+        for (const [unit, n] of [['d', 86400], ['h', 3600], ['min', 60]]) {
+            if (s >= n) return `${Math.floor(s / n)} ${unit} ago`;
+        }
+        return 'just now';
+    }
+
+    // The advisory (step 7, item 4): what's coming in, by station; what's here and not pushed;
+    // when each station last synced; how automatic sync is doing. d null: still checking.
+    function _renderSyncStatus(el, d) {
+        if (!d) { el.innerHTML = '<span class="sync-checking">Checking the other stations…</span>'; return; }
+        if (!d.git) { el.textContent = ''; return; }
+        const STATUS_LABEL = { M: 'modified', A: 'added', D: 'deleted', '?': 'untracked' };
+        const plural = (n, w) => `${n} ${w}${n !== 1 ? 's' : ''}`;
+        const parts = [];
+        const inc = Object.entries(d.incoming || {});
+        if (inc.length) {
+            parts.push(`<div class="sync-incoming">Incoming: ` +
+                inc.map(([st, n]) => `${plural(n, 'change')} from <b>${esc(st)}</b>`).join(', ') + `</div>`);
+        } else if (d.station) {
+            parts.push(`<div class="sync-incoming none">Nothing new from the other stations</div>`);
+        }
+        if (d.files?.length) {
+            const rows = d.files.map(f => {
+                const label = STATUS_LABEL[f.status] || f.status;
+                return `<span class="sync-file-row">` +
+                    `<span class="sync-file-status sync-fs-${esc(f.status.toLowerCase())}">${esc(label)}</span>` +
+                    `<span class="sync-file-name">${esc(f.path)}</span></span>`;
+            }).join('');
+            parts.push(`<div class="sync-files-section">` +
+                `<div class="sync-files-label">${plural(d.files.length, 'file')} changed here</div>${rows}</div>`);
+        }
+        if (d.unpushed) parts.push(`<div class="sync-unpushed">${plural(d.unpushed, 'commit')} here, not pushed yet</div>`);
+        if (!inc.length && !d.files?.length && !d.unpushed) parts.push('<span class="sync-uptodate">Up to date</span>');
+        const seen = Object.entries(d.last_seen || {});
+        if (seen.length) {
+            parts.push(`<div class="sync-stations">Stations: ` + seen.map(([st, when]) =>
+                `<span class="sync-station">${esc(st)}${st === d.station ? ' (this one)' : ''} ` +
+                `synced ${esc(_ago(when))}</span>`).join(' · ') + `</div>`);
+        }
+        const a = d.auto;
+        if (a) {
+            parts.push(`<div class="sync-auto">` + (!a.enabled ? 'Automatic sync: off (Settings → General)'
+                : a.last == null ? 'Automatic sync: on'
+                : a.last_ok ? `Automatic sync: on, last ${esc(_ago(a.last))}`
+                : `<span class="sync-auto-failed">Automatic sync: last try failed ${esc(_ago(a.last))}` +
+                  (a.last_note ? `: ${esc(a.last_note)}` : '') + ` (offline?)</span>`) + `</div>`);
+        }
+        el.innerHTML = parts.join('');
+    }
+
+    function _pulledText(pulled) {
+        return Object.entries(pulled || {}).map(([st, n]) => `${n} change${n !== 1 ? 's' : ''} from ${st}`).join(', ');
+    }
+
     function openSyncDialog() {
         const dialog    = document.getElementById('tw-sync-dialog');
         const btn       = document.getElementById('tw-sync-now');
@@ -2000,27 +2064,10 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             .then(d => { method.textContent = `Method: ${d.method}`; })
             .catch(() => { method.textContent = ''; });
 
-        fetch('/api/sync/status').then(r => r.json()).then(d => {
-            if (!d.git) { changesEl.textContent = ''; return; }
-            const STATUS_LABEL = { M: 'modified', A: 'added', D: 'deleted', '?': 'untracked' };
-            const parts = [];
-            if (d.files?.length) {
-                const rows = d.files.map(f => {
-                    const label = STATUS_LABEL[f.status] || f.status;
-                    return `<span class="sync-file-row">` +
-                        `<span class="sync-file-status sync-fs-${f.status.toLowerCase()}">${label}</span>` +
-                        `<span class="sync-file-name">${f.path}</span></span>`;
-                }).join('');
-                parts.push(`<div class="sync-files-section">` +
-                    `<div class="sync-files-label">${d.files.length} file${d.files.length !== 1 ? 's' : ''} changed</div>` +
-                    `${rows}</div>`);
-            }
-            if (d.unpushed) parts.push(
-                `<div class="sync-unpushed">${d.unpushed} unpushed commit${d.unpushed !== 1 ? 's' : ''}</div>`);
-            changesEl.innerHTML = parts.length
-                ? parts.join('')
-                : '<span class="sync-uptodate">Up to date</span>';
-        }).catch(() => { changesEl.textContent = ''; });
+        _renderSyncStatus(changesEl, null);
+        fetch('/api/sync/status?fetch=1').then(r => r.json())
+            .then(d => _renderSyncStatus(changesEl, d))
+            .catch(e => { changesEl.textContent = TW.api.networkError(e); });
 
         dialog.style.display = 'flex';
         const close = () => { dialog.style.display = 'none'; };
@@ -2033,17 +2080,20 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             btn.textContent = 'Syncing…';
             output.style.display = 'none';
             TW.api.write('POST', '/api/sync', { message: msg }).then(data => {
-                output.textContent   = data.output || (data.success ? 'Sync complete.' : 'Sync failed.');
+                const came = _pulledText(data.pulled);
+                output.textContent   = (came ? `Pulled ${came}.\n\n` : '') +
+                                       (data.output || (data.success ? 'Sync complete.' : 'Sync failed.'));
                 output.style.display = 'block';
                 btn.textContent      = data.success ? 'Sync Now' : 'Retry';
                 btn.disabled         = false;
                 if (data.success) {
                     comment.value = '';
                     pollSyncStatus();
+                    fetch('/api/sync/status').then(r => r.json()).then(d => _renderSyncStatus(changesEl, d)).catch(() => {});
                     document.dispatchEvent(new CustomEvent('tw-sync-complete'));
                 }
             }).catch(err => {
-                output.textContent   = 'Error: ' + err;
+                output.textContent   = TW.api.networkError(err);
                 output.style.display = 'block';
                 btn.textContent      = 'Retry';
                 btn.disabled         = false;
@@ -2162,6 +2212,13 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 if (msg.type === 'confirm') {
                     _promptQueue.push(msg);
                     _showNextPrompt();
+                } else if (msg.type === 'synced') {
+                    // An automatic sync brought changes from another station
+                    // (every view reloads on tw-filter-change, as for the title's refresh)
+                    TW.store.invalidate();
+                    pollSyncStatus();
+                    document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
+                    showNotification(`Synced: ${_pulledText(msg.pulled)}`, 'info');
                 } else if (msg.type === 'info') {
                     document.dispatchEvent(new CustomEvent('tw-show-notification',
                         { detail: { message: msg.question, type: 'info' } }));

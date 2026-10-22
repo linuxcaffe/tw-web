@@ -42,6 +42,10 @@ os.environ['TASKDATA'] = str(_tmp / 'data')
 # Private runtime dir (hook prompts, spool, PID) — never the live server's.
 (_tmp / 'run').mkdir(mode=0o700)
 os.environ['XDG_RUNTIME_DIR'] = str(_tmp / 'run')
+# Run from a git hook (pre-commit), git sets these, and every `git -C <dir>` would then read
+# tw-web's own repo instead of <dir>.
+for _k in ('GIT_DIR', 'GIT_INDEX_FILE', 'GIT_WORK_TREE', 'GIT_PREFIX', 'GIT_OBJECT_DIRECTORY'):
+    os.environ.pop(_k, None)
 # Network settings under test are passed explicitly; don't inherit the shell's.
 for _k in ('TW_WEB_HOST', 'TW_WEB_TAILSCALE', 'TW_WEB_DEBUG', 'TW_WEB_ALLOWED_HOSTS'):
     os.environ.pop(_k, None)

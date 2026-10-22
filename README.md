@@ -166,6 +166,21 @@ chmod +x ~/.termux/boot/start-tw-web.sh
 
 Once gittw is installed and your `~/.task/` is cloned from your remote, the tw-web Sync button works out of the box with no further configuration.
 
+**What the Sync dialog tells you** (gittw 0.3+): what's coming in from each other station
+("Incoming: 3 changes from s5"; it fetches when it opens), what's here and not pushed yet, when each
+station last synced, and how automatic sync is doing. A note typed there becomes the sync's commit
+message (`gittw sync -m`), with this station's `Station:` line like every other commit. A sync may
+take up to 2 minutes (a phone's pull and push are slow); a task command takes at most 15 seconds.
+
+**Automatic sync** (Settings → General → Sync automatically, on by default when gittw is there): soon
+after the server starts, a minute after your last change, and every 15 minutes; after a failed try
+(offline) every 5. Changes from another station reload the view, with a note saying where they came
+from. A sync and `task` never run at the same time: a sync waits for running commands, and commands
+wait for a sync (usually a few seconds), so a pull can't land between task reading and rewriting
+its data files.
+
+File links (annotations, the `file` launcher) open with `termux-open` on Termux, which has no `xdg-open`.
+
 ---
 
 ## Firefox Extension

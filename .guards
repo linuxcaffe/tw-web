@@ -103,3 +103,15 @@ tw-api.js:networkError
 nav.js:tw-server-check
 nav.js:function _initServerWatch
 nav.js:_TERMUX_INTENT
+
+# ── Sync (Android plan, step 7 items 4–7): the lock between sync and task, automatic sync, advisory ──
+app.py:class _RWLock
+app.py:_data_lock
+app.py:SYNC_TIMEOUT
+app.py:def _sync_now
+app.py:def _auto_sync_due
+app.py:def _auto_sync_loop
+app.py:def _pulled_since
+app.py:def _opener
+nav.js:function _renderSyncStatus
+nav.js:'synced'

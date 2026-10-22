@@ -19,6 +19,7 @@ from queue import Queue, Empty
 from pathlib import Path
 from datetime import datetime
 import tempfile
+import contextlib
 from config import DEVELOPER_MODE, DEBUG_FILE
 
 # Taskwarrior 2.6.2's virtual tags, as `man task` lists them. They aren't stored or exported;
@@ -158,6 +159,7 @@ _SETTINGS_SCHEMA = {
                               'coerce': lambda v: str(v).strip()},
     'pty_init':             {'type': str,  'default': '',
                               'coerce': lambda v: str(v).strip()},
+    'sync_auto':            {'type': None, 'default': True, 'coerce': _valid_bool},   # gittw: see _auto_sync
     'annotation_launchers': {'type': None, 'default': {'file': 'xdg-open {value}', 'nb': 'http://localhost:5001/#{value}'},
                               'coerce': lambda v: {str(k).strip(): str(w).strip() for k, w in v.items()} if isinstance(v, dict) else {}},
 }
@@ -470,6 +472,64 @@ def _pty_env():
 # Timeout (seconds) for any single task command.
 # Prevents a hung interactive hook from deadlocking the Flask request.
 TASK_TIMEOUT = 15
+# A sync goes over the network, and on a phone gittw's pull and push take a while (step 7, item 5)
+SYNC_TIMEOUT = 120
+FETCH_TIMEOUT = 45
+
+
+class _RWLock:
+    """Any number of task commands at once, or one sync alone. A sync commits, pulls and rebases
+    the data files; task reads a file and writes the whole of it back, so a pull landing in between
+    would be overwritten, and committed as deleted. Even reads write (until: expiry). Writers go
+    first: a waiting sync holds back new task commands, so it can't be starved."""
+    def __init__(self):
+        self._cond = threading.Condition()
+        self._readers = 0
+        self._writer = False
+        self._waiting = 0
+
+    def acquire_shared(self, timeout=None):
+        with self._cond:
+            if not self._cond.wait_for(lambda: not self._writer and not self._waiting, timeout):
+                return False
+            self._readers += 1
+            return True
+
+    def release_shared(self):
+        with self._cond:
+            self._readers -= 1
+            if not self._readers:
+                self._cond.notify_all()
+
+    def acquire_exclusive(self):
+        with self._cond:
+            self._waiting += 1
+            self._cond.wait_for(lambda: not self._writer and not self._readers)
+            self._waiting -= 1
+            self._writer = True
+
+    def release_exclusive(self):
+        with self._cond:
+            self._writer = False
+            self._cond.notify_all()
+
+    @contextlib.contextmanager
+    def shared(self):
+        self.acquire_shared()
+        try:
+            yield
+        finally:
+            self.release_shared()
+
+    @contextlib.contextmanager
+    def exclusive(self):
+        self.acquire_exclusive()
+        try:
+            yield
+        finally:
+            self.release_exclusive()
+
+_data_lock = _RWLock()
 
 # Legacy marker: a hook that aborts because it needs a terminal may write this anywhere on
 # stderr (CONVENTIONS §2). It means tw_needs_pty without a cmd; _hook_signals reads both.
@@ -511,10 +571,18 @@ def run_task_command(args, readonly=False, extra_overrides=None, extra_env=None)
             }
 
         env = {**_TW_ENV, **(extra_env or {})}
-        result = subprocess.run(
-            args, capture_output=True, text=True,
-            env=env, timeout=TASK_TIMEOUT
-        )
+        if not _data_lock.acquire_shared(timeout=SYNC_TIMEOUT):
+            return {'success': False, 'stdout': '', 'returncode': -1,
+                    'stderr': 'A sync is still running: try again in a moment.'}
+        try:
+            result = subprocess.run(
+                args, capture_output=True, text=True,
+                env=env, timeout=TASK_TIMEOUT
+            )
+        finally:
+            _data_lock.release_shared()
+            if not readonly:
+                _auto_sync['pending'] = time.time()   # sync once things go quiet
         out = {
             'success': result.returncode == 0,
             'stdout': result.stdout,
@@ -544,12 +612,12 @@ def run_task_command(args, readonly=False, extra_overrides=None, extra_env=None)
             'returncode': -1
         }
 
-def run_command(args):
+def run_command(args, timeout=TASK_TIMEOUT):
     """Run an arbitrary command (not task). Returns same dict as run_task_command."""
     try:
         result = subprocess.run(
             args, capture_output=True, text=True,
-            env=_TW_ENV, timeout=TASK_TIMEOUT
+            env=_TW_ENV, timeout=timeout
         )
         return {
             'success': result.returncode == 0,
@@ -558,7 +626,7 @@ def run_command(args):
             'returncode': result.returncode
         }
     except subprocess.TimeoutExpired:
-        return {'success': False, 'stdout': '', 'stderr': f'Command timed out after {TASK_TIMEOUT}s.', 'returncode': -1}
+        return {'success': False, 'stdout': '', 'stderr': f'Command timed out after {timeout}s.', 'returncode': -1}
     except Exception as e:
         return {'success': False, 'stdout': '', 'stderr': str(e), 'returncode': -1}
 
@@ -1166,12 +1234,20 @@ def open_file():
         return jsonify({'success': False, 'error': 'Path not found'}), 404
     if not _open_allowed(path, Path.home()):
         return jsonify({'success': False, 'error': 'Only files under your home directory can be opened'}), 403
-    subprocess.Popen(['xdg-open', path])
+    subprocess.Popen([_opener(), path])
     return jsonify({'success': True})
+
+def _opener():
+    """xdg-open, or on Termux (which has no xdg-open) termux-open."""
+    if not shutil.which('xdg-open') and shutil.which('termux-open'):
+        return 'termux-open'
+    return 'xdg-open'
 
 def _launch_argv(template, value):
     """Split the launcher template first, then substitute: the value is always ONE argument (S10)."""
     tokens = shlex.split(template)
+    if tokens and tokens[0] == 'xdg-open':
+        tokens[0] = _opener()      # the default 'file' launcher, on Termux
     if not any('{value}' in t for t in tokens):
         tokens.append('{value}')
     return [t.replace('{value}', value) for t in tokens]
@@ -1730,9 +1806,111 @@ def edit_annotation(task_id):
         **_hook_signals(annotate, args),
     })
 
+def _task_dir():
+    return Path(os.environ.get('TW_TASK_DIR') or Path.home() / '.task')
+
+def _gittw():
+    """gittw's path: on PATH, or in the task dir's scripts/ (a widget-started server's PATH lacks it)."""
+    found = shutil.which('gittw')
+    if found:
+        return found
+    candidate = _task_dir() / 'scripts' / 'gittw'
+    return str(candidate) if os.access(candidate, os.X_OK) else None
+
+def _gittw_status(gittw, fetch=False):
+    """gittw status --json: station, incoming by station, behind, stations last seen. None on failure."""
+    args = [gittw, 'status'] + (['--fetch'] if fetch else []) + ['--json']
+    r = run_command(args, timeout=FETCH_TIMEOUT if fetch else TASK_TIMEOUT)
+    try:
+        return json.loads(r['stdout']) if r['success'] else None
+    except ValueError:
+        return None
+
+def _git_head(td):
+    r = subprocess.run(['git', '-C', str(td), 'rev-parse', 'HEAD'], capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else ''
+
+def _pulled_since(td, old, own):
+    """{station: commits} that arrived since old, by their Station: trailer; this station's own left out."""
+    r = subprocess.run(['git', '-C', str(td), 'log', '--format=%(trailers:key=Station,valueonly,separator=%x2C)',
+                        f'{old}..HEAD'], capture_output=True, text=True)
+    out = {}
+    if r.returncode == 0:
+        for line in r.stdout.splitlines():
+            name = line.strip().split(',')[0].strip() or '(untagged)'
+            if name != own:
+                out[name] = out.get(name, 0) + 1
+    return out
+
+# ── Automatic sync (gittw): soon after the server starts, a minute after the last write, every
+# 15 minutes; after a failure (offline) every 5. A background thread (main block) checks every 15 s.
+# Pages hear of incoming changes over SSE ({'type': 'synced', 'pulled': {station: n}}).
+AUTO_SYNC_START, AUTO_SYNC_QUIET, AUTO_SYNC_EVERY, AUTO_SYNC_RETRY = 10, 60, 900, 300
+_auto_sync = {'started': time.time(), 'last': None, 'last_ok': None, 'last_note': '', 'pending': None}
+
+def _auto_sync_due(s, now):
+    if not s['enabled']:
+        return False
+    if s['last'] is None:
+        return now - s['started'] >= AUTO_SYNC_START
+    since = now - s['last']
+    if s['last_ok'] is False and since < AUTO_SYNC_RETRY:
+        return False
+    if s['pending'] is not None and now - s['pending'] >= AUTO_SYNC_QUIET:
+        return True
+    return since >= AUTO_SYNC_EVERY
+
+def _auto_sync_enabled():
+    return bool(_load_settings().get('sync_auto')) and bool(_gittw()) and (_task_dir() / '.git').exists()
+
+def _sync_now(message=''):
+    """One sync, alone (no task command runs meanwhile). Returns run_command's dict plus 'pulled'."""
+    gittw, td = _gittw(), _task_dir()
+    if not gittw:
+        lines = []
+        if message and (td / '.git').exists():
+            with _data_lock.exclusive():
+                cr = subprocess.run(['git', '-C', str(td), 'commit', '-a', '-m', message],
+                                    capture_output=True, text=True)
+            if cr.returncode == 0:
+                lines.append(f'Committed: {message}')
+        result = run_task_command(['task', 'sync'])
+        if lines:
+            result['stdout'] = '\n'.join(lines + [result['stdout']])
+        return {**result, 'pulled': {}}
+    with _data_lock.exclusive():
+        old = _git_head(td)
+        result = run_command([gittw, 'sync'] + (['-m', message] if message else []), timeout=SYNC_TIMEOUT)
+    pulled = {}
+    if result['success'] and old:
+        st = _gittw_status(gittw) or {}
+        pulled = _pulled_since(td, old, own=st.get('station', ''))
+    _auto_sync.update(last=time.time(), last_ok=result['success'],
+                      last_note='' if result['success'] else
+                      ((result['stderr'] or result['stdout']).strip().splitlines() or [''])[-1][:200])
+    if result['success']:
+        _auto_sync['pending'] = None
+    return {**result, 'pulled': pulled}
+
+def _auto_sync_run():
+    r = _sync_now()
+    if r['success'] and r['pulled']:
+        _sse_broadcast({'type': 'synced', 'pulled': r['pulled']})
+
+def _auto_sync_loop():
+    while True:
+        time.sleep(15)
+        try:
+            if _auto_sync_due({**_auto_sync, 'enabled': _auto_sync_enabled()}, time.time()):
+                _auto_sync_run()
+        except Exception as e:      # never let the thread die
+            print(f'auto sync: {e}')
+
 @app.route('/api/sync/status')
 def sync_status():
-    task_dir = Path.home() / '.task'
+    """Uncommitted files and unpushed commits; with gittw also what's incoming (by station), how far
+    behind, and when each station last synced (the advisory). ?fetch=1 fetches first (network)."""
+    task_dir = _task_dir()
     if not (task_dir / '.git').exists():
         return jsonify({'changes': 0, 'git': False, 'files': [], 'unpushed': 0})
 
@@ -1753,8 +1931,16 @@ def sync_status():
         if line.strip():
             files.append({'status': line[:2].strip(), 'path': line[3:].strip()})
 
-    changes = unpushed + len(files)
-    return jsonify({'changes': changes, 'git': True, 'files': files, 'unpushed': unpushed})
+    out = {'changes': unpushed + len(files), 'git': True, 'files': files, 'unpushed': unpushed}
+    gittw = _gittw()
+    if gittw:
+        st = _gittw_status(gittw, fetch=request.args.get('fetch') == '1')
+        if st:
+            out.update(station=st.get('station'), incoming=st.get('incoming') or {},
+                       behind=st.get('behind', 0), last_seen=st.get('last_seen') or {})
+        out['auto'] = {'enabled': _auto_sync_enabled(), 'last': _auto_sync['last'],
+                       'last_ok': _auto_sync['last_ok'], 'last_note': _auto_sync['last_note']}
+    return jsonify(out)
 
 @app.route('/api/sync/info')
 def sync_info():
@@ -1789,37 +1975,17 @@ def sync_undo():
 
 @app.route('/api/sync', methods=['POST'])
 def sync_tasks():
-    import shutil
+    """Sync now. With gittw the note becomes the commit message (gittw sync -m), so that commit
+    carries this station's Station: trailer like every other."""
     data    = request.get_json(silent=True) or {}
     message = (data.get('message') or '').strip()
-    task_dir = Path.home() / '.task'
-
-    lines = []
-
-    # If a comment was provided and this is a git-backed task dir,
-    # commit any uncommitted changes with that message before syncing.
-    if message and (task_dir / '.git').exists():
-        cr = subprocess.run(
-            ['git', '-C', str(task_dir), 'commit', '-a', '-m', message],
-            capture_output=True, text=True
-        )
-        if cr.returncode == 0:
-            lines.append(f'Committed: {message}')
-        elif 'nothing to commit' not in cr.stdout + cr.stderr:
-            lines.append(f'Commit note: {cr.stderr.strip() or cr.stdout.strip()}')
-
-    if shutil.which('gittw'):
-        result = run_command(['gittw', 'sync'])
-    else:
-        result = run_task_command(['task', 'sync'])
-
-    sync_out = result['stdout'].strip() or result['stderr'].strip()
-    if sync_out:
-        lines.append(sync_out)
-    output = '\n'.join(lines) if lines else ('Sync complete.' if result['success'] else 'Sync failed.')
+    result  = _sync_now(message)
+    output  = (result['stdout'].strip() or result['stderr'].strip()
+               or ('Sync complete.' if result['success'] else 'Sync failed.'))
     return jsonify({
-        'success': result['success'],
-        'output': output,
+        'success':  result['success'],
+        'output':   output,
+        'pulled':   result['pulled'],
         'warnings': _warnings(result)
     })
 
@@ -1891,6 +2057,7 @@ if __name__ == '__main__':
     # reloader's parent only holds the first bind. On reload the child exits
     # and releases them.
     if not opts['use_reloader'] or is_running_from_reloader():
+        threading.Thread(target=_auto_sync_loop, daemon=True, name='auto-sync').start()
         for extra in opts['binds'][1:]:
             srv = make_server(extra, port, app, threaded=True)
             threading.Thread(target=srv.serve_forever, daemon=True, name=f'serve-{extra}').start()

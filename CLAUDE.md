@@ -125,6 +125,9 @@ deliberate work-in-progress commit with `--no-verify`. Install it once per clone
    `{value}` is substituted, so the value stays one argument (S10).
 6. **`run_task_command`:** 15 s timeout, `rc.confirmation=no` injected. Use `readonly=True` for every
    read; it adds `rc.hooks=off`, so slow on-exit hooks (recurrence) don't fire on a GET.
+   Every `task` call holds `_data_lock` shared; a sync (`_sync_now`, manual or automatic) holds it alone,
+   because a pull landing between task's read and rewrite of a data file would be lost. Never run `git`
+   or `gittw sync` on the task dir outside `_sync_now`. A write marks an automatic sync pending.
 7. **Runtime paths are computed in three places:** `app.py`, `tw-web-launch.sh` and
    `tw-web-native-host.py`. Change all three together (S9).
 8. **Debugger:** never hard-code `debug=True`. `TW_WEB_DEBUG=1` is honoured only on a localhost-only

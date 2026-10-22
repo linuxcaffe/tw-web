@@ -1106,6 +1106,12 @@ a.ann-link:hover { text-decoration: underline; }
 .sync-fs-? { color: #95a5a6; }
 .sync-unpushed { color: #3498db; margin-top: 4px; }
 .sync-uptodate { color: #2ecc71; }
+.sync-checking { color: #95a5a6; font-style: italic; }
+.sync-incoming { color: #f0b429; margin-bottom: 4px; }
+.sync-incoming.none { color: #95a5a6; }
+.sync-stations, .sync-auto { font-size: 12px; color: #95a5a6; margin-top: 6px; }
+.sync-station { white-space: nowrap; }
+.sync-auto-failed { color: #e67e22; }
 .sync-btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .sync-secondary-btn {
     background: rgba(255,255,255,0.08); color: #bdc3c7; border: 1px solid rgba(255,255,255,0.15);
