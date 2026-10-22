@@ -128,6 +128,8 @@ deliberate work-in-progress commit with `--no-verify`. Install it once per clone
    Every `task` call holds `_data_lock` shared; a sync (`_sync_now`, manual or automatic) holds it alone,
    because a pull landing between task's read and rewrite of a data file would be lost. Never run `git`
    or `gittw sync` on the task dir outside `_sync_now`. A write marks an automatic sync pending.
+   The task folder is always `_task_dir()` (TW_TASK_DIR, else TASKDATA, else ~/.task), and gittw gets it as
+   TW_TASK_DIR: a hard-coded `~/.task` once made every scratch server sync the real repo.
 7. **Runtime paths are computed in three places:** `app.py`, `tw-web-launch.sh` and
    `tw-web-native-host.py`. Change all three together (S9).
 8. **Debugger:** never hard-code `debug=True`. `TW_WEB_DEBUG=1` is honoured only on a localhost-only
