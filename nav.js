@@ -2001,6 +2001,12 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         const STATUS_LABEL = { M: 'modified', A: 'added', D: 'deleted', '?': 'untracked' };
         const plural = (n, w) => `${n} ${w}${n !== 1 ? 's' : ''}`;
         const parts = [];
+        if (d.rebase_stopped) {
+            parts.push(`<div class="sync-stuck">The task folder is stopped in the middle of a rebase (an earlier ` +
+                `pull conflicted), so no sync can run. In a terminal: <code>git -C ~/.task status</code>, then ` +
+                `fix the files it names and <code>git rebase --continue</code>, or undo with ` +
+                `<code>git -C ~/.task rebase --abort</code> (local commits stay).</div>`);
+        }
         const inc = Object.entries(d.incoming || {});
         if (inc.length) {
             parts.push(`<div class="sync-incoming">Incoming: ` +

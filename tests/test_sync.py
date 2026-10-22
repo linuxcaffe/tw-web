@@ -219,3 +219,25 @@ def test_a_launcher_naming_xdg_open_uses_termux_open_where_that_is_all_there_is(
     assert app_module._launch_argv('xdg-open {value}', '/home/x/a.pdf') == ['termux-open', '/home/x/a.pdf']
     monkeypatch.setattr(app_module.shutil, 'which', lambda name: '/usr/bin/' + name)
     assert app_module._launch_argv('xdg-open {value}', '/home/x/a.pdf') == ['xdg-open', '/home/x/a.pdf']
+
+
+# ── what a failed sync says, and a repo stuck mid-rebase ──────────────────────
+
+def test_the_note_is_gits_telling_line_not_its_last(app_module):
+    note = app_module._sync_note
+    assert note("Pulling...\nERROR: Repository not found.\nfatal: Could not read from remote repository.\n\n"
+                "Please make sure you have the correct access rights\nand the repository exists.") \
+        == 'ERROR: Repository not found.'
+    assert note('ssh: Could not resolve hostname codeberg.org: Name or service not known\nfatal: Could not read '
+                'from remote repository.') == 'ssh: Could not resolve hostname codeberg.org: Name or service not known'
+    assert note('error: could not apply 5bb6954... task: update branding\nhint: Resolve all conflicts') \
+        == 'error: could not apply 5bb6954... task: update branding'
+    assert note('gittw: the pull conflicted in config/x, which gittw can\'t merge; undone') .startswith('gittw: the pull')
+    assert note('something odd\nlast line') == 'last line'
+    assert note('') == ''
+
+
+def test_status_says_when_the_repo_is_stuck_mid_rebase(client, gittw, tmp_path):
+    assert client.get('/api/sync/status', headers=LOCAL).get_json()['rebase_stopped'] is False
+    (tmp_path / '.git' / 'rebase-merge').mkdir()
+    assert client.get('/api/sync/status', headers=LOCAL).get_json()['rebase_stopped'] is True

@@ -1863,6 +1863,24 @@ def _auto_sync_due(s, now):
 def _auto_sync_enabled():
     return bool(_load_settings().get('sync_auto')) and bool(_gittw()) and (_task_dir() / '.git').exists()
 
+def _sync_note(text):
+    """The line of a failed sync's output that says what went wrong. git ends with "Please make sure
+    you have the correct access rights / and the repository exists" whatever the cause; the cause is
+    above it (gittw's own message, ERROR:/error:, ssh:, a specific fatal:)."""
+    lines = [l.strip() for l in (text or '').splitlines() if l.strip()]
+    generic = 'fatal: Could not read from remote repository.'
+    for test in (lambda l: l.startswith('gittw:'),
+                 lambda l: l.startswith(('ERROR:', 'error:')),
+                 lambda l: l.startswith('ssh:'),
+                 lambda l: l.startswith('fatal:') and l != generic):
+        for line in lines:
+            if test(line):
+                return line[:200]
+    return lines[-1][:200] if lines else ''
+
+def _rebase_stopped(td):
+    return any((td / '.git' / name).exists() for name in ('rebase-merge', 'rebase-apply'))
+
 def _sync_now(message=''):
     """One sync, alone (no task command runs meanwhile). Returns run_command's dict plus 'pulled'."""
     gittw, td = _gittw(), _task_dir()
@@ -1886,8 +1904,7 @@ def _sync_now(message=''):
         st = _gittw_status(gittw) or {}
         pulled = _pulled_since(td, old, own=st.get('station', ''))
     _auto_sync.update(last=time.time(), last_ok=result['success'],
-                      last_note='' if result['success'] else
-                      ((result['stderr'] or result['stdout']).strip().splitlines() or [''])[-1][:200])
+                      last_note='' if result['success'] else _sync_note(result['stderr'] + '\n' + result['stdout']))
     if result['success']:
         _auto_sync['pending'] = None
     return {**result, 'pulled': pulled}
@@ -1931,7 +1948,8 @@ def sync_status():
         if line.strip():
             files.append({'status': line[:2].strip(), 'path': line[3:].strip()})
 
-    out = {'changes': unpushed + len(files), 'git': True, 'files': files, 'unpushed': unpushed}
+    out = {'changes': unpushed + len(files), 'git': True, 'files': files, 'unpushed': unpushed,
+           'rebase_stopped': _rebase_stopped(task_dir)}
     gittw = _gittw()
     if gittw:
         st = _gittw_status(gittw, fetch=request.args.get('fetch') == '1')

@@ -1112,6 +1112,8 @@ a.ann-link:hover { text-decoration: underline; }
 .sync-stations, .sync-auto { font-size: 12px; color: #95a5a6; margin-top: 6px; }
 .sync-station { white-space: nowrap; }
 .sync-auto-failed { color: #e67e22; }
+.sync-stuck { background: rgba(231,76,60,0.15); border-left: 3px solid #e74c3c; padding: 6px 8px; margin-bottom: 6px; color: #f5b7b1; }
+.sync-stuck code { font-size: 12px; }
 .sync-btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .sync-secondary-btn {
     background: rgba(255,255,255,0.08); color: #bdc3c7; border: 1px solid rgba(255,255,255,0.15);

@@ -9,7 +9,7 @@ check(async pg => {
     let synced = 0;
     await pg.route('**/api/sync', r => { synced++; r.fulfill({ json: { success: true, output: 'ok', pulled: {} } }); });
     await pg.route('**/api/sync/status**', r => r.fulfill({ json: {
-        git: true, changes: 1, files: [{ status: 'M', path: 'pending<b>.data' }], unpushed: 1,
+        git: true, rebase_stopped: true, changes: 1, files: [{ status: 'M', path: 'pending<b>.data' }], unpushed: 1,
         station: 'yoga', behind: 3, incoming: { s5: 3 },
         last_seen: { s5: ago(7200), yoga: ago(30) },
         auto: { enabled: true, last: Date.now() / 1000 - 600, last_ok: false, last_note: 'Could not resolve host' },
@@ -41,7 +41,7 @@ check(async pg => {
     await sleep(600);
     const box = await pg.locator('#tw-sync-changes').textContent();
     for (const want of ['Incoming: 3 changes from s5', 'Stations: s5 synced 2 h ago', 'yoga (this one) synced just now',
-                        '1 commit here, not pushed yet', 'last try failed 10 min ago: Could not resolve host']) {
+                        '1 commit here, not pushed yet', 'stopped in the middle of a rebase', 'rebase --abort', 'last try failed 10 min ago: Could not resolve host']) {
         expect(box.includes(want), `dialog lacks ${JSON.stringify(want)}: ${JSON.stringify(box)}`);
     }
     expect(await pg.locator('#tw-sync-changes b').count() === 1, 'a file name was read as HTML');
