@@ -125,9 +125,23 @@ In Firefox: **⋮ → Install.**
 
 #### Keep the server running
 
-Termux can be backgrounded, but processes may be killed when switching apps. Two options:
+Android stops background apps when it likes, and Termux with them. [tw-mobilize](https://github.com/linuxcaffe/tw-mobilize)
+(`mobilize init`) sets this up for you: a Termux:Widget button that starts tw-web in a loop that
+restarts it when it dies, a `~/.bashrc` block that starts it whenever Termux opens, and
+`mobilize android`, which walks through the phone's own settings (battery, Huawei's App launch,
+"Display over other apps") and opens each screen.
 
-**tmux** (recommended):
+**When the server stops anyway**, the page says so: a banner, "tw-web server isn't answering (last
+reached 13:42)", with Retry, and on a phone **Open Termux** (opening Termux starts it again). The
+page checks every 30 seconds while it's on screen, and reloads the view when the server is back.
+**Settings → Server** restarts it (a fresh server, the page reconnects by itself) or stops it.
+
+On Termux tw-web sets `LD_PRELOAD` to Termux's termux-exec when it's missing (as when Termux:Widget
+starts it), so hooks starting `#!/usr/bin/env python3` work however the server was started.
+
+Without tw-mobilize, two options:
+
+**tmux**:
 ```bash
 pkg install tmux
 tmux new -s tw-web
