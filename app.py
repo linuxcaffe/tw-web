@@ -1927,20 +1927,32 @@ def _auto_sync_due(s, now):
 def _auto_sync_enabled():
     return bool(_load_settings().get('sync_auto')) and bool(_gittw()) and (_task_dir() / '.git').exists()
 
-def _sync_note(text):
-    """The line of a failed sync's output that says what went wrong. git ends with "Please make sure
-    you have the correct access rights / and the repository exists" whatever the cause; the cause is
-    above it (gittw's own message, ERROR:/error:, ssh:, a specific fatal:)."""
-    lines = [l.strip() for l in (text or '').splitlines() if l.strip()]
+_NETWORK_TROUBLE = re.compile(r'connection abort|connection reset|connection refused|timed out|'
+                              r'could not resolve|network is unreachable|no route to host|read from remote host',
+                              re.I)
+
+def _sync_note(stderr, stdout='', returncode=1):
+    """What a failed sync says went wrong, in one line. git ends with "Please make sure you have the
+    correct access rights / and the repository exists" whatever the cause; the cause is above it.
+    On s5 the note once read just "Pulling...": the network had dropped the connection (2026-10-22)."""
+    progress = [l.strip() for l in (stdout or '').splitlines() if l.strip()]
+    step = progress[-1].rstrip('.').lower() if progress else ''
+    during = f' during the {step[:-3]}' if step in ('pulling', 'pushing') else ''
+    if returncode is not None and returncode < 0:
+        return f'stopped from outside{during} (signal {-returncode})'
+    lines = [l.strip() for l in (stderr or '').splitlines() if l.strip()]
     generic = 'fatal: Could not read from remote repository.'
     for test in (lambda l: l.startswith('gittw:'),
+                 lambda l: bool(_NETWORK_TROUBLE.search(l)),
                  lambda l: l.startswith(('ERROR:', 'error:')),
                  lambda l: l.startswith('ssh:'),
                  lambda l: l.startswith('fatal:') and l != generic):
         for line in lines:
             if test(line):
                 return line[:200]
-    return lines[-1][:200] if lines else ''
+    if not lines and during:
+        return f'stopped{during} with no error (the network dropped, or Android stopped it?)'
+    return (lines or progress or [''])[-1][:200]
 
 def _rebase_stopped(td):
     return any((td / '.git' / name).exists() for name in ('rebase-merge', 'rebase-apply'))
@@ -1969,7 +1981,8 @@ def _sync_now(message=''):
         st = _gittw_status(gittw) or {}
         pulled = _pulled_since(td, old, own=st.get('station', ''))
     _auto_sync.update(last=time.time(), last_ok=result['success'],
-                      last_note='' if result['success'] else _sync_note(result['stderr'] + '\n' + result['stdout']))
+                      last_note='' if result['success'] else
+                      _sync_note(result['stderr'], result['stdout'], result.get('returncode', 1)))
     if result['success']:
         _auto_sync['pending'] = None
     return {**result, 'pulled': pulled}
@@ -2063,7 +2076,8 @@ def sync_tasks():
     data    = request.get_json(silent=True) or {}
     message = (data.get('message') or '').strip()
     result  = _sync_now(message)
-    output  = (result['stdout'].strip() or result['stderr'].strip()
+    # all of it: gittw's progress, then git's errors (showing only stdout hid why a pull failed)
+    output  = ('\n'.join(x for x in (result['stdout'].strip(), result['stderr'].strip()) if x)
                or ('Sync complete.' if result['success'] else 'Sync failed.'))
     return jsonify({
         'success':  result['success'],

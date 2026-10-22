@@ -267,3 +267,31 @@ def test_gittw_is_told_which_folder(client, gittw, app_module, monkeypatch, tmp_
                         (seen.append(env), real(args, timeout))[1])
     client.post('/api/sync', headers=TRUSTED, json={})
     assert seen and all(e and e.get('TW_TASK_DIR') == str(tmp_path) for e in seen)
+
+
+S5_ABORT = ("Read from remote host codeberg.org: Software caused connection abort\n"
+            "client_loop: send disconnect: Broken pipe\nfatal: Could not read from remote repository.\n\n"
+            "Please make sure you have the correct access rights\nand the repository exists.")
+
+
+def test_the_note_names_a_dropped_network(app_module):
+    # s5, 2026-10-22: the note read "Pulling..." while stderr said this
+    assert app_module._sync_note(S5_ABORT, 'Working tree clean.\nPulling...', 1) == \
+        'Read from remote host codeberg.org: Software caused connection abort'
+    assert app_module._sync_note('ssh: connect to host codeberg.org port 22: Connection timed out\nfatal: Could not '
+                                 'read from remote repository.', '', 128).startswith('ssh: connect')
+
+
+def test_a_sync_stopped_from_outside_says_so(app_module):
+    assert app_module._sync_note('', 'Committed local changes.\nPulling...', -9) == \
+        'stopped from outside during the pull (signal 9)'
+    assert 'no error' in app_module._sync_note('', 'Working tree clean.\nPulling...', 1)
+    assert app_module._sync_note('fatal: x', '', 128) == 'fatal: x'
+
+
+def test_the_sync_box_shows_errors_too(client, gittw, app_module, monkeypatch):
+    monkeypatch.setattr(app_module, 'run_command', lambda args, timeout=None, env=None: (
+        {'success': True, 'stdout': json.dumps(STATUS), 'stderr': '', 'returncode': 0} if 'status' in args else
+        {'success': False, 'stdout': 'Working tree clean.\nPulling...', 'stderr': S5_ABORT, 'returncode': 1}))
+    d = client.post('/api/sync', headers=TRUSTED, json={}).get_json()
+    assert 'Pulling...' in d['output'] and 'Software caused connection abort' in d['output']
