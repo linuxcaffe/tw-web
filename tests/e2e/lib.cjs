@@ -78,6 +78,30 @@ async function withHolidays(days, fn) {
     try { return await fn(key); } finally { fs.writeFileSync(rc, before); }
 }
 
+// recurrence-overhaul's hooks for one check: copied from its repo ($TW_E2E_RECURRENCE, else
+// ~/dev/tw-recurrence_overhaul-hook) into the scratch dir, with its recurrence.rc (the r, type,
+// rend… UDAs), and the taskrc put back afterwards. The hooks keep their spool and logs in
+// TW_TASK_DIR (else ~/.task): the scratch data dir here, as on the scratch server.
+async function withRecurrence(fn) {
+    guard();
+    const repo = process.env.TW_E2E_RECURRENCE || path.join(os.homedir(), 'dev', 'tw-recurrence_overhaul-hook');
+    if (!fs.existsSync(path.join(repo, 'on-add_recurrence.py')))
+        throw new Error(`recurrence-overhaul not found at ${repo}; set TW_E2E_RECURRENCE`);
+    const rc = process.env.TASKRC;
+    const before = fs.readFileSync(rc, 'utf8');
+    const hooks = path.join(path.dirname(rc), 'hooks');
+    fs.rmSync(hooks, { recursive: true, force: true });
+    fs.mkdirSync(hooks);
+    for (const f of ['on-add_recurrence.py', 'on-exit_recurrence.py', 'recurrence_common_hook.py', 'recurrence_rules.py'])
+        fs.copyFileSync(path.join(repo, f), path.join(hooks, f));
+    for (const f of ['on-add_recurrence.py', 'on-exit_recurrence.py']) fs.chmodSync(path.join(hooks, f), 0o755);
+    fs.symlinkSync('on-add_recurrence.py', path.join(hooks, 'on-modify_recurrence.py'));
+    process.env.TW_TASK_DIR = process.env.TASKDATA;
+    delete process.env.TW_DEBUG;
+    fs.writeFileSync(rc, before + `hooks=on\nhooks.location=${hooks}\ninclude ${path.join(repo, 'recurrence.rc')}\n`);
+    try { return await fn(); } finally { fs.writeFileSync(rc, before); fs.rmSync(hooks, { recursive: true, force: true }); }
+}
+
 function exportOne(filter) {
     return JSON.parse(task(filter, 'export'))[0];
 }
@@ -107,4 +131,4 @@ function check(fn) {
         });
 }
 
-module.exports = { check, expect, task, exportOne, B, sleep, cardTexts, withHolidays };
+module.exports = { check, expect, task, exportOne, B, sleep, cardTexts, withHolidays, withRecurrence };

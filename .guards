@@ -77,6 +77,8 @@ tw-filter.js:function matchesNav
 tw-filter.js:function priRank
 tw-filter.js:function setVirtual
 tw-filter.js:function virtualTerms
+tw-filter.js:function offsetDate
+tw-filter.js:function offsetExpr
 sun.js:TW.sun =
 calendar-planner.js:function paintDaylight
 app.py:TW_VIRTUAL_TAGS
@@ -121,4 +123,6 @@ nav.js:'synced'
 app.py:def _version_info
 app.py:'/api/update'
 app.py:def _update_check_loop
+app.py:RECUR_KEYS =
+app.py:def _stderr_lines
 nav.js:function _applyUpdate

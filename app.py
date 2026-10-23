@@ -871,11 +871,17 @@ def get_planned_tasks():
             'stderr': result['stderr']
         }), 500
 
+def _stderr_lines(result):
+    """stderr's lines, less Taskwarrior's override notices (TASKRC, TASKDATA, rc.*): what a hook
+    or task itself said."""
+    return [l.rstrip() for l in (result.get('stderr') or '').splitlines()
+            if l.strip() and not l.startswith(('TASKRC override', 'TASKDATA override', 'Configuration override'))]
+
+
 def _task_error(message, result):
     """`message`, plus Taskwarrior's own reason (last stderr line that isn't an rc override notice),
     so a view says "Could not read include file …" instead of only "Failed to retrieve tasks"."""
-    lines = [l.strip() for l in (result.get('stderr') or '').splitlines()
-             if l.strip() and not l.startswith(('TASKRC override', 'TASKDATA override', 'Configuration override'))]
+    lines = [l.strip() for l in _stderr_lines(result)]
     return f'{message}: {lines[-1]}' if lines else message
 
 
@@ -1411,8 +1417,13 @@ def get_contexts():
     return jsonify({'success': True, 'contexts': contexts, 'filters': filters, 'active': active})
 
 def _warnings(result):
-    """Extract non-empty stderr lines as a warnings list."""
-    return [l for l in result['stderr'].splitlines() if l.strip()]
+    """stderr's lines as a warnings list (a hook's notes), less the override notices."""
+    return _stderr_lines(result)
+
+
+def _write_error(result, fallback):
+    """A failed write's reason: what the hook or task said, less the override notices."""
+    return '\n'.join(_stderr_lines(result)) or result.get('stderr') or fallback
 
 def _deferred_cmd(result):
     """The first command a hook spooled during this write (CONVENTIONS §3), or None."""
@@ -1525,6 +1536,11 @@ def delete_task(task_id):
                     'message': result['stdout'] if result['success'] else result['stderr'],
                     'warnings': _warnings(result), **_hook_signals(result, args)})
 
+# recurrence-overhaul's fields the editor sets: the rule, its type and end, and a template's
+# wait, until and scheduled relative to its anchor (`due-604800s`)
+RECUR_KEYS = ('r', 'type', 'rend', 'rwait', 'runtil', 'rscheduled')
+
+
 @app.route('/api/task/<task_id>/modify', methods=['PUT'])
 def modify_task(task_id):
     """Modify a task"""
@@ -1581,6 +1597,12 @@ def modify_task(task_id):
     if 'until' in data:
         modifications.append(f'until:{data["until"]}' if data['until'] else 'until:')
 
+    # Recurrence (recurrence-overhaul): the rule, its type and end, and a template's dates
+    # relative to its anchor. The hook checks them all; an empty value clears.
+    for key in RECUR_KEYS:
+        if key in data:
+            modifications.append(f'{key}:{data[key]}' if data[key] else f'{key}:')
+
     if modifications:
         args = ['task', task_id, 'modify'] + modifications
         result = run_task_command(args)
@@ -1600,7 +1622,7 @@ def modify_task(task_id):
 
         return jsonify({
             'success': False,
-            'error': result['stderr'],
+            'error': _write_error(result, 'Failed to update task'),
             'task': None,
             'warnings': _warnings(result),
             **signals,
@@ -1741,6 +1763,10 @@ def add_task():
     if data.get('until'):
         args.append(f'until:{data["until"]}')
 
+    # Recurrence (recurrence-overhaul): r makes the new task a template; the hook does the rest
+    if data.get('r'):
+        args += [f'{key}:{data[key]}' for key in RECUR_KEYS if data.get(key)]
+
     args += ['--', data['description']]   # free text last, after `--` (S11)
     create_result = run_task_command(args)
     signals = _hook_signals(create_result, args)
@@ -1770,7 +1796,7 @@ def add_task():
 
     return jsonify({
         'success': create_result.get('success', False),
-        'error': create_result.get('stderr', 'Failed to create task'),
+        'error': _write_error(create_result, 'Failed to create task'),
         'task': None,
         'warnings': _warnings(create_result),
         **signals,

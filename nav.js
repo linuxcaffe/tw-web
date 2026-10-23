@@ -1122,7 +1122,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         notifEl.id = 'tw-notification';
         notifEl.className = 'notification';
         notifEl.innerHTML =
-            `<span id="tw-notif-text" style="flex:1"></span>` +
+            `<span id="tw-notif-text" style="flex:1;white-space:pre-line"></span>` +
             `<button class="notif-close" id="tw-notif-close">×</button>`;
         document.body.appendChild(notifEl);
         notifEl.querySelector('#tw-notif-close').addEventListener('click', () =>

@@ -78,6 +78,27 @@
                 </div>
             </div>
 
+            <!-- Row 7: Recur rule | period/chain | End (recurrence-overhaul; the hook checks them).
+                 On an instance the row gives way to the template's rule (#te-recur-note). -->
+            <div class="te-row te-row-recur" id="te-recur-row">
+                <div class="te-date-field te-recur-rule">
+                    <small>Recur</small>
+                    <input type="text" id="task-editor-r" placeholder="1w, 1mo, m:2tue" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="te-recur-type" role="radiogroup" aria-label="Recurrence type">
+                    <label><input type="radio" name="te-rtype" value="period" checked><span>period</span></label>
+                    <label><input type="radio" name="te-rtype" value="chain"><span>chain</span></label>
+                </div>
+                <div class="te-date-field te-recur-end">
+                    <small>End</small>
+                    <div class="te-date-row">
+                        <input type="date" id="task-editor-rend">
+                        <button type="button" class="te-clr" data-clears="task-editor-rend" title="Clear">×</button>
+                    </div>
+                </div>
+            </div>
+            <div id="te-recur-note" class="te-recur-note" style="display:none"></div>
+
             <!-- Annotations (edit mode only — hidden for new tasks until after save) -->
             <div id="te-annotations-section" class="te-annotations-section">
                 <div id="te-existing-annotations" class="te-existing-annotations"></div>

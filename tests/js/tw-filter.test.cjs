@@ -137,4 +137,20 @@ t('recur: built-in child has parent', () => eq(R.kind({ status: 'waiting', paren
 t('recur: a done instance is still one', () => eq(R.kind({ status: 'completed', rtemplate: 'c54a' }), 'instance'));
 t('recur: plain task is neither', () => eq(R.kind({ status: 'pending' }), ''));
 
+// TW.recur offsets: a template's rwait/runtil/rscheduled shown as dates, and a picked date saved back
+const at = (y, mo, d, h = 0, mi = 0) => new Date(y, mo - 1, d, h, mi).getTime();
+const od = (y, mo, d, expr) => { const r = R.offsetDate(new Date(y, mo - 1, d, 9, 0), expr); return r && r.getTime(); };
+t('offset: seconds, as the hook writes them', () => eq(od(2030, 1, 31, 'due-604800s'), at(2030, 1, 24, 9)));
+t('offset: days and hours', () => { eq(od(2030, 1, 31, 'sched-3d'), at(2030, 1, 28, 9)); eq(od(2030, 1, 31, 'due+2h'), at(2030, 1, 31, 11)); });
+t('offset: minutes, m or min', () => { eq(od(2030, 1, 31, 'due-90min'), at(2030, 1, 31, 7, 30)); eq(od(2030, 1, 31, 'due-30m'), at(2030, 1, 31, 8, 30)); });
+t('offset: months by the calendar, clamped', () => { eq(od(2030, 3, 31, 'due-1mo'), at(2030, 2, 28, 9)); eq(od(2030, 1, 31, 'due+1mo'), at(2030, 2, 28, 9)); });
+t('offset: years by the calendar', () => eq(od(2028, 2, 29, 'due+1y'), at(2029, 2, 28, 9)));
+t('offset: weeks', () => eq(od(2030, 1, 31, 'due-2w'), at(2030, 1, 17, 9)));
+t('offset: not an offset', () => { eq(od(2030, 1, 31, '20300101T000000Z'), null); eq(od(2030, 1, 31, ''), null); });
+t('offset expr: seconds from the anchor, signed', () => {
+    eq(R.offsetExpr('due', new Date(2030, 0, 31, 9), new Date(2030, 0, 24, 9)), 'due-604800s');
+    eq(R.offsetExpr('sched', new Date(2030, 0, 31, 9), new Date(2030, 0, 31, 11)), 'sched+7200s');
+});
+t('anchor name: ranchor sched, else due', () => { eq(R.anchorName({ ranchor: 'sched' }), 'sched'); eq(R.anchorName({ ranchor: 'due' }), 'due'); eq(R.anchorName({}), 'due'); });
+
 console.log(`tw-filter: ${n} passed`);

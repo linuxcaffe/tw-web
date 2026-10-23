@@ -920,6 +920,33 @@ a.ann-link:hover { text-decoration: underline; }
 #task-editor-state option[value=""] { color: rgba(255,255,255,0.35); }
 #task-editor-state.te-state-empty   { color: rgba(255,255,255,0.35); }
 
+/* Recur line: rule | period/chain | end (recurrence-overhaul) */
+.te-row-recur > .te-recur-rule { flex: 2; }
+.te-row-recur > .te-recur-end  { flex: 5; }
+#task-editor-form input[type="date"] {
+    width: 100%; padding: 6px 8px; border: 1px solid rgba(255,255,255,0.15); border-radius: 5px;
+    font-size: 0.85rem; box-sizing: border-box; background: rgba(255,255,255,0.08);
+    color: #ecf0f1; color-scheme: dark;
+}
+#task-editor-form input[type="date"].te-dt-empty { color: rgba(255,255,255,0.35); }
+.te-recur-type {
+    flex: 0 0 auto !important; display: flex; border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 5px; overflow: hidden; height: 31px; box-sizing: border-box;
+}
+.te-recur-type label { display: flex; cursor: pointer; }
+.te-recur-type input { position: absolute; opacity: 0; width: 0; height: 0; }
+.te-recur-type span {
+    display: flex; align-items: center; padding: 0 7px; font-size: 0.75rem;
+    color: rgba(255,255,255,0.45); user-select: none;
+}
+.te-recur-type input:checked + span { background: rgba(142,68,173,0.55); color: #fff; }
+.te-recur-type input:focus-visible + span { outline: 1px solid #3498db; outline-offset: -1px; }
+/* A hint, never a block: the hook decides (a chain takes no until) */
+#task-editor-form .te-recur-unused input { opacity: 0.45; }
+.te-recur-note { font-size: 0.75rem; color: rgba(255,255,255,0.55); margin-top: -2px; padding-left: 2px; }
+.te-recur-note.te-recur-hint { color: #f0b37e; }
+.te-recur-note a { color: #b48ad6; cursor: pointer; text-decoration: underline; }
+
 /* Annotations section */
 .te-annotations-section {
     display: flex;

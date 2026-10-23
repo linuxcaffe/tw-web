@@ -226,7 +226,7 @@ class TaskEditor {
 
         // Datetime-local: dim the format-hint text when the field is empty
         const syncDtColor = (inp) => inp.classList.toggle('te-dt-empty', !inp.value);
-        this.modal.querySelectorAll('input[type="datetime-local"]').forEach(inp => {
+        this.modal.querySelectorAll('input[type="datetime-local"], input[type="date"]').forEach(inp => {
             inp.addEventListener('change', () => syncDtColor(inp));
             syncDtColor(inp);
         });
@@ -238,9 +238,10 @@ class TaskEditor {
                 e.preventDefault();
                 const target = this.modal.querySelector('#' + btn.dataset.clears);
                 if (!target) return;
+                const type   = target.type;
                 target.type  = 'text';
                 target.value = '';
-                target.type  = 'datetime-local';
+                target.type  = type;
                 target.dispatchEvent(new Event('change', { bubbles: true }));
             });
         });
@@ -254,6 +255,14 @@ class TaskEditor {
             stateSel.classList.toggle('te-state-empty', !stateSel.value);
             stateSel.dataset.current = stateSel.value;
         });
+
+        // Recur line: hints as the rule, type and dates change (the hook decides, on save)
+        ['#task-editor-r', '#task-editor-due', '#task-editor-scheduled', '#task-editor-until'].forEach(sel => {
+            const el = this.modal.querySelector(sel);
+            if (el) ['input', 'change'].forEach(ev => el.addEventListener(ev, () => this._recurHints()));
+        });
+        this.modal.querySelectorAll('input[name="te-rtype"]').forEach(r =>
+            r.addEventListener('change', () => this._recurHints()));
 
         // Save button — pulse animation + feedback
         const saveBtn = this.modal.querySelector('#task-editor-save');
@@ -414,10 +423,12 @@ class TaskEditor {
             const untilField = form.querySelector('#task-editor-until');
             if (waitField)  waitField.value  = this.formatDateForInput(task.wait);
             if (untilField) untilField.value = this.formatDateForInput(task.until);
+            if (TW.recur.kind(task) === 'template') this._fillTemplateDates(task);
         }
+        this._fillRecur(task);
 
         // Sync datetime-local empty-state styling after programmatic fill
-        this.modal.querySelectorAll('input[type="datetime-local"]').forEach(inp =>
+        this.modal.querySelectorAll('input[type="datetime-local"], input[type="date"]').forEach(inp =>
             inp.classList.toggle('te-dt-empty', !inp.value)
         );
 
@@ -441,6 +452,7 @@ class TaskEditor {
             scheduled: v('scheduled'), sched_duration: v('sched-duration'),
             state: f?.querySelector('#task-editor-state')?.dataset.current ?? '',
             deps: v('deps'), wait: v('wait'), until: v('until'),
+            r: v('r').trim(), rtype: this._rtype(), rend: v('rend'),
         };
     }
 
@@ -451,6 +463,7 @@ class TaskEditor {
             project: ['project'], due: ['due'], due_duration: ['due_duration'],
             scheduled: ['scheduled'], sched_duration: ['sched_duration'], state: ['state'],
             deps: ['depends', 'parent_id'], wait: ['wait'], until: ['until'],
+            r: ['r'], rtype: ['type'], rend: ['rend'],
         };
     }
 
@@ -460,8 +473,10 @@ class TaskEditor {
         const revertBtn = this.modal.querySelector('#te-revert-btn');
         if (!banner) return;
 
+        // Read-only for completed and deleted only: a recurrence template (status recurring) is
+        // edited like any other task (a template "reverted to pending" would stop being one)
         const status = task?.status;
-        const isNonPending = status && status !== 'pending';
+        const isNonPending = status === 'completed' || status === 'deleted';
         const logBtn  = this.modal.querySelector('#task-editor-log');
         const saveBtn = this.modal.querySelector('#task-editor-save');
         if (logBtn)  logBtn.style.display  = isNonPending ? 'none' : '';
@@ -505,12 +520,13 @@ class TaskEditor {
         if (logBtn2)  logBtn2.style.display  = '';
         if (saveBtn2) saveBtn2.style.display = '';
         // Re-sync datetime styling
-        this.modal.querySelectorAll('input[type="datetime-local"]').forEach(inp =>
+        this.modal.querySelectorAll('input[type="datetime-local"], input[type="date"]').forEach(inp =>
             inp.classList.toggle('te-dt-empty', !inp.value)
         );
         // Reset state select to placeholder
         const sel = this.modal.querySelector('#task-editor-state');
         if (sel) { sel.dataset.current = ''; this._loadStateOptions(); }
+        this._fillRecur(null);
     }
     
     handleSave() {
@@ -570,6 +586,16 @@ class TaskEditor {
         if (waitField)     taskData.wait           = waitField.value;
         if (untilField)    taskData.until          = untilField.value;
 
+        // Recur line (not on an instance: its rule is the template's). Type and end go with a rule;
+        // a template's emptied rule goes too, for the hook to answer.
+        const rField = form.querySelector('#task-editor-r');
+        if (rField && !this._recurInstance &&
+                (rField.value.trim() || TW.recur.kind(this.currentTask) === 'template')) {
+            taskData.r    = rField.value.trim();
+            taskData.type = this._rtype();
+            taskData.rend = form.querySelector('#task-editor-rend')?.value || '';
+        }
+
         if (this.currentTask) {
             if (this._shown) {
                 const now = this._formValues();
@@ -582,6 +608,7 @@ class TaskEditor {
                     { detail: { message: 'No changes', type: 'info' } }));
                 return;
             }
+            if (TW.recur.kind(this.currentTask) === 'template') this._relativeDates(taskData);
             taskData.id = this.currentTask.id;
             taskData.uuid = this.currentTask.uuid;
         }
@@ -601,6 +628,7 @@ class TaskEditor {
             if (data.success) {
                 this.onSaveSuccess(data.task, isEdit);
                 this.hide();
+                this._showNotes(data.warnings);
             } else {
                 this.onSaveError(data.error || data.message || (isEdit ? 'Failed to update task' : 'Failed to add task'));
             }
@@ -683,6 +711,10 @@ class TaskEditor {
         if (taskData.until !== undefined)
             preparedData.until = taskData.until ? this.formatDateForTask(taskData.until) : '';
 
+        // Recurrence: the rule, its type and end (a date), a template's offsets (rwait:due-604800s)
+        for (const k of ['r', 'type', 'rend', 'rwait', 'runtil', 'rscheduled'])
+            if (taskData[k] !== undefined) preparedData[k] = taskData[k];
+
         return preparedData;
     }
     
@@ -718,6 +750,122 @@ class TaskEditor {
 
     
     
+    // ── Recur line (recurrence-overhaul) ─────────────────────────────────────
+    // The hook owns the rules: these only fill the line, hint, and turn a template's picked dates
+    // into the offsets it stores.
+
+    _rtype() {
+        return this.modal?.querySelector('input[name="te-rtype"]:checked')?.value || 'period';
+    }
+
+    // Fill the line for task (null: a new task). A template shows its rule; an instance shows its
+    // template's rule instead, with a link to edit that (an edit here changes this instance only).
+    _fillRecur(task) {
+        const f = this.modal;
+        const row = f?.querySelector('#te-recur-row');
+        if (!row) return;
+        const kind = TW.recur.kind(task);
+        this._recurInstance = kind === 'instance' ? task : null;
+        row.style.display = kind === 'instance' ? 'none' : '';
+        f.querySelector('#task-editor-r').value = kind === 'template' ? (task.r || '') : '';
+        const type = kind === 'template' && task.type === 'chain' ? 'chain' : 'period';
+        f.querySelectorAll('input[name="te-rtype"]').forEach(r => { r.checked = r.value === type; });
+        const rend = f.querySelector('#task-editor-rend');
+        rend.value = kind === 'template' ? this.formatDateForInput(task.rend).slice(0, 10) : '';
+        rend.classList.toggle('te-dt-empty', !rend.value);
+        if (kind === 'instance') this._showTemplateNote(task);
+        else this._recurHints();
+    }
+
+    // Hints, never blocks: a rule needs a due or scheduled date, a chain takes no until
+    _recurHints() {
+        const f = this.modal;
+        const note = f?.querySelector('#te-recur-note');
+        if (!note || this._recurInstance) return;
+        const val = id => f.querySelector('#task-editor-' + id)?.value || '';
+        const r = val('r').trim(), chain = r && this._rtype() === 'chain';
+        const until = f.querySelector('#task-editor-until')?.closest('.te-date-field');
+        if (until) {
+            until.classList.toggle('te-recur-unused', !!chain);
+            until.title = chain ? 'A chain takes no until: End stops it' : '';
+        }
+        const hint = r && !val('due') && !val('scheduled') ? 'A recurring task needs a due or scheduled date.'
+                   : chain && val('until') ? 'A chain takes no until: End stops it.' : '';
+        note.className = 'te-recur-note te-recur-hint';
+        note.textContent = hint;
+        note.style.display = hint ? '' : 'none';
+    }
+
+    async _showTemplateNote(inst) {
+        const note = this.modal.querySelector('#te-recur-note');
+        const head = '↻ instance' + (inst.rindex ? ' #' + inst.rindex : '');
+        note.className = 'te-recur-note';
+        note.textContent = head;
+        note.style.display = '';
+        const until = this.modal.querySelector('#task-editor-until')?.closest('.te-date-field');
+        if (until) { until.classList.remove('te-recur-unused'); until.title = ''; }
+        let tpl = null;
+        try { tpl = await TW.api.get(`/api/task/${inst.rtemplate || inst.parent}`); } catch {}
+        if (this._recurInstance !== inst || !tpl?.uuid) return;   // the form moved on, or no template
+        const rule = tpl.r || tpl.recur || '';
+        note.textContent = `${head} · ${tpl.type === 'chain' ? 'chain' : 'period'} ${rule} · `;
+        const link = document.createElement('a');
+        link.textContent = 'edit template';
+        link.addEventListener('click', () => this.show(tpl));
+        note.appendChild(link);
+    }
+
+    // A template stores wait, until and the other date as offsets from its anchor: show them as dates
+    _fillTemplateDates(task) {
+        const name = TW.recur.anchorName(task);
+        const anchor = this._twDate(name === 'sched' ? task.scheduled : task.due);
+        if (!anchor) return;
+        const set = (id, expr) => {
+            const el = this.modal.querySelector('#task-editor-' + id);
+            const d = expr && TW.recur.offsetDate(anchor, expr);
+            if (el && d) el.value = this._localInput(d);
+        };
+        set('wait', task.rwait);
+        set('until', task.runtil);
+        if (name === 'due') set('scheduled', task.rscheduled);
+    }
+
+    // …and save the ones changed as offsets from the anchor the form now holds (quietly: the
+    // hook keeps an existing rwait over a new absolute wait, so dates can't go as dates)
+    _relativeDates(taskData) {
+        const name = TW.recur.anchorName(this.currentTask);
+        const anchorVal = this.modal.querySelector(name === 'sched' ? '#task-editor-scheduled' : '#task-editor-due')?.value;
+        const anchor = anchorVal ? new Date(anchorVal) : null;
+        const fields = { wait: 'rwait', until: 'runtil' };
+        if (name === 'due') fields.scheduled = 'rscheduled';
+        for (const [abs, rel] of Object.entries(fields)) {
+            if (!(abs in taskData)) continue;
+            const v = taskData[abs];
+            delete taskData[abs];
+            taskData[rel] = v && anchor ? TW.recur.offsetExpr(name, anchor, new Date(v)) : '';
+        }
+    }
+
+    _showNotes(lines) {
+        if (lines && lines.length)
+            document.dispatchEvent(new CustomEvent('tw-show-notification',
+                { detail: { message: lines.join('\n'), type: 'info' } }));
+    }
+
+    // A Taskwarrior date (20250131T055530Z or ISO) as a Date, or null
+    _twDate(s) {
+        if (!s) return null;
+        const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(s);
+        const d = m ? new Date(Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6])) : new Date(s);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    // A Date as a datetime-local value, in local time
+    _localInput(d) {
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
     // Remove the modal
     destroy() {
         if (this.modal) this.modal.remove();

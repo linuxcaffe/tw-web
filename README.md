@@ -338,6 +338,15 @@ A command word is one Taskwarrior itself would take: a command or report (custom
 
 **Menu → Terminal** (or `t`) opens the same console with your shell.
 
+### Recurrence
+
+tw-web works with [recurrence-overhaul](https://github.com/linuxcaffe/tw-recurrence_overhaul-hook)'s templates and instances; the hook decides everything, tw-web shows and asks.
+
+- **A ring round the priority dot** marks a recurring task: violet a template (shown with the Recur status button), green an instance. It's there without a priority too.
+- **The editor's Recur line:** the rule (`1w`, `1mo`, `m:2tue`, anything the hook reads), period or chain, and an End date (`rend`). A rule on a new task makes it a template, and the hook its first instance; added to an existing task, it turns that task into a template. Hints only: a rule needs a due or scheduled date, and a chain takes no until (End stops it). What the hook refuses comes back in its own words.
+- **Editing a template:** its wait, scheduled and until show as dates and save as offsets from its anchor (`rwait:due-604800s`), so later instances follow.
+- **Editing an instance** changes that instance only. The line shows its template's rule, with a link to edit the template; the hook's note on what to run to carry a change forward appears after the save.
+
 ### Completed and deleted tasks
 
 Switch status via the status button in the nav bar. Completed and deleted tasks are shown newest-first (by end date) by default. Each card shows `uuid:8chars` and `end:date` at the start of its attributes row.

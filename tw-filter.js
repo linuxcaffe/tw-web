@@ -205,5 +205,42 @@ TW.recur = (() => {
         if (task.rtemplate || task.parent) return 'instance';
         return '';
     }
-    return { kind };
+
+    // A template keeps wait, until and the other date relative to its anchor (rwait:due-604800s).
+    // The anchor's name in those: ranchor is 'due' or 'sched'.
+    function anchorName(template) {
+        return template && template.ranchor === 'sched' ? 'sched' : 'due';
+    }
+
+    // anchor (a Date) moved by a relative date like 'due-604800s', 'sched-3d' or 'due-1mo', as the
+    // hook reads them: months and years by the calendar (clamped to the month's end), the rest by
+    // the clock. null when expr isn't one.
+    const OFFSET = /^(due|sched|wait)\s*([+-])\s*(\d+)(seconds?|s|minutes?|min|months?|mo|m|hours?|h|days?|d|weeks?|w|years?|y)\s*$/;
+    function offsetDate(anchor, expr) {
+        const m = OFFSET.exec(String(expr || '').toLowerCase());
+        if (!m || !anchor) return null;
+        const n = (m[2] === '-' ? -1 : 1) * Number(m[3]), unit = m[4];
+        const d = new Date(anchor.getTime());
+        if (unit.startsWith('mo') || unit.startsWith('y')) {
+            const months = unit.startsWith('mo') ? n : 12 * n;
+            const day = d.getDate();
+            d.setDate(1);
+            d.setMonth(d.getMonth() + months);
+            const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+            d.setDate(Math.min(day, last));
+            return d;
+        }
+        const secs = unit.startsWith('min') || unit === 'm' ? 60 : unit.startsWith('s') ? 1
+                   : unit.startsWith('h') ? 3600 : unit.startsWith('d') ? 86400 : 604800;
+        d.setSeconds(d.getSeconds() + n * secs);
+        return d;
+    }
+
+    // date as an offset from the anchor, the way the hook writes one: 'due-604800s'
+    function offsetExpr(name, anchor, date) {
+        const secs = Math.round((date.getTime() - anchor.getTime()) / 1000);
+        return `${name}${secs < 0 ? '-' : '+'}${Math.abs(secs)}s`;
+    }
+
+    return { kind, anchorName, offsetDate, offsetExpr };
 })();
