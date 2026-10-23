@@ -126,7 +126,7 @@ deliberate work-in-progress commit with `--no-verify`. Install it once per clone
 6. **`run_task_command`:** 15 s timeout, `rc.confirmation=no` injected. Use `readonly=True` for every
    read; it adds `rc.hooks=off`, so slow on-exit hooks (recurrence) don't fire on a GET.
    Every `task` call holds `_data_lock` shared; a sync (`_sync_now`, manual or automatic) holds it alone,
-   because a pull landing between task's read and rewrite of a data file would be lost. Never run `git`
+   because a pull landing between task's read and rewrite of a data file would be lost. git's network work there (the Sync dialog's fetch, a sync) also holds `_git_net_lock`, taken first: two fetches at once write FETCH_HEAD twice and the pull fails ("Cannot rebase onto multiple branches"). Never run `git`
    or `gittw sync` on the task dir outside `_sync_now`. A write marks an automatic sync pending.
    The task folder is always `_task_dir()` (TW_TASK_DIR, else TASKDATA, else ~/.task), and gittw gets it as
    TW_TASK_DIR: a hard-coded `~/.task` once made every scratch server sync the real repo.

@@ -295,3 +295,39 @@ def test_the_sync_box_shows_errors_too(client, gittw, app_module, monkeypatch):
         {'success': False, 'stdout': 'Working tree clean.\nPulling...', 'stderr': S5_ABORT, 'returncode': 1}))
     d = client.post('/api/sync', headers=TRUSTED, json={}).get_json()
     assert 'Pulling...' in d['output'] and 'Software caused connection abort' in d['output']
+
+
+# ── the dialog's fetch and a sync never overlap ──────────────────────────────
+# 2026-10-23: opening Sync ran `gittw status --fetch` (no lock) and Sync's pull started while it
+# was still fetching: two git fetches wrote FETCH_HEAD at once, it held master twice, and the
+# pull said "fatal: Cannot rebase onto multiple branches".
+
+def test_a_sync_waits_for_the_status_fetch(client, gittw, app_module, monkeypatch):
+    order = []
+    def slow(args, timeout=None, env=None):
+        if '--fetch' in args:
+            order.append('fetch starts')
+            time.sleep(0.5)
+            order.append('fetch ends')
+            return {'success': True, 'stdout': json.dumps(STATUS), 'stderr': '', 'returncode': 0}
+        if args[1:2] == ['sync']:
+            order.append('sync')
+        return {'success': True, 'stdout': json.dumps(STATUS), 'stderr': '', 'returncode': 0}
+    monkeypatch.setattr(app_module, 'run_command', slow)
+    t = threading.Thread(target=lambda: client.get('/api/sync/status?fetch=1'))
+    t.start()
+    time.sleep(0.15)
+    app_module._sync_now()
+    t.join(5)
+    assert order == ['fetch starts', 'fetch ends', 'sync']
+
+
+# ── the update check counts the clock, not the phone's waking time ───────────
+# time.sleep runs on the monotonic clock, which stops while Android sleeps: s5's hourly check
+# hadn't run for over three hours (2026-10-23).
+
+def test_the_update_check_is_due_by_the_clock(app_module):
+    due = app_module._update_check_due
+    assert due(None, 1000.0)
+    assert not due(1000.0, 1000.0 + app_module.UPDATE_CHECK_EVERY - 1)
+    assert due(1000.0, 1000.0 + app_module.UPDATE_CHECK_EVERY)

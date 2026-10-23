@@ -1234,11 +1234,17 @@ def _version_info():
     return {'version': version, 'behind': behind, 'subjects': subjects, 'can_update': not reason,
             'reason': reason, 'checked': _update_state['checked']}
 
+def _update_check_due(checked, now):
+    """By the clock: time.sleep runs on the monotonic clock, which stops while a phone sleeps, so a
+    sleep of an hour took s5 more than three (2026-10-23)."""
+    return checked is None or now - checked >= UPDATE_CHECK_EVERY
+
 def _update_check_loop():
     time.sleep(60)
     while True:
-        _fetch_web()
-        time.sleep(UPDATE_CHECK_EVERY)
+        if _update_check_due(_update_state['checked'], time.time()):
+            _fetch_web()
+        time.sleep(60)
 
 @app.route('/api/version')
 def web_version():
@@ -1907,10 +1913,19 @@ def _gittw_env():
     """gittw works on TW_TASK_DIR, else ~/.task: tell it the folder tw-web means."""
     return {'TW_TASK_DIR': str(_task_dir())}
 
+# git's network work in the task folder, one at a time: the Sync dialog's fetch and a sync. Two
+# fetches at once both write FETCH_HEAD, and a pull reading it then finds the branch twice ("fatal:
+# Cannot rebase onto multiple branches", 2026-10-23). Taken before _data_lock, never inside it.
+_git_net_lock = threading.Lock()
+
 def _gittw_status(gittw, fetch=False):
     """gittw status --json: station, incoming by station, behind, stations last seen. None on failure."""
     args = [gittw, 'status'] + (['--fetch'] if fetch else []) + ['--json']
-    r = run_command(args, timeout=FETCH_TIMEOUT if fetch else TASK_TIMEOUT, env=_gittw_env())
+    if fetch:
+        with _git_net_lock:
+            r = run_command(args, timeout=FETCH_TIMEOUT, env=_gittw_env())
+    else:
+        r = run_command(args, timeout=TASK_TIMEOUT, env=_gittw_env())
     try:
         return json.loads(r['stdout']) if r['success'] else None
     except ValueError:
@@ -1998,7 +2013,7 @@ def _sync_now(message=''):
         if lines:
             result['stdout'] = '\n'.join(lines + [result['stdout']])
         return {**result, 'pulled': {}}
-    with _data_lock.exclusive():
+    with _git_net_lock, _data_lock.exclusive():
         old = _git_head(td)
         result = run_command([gittw, 'sync'] + (['-m', message] if message else []), timeout=SYNC_TIMEOUT,
                              env=_gittw_env())
