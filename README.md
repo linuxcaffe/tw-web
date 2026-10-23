@@ -152,7 +152,7 @@ page checks every 30 seconds while it's on screen, and reloads the view when the
 
 **Updates:** the menu shows tw-web's version under the logo (`v2.0.0-27`: the last release and
 the commits since; the app cache's number is its tooltip). The server checks for new commits about
-once an hour; when there are some, a pill appears there, **Update (3 new)**, listing them on hover.
+once an hour (by the clock: a phone that slept checks within a minute of waking); when there are some, a pill appears there, **Update (3 new)**, listing them on hover.
 Tapping it pulls them (fast-forward only, and only on `main` with no local edits) and reloads the
 page onto the new version. Updating by hand still works: `git pull` in the tw-web folder.
 
