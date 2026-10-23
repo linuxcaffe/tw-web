@@ -331,3 +331,29 @@ def test_the_update_check_is_due_by_the_clock(app_module):
     assert due(None, 1000.0)
     assert not due(1000.0, 1000.0 + app_module.UPDATE_CHECK_EVERY - 1)
     assert due(1000.0, 1000.0 + app_module.UPDATE_CHECK_EVERY)
+
+
+# ── the log keeps every sync's outcome (2026-10-23: s5's failures were only on screen) ──
+
+REJECTED = ('To github.com:me/data.git\n ! [rejected]        master -> master (non-fast-forward)\n'
+            "error: failed to push some refs to 'github.com:me/data.git'\n")
+
+
+def test_a_failed_sync_logs_its_note_and_all_of_gittw_s_output(client, gittw, app_module, monkeypatch, capsys):
+    monkeypatch.setattr(app_module, 'run_command', lambda args, timeout=None, env=None: {
+        'success': False, 'stdout': 'Pulling...\nPushing...\n', 'stderr': REJECTED, 'returncode': 1})
+    client.post('/api/sync', headers=TRUSTED, json={})
+    err = capsys.readouterr().err
+    assert 'sync (manual) failed: error: failed to push some refs' in err
+    assert '  Pushing...' in err and '  ! [rejected]' in err        # every line, indented
+
+
+def test_a_sync_that_works_logs_one_line(client, gittw, capsys):
+    client.post('/api/sync', headers=TRUSTED, json={})
+    lines = [l for l in capsys.readouterr().err.splitlines() if 'sync (' in l]
+    assert len(lines) == 1 and 'sync (manual) ok' in lines[0]
+
+
+def test_an_automatic_sync_says_so(gittw, app_module, capsys):
+    app_module._auto_sync_run()
+    assert 'sync (auto) ok' in capsys.readouterr().err

@@ -127,3 +127,4 @@ app.py:RECUR_KEYS =
 app.py:def _stderr_lines
 app.py:_git_net_lock =
 nav.js:function _applyUpdate
+app.py:def _log_sync

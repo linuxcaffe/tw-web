@@ -13,6 +13,7 @@ import os
 import re
 import shlex
 import shutil
+import sys
 import time
 import threading
 from queue import Queue, Empty
@@ -1999,7 +2000,20 @@ def _sync_note(stderr, stdout='', returncode=1):
 def _rebase_stopped(td):
     return any((td / '.git' / name).exists() for name in ('rebase-merge', 'rebase-apply'))
 
-def _sync_now(message=''):
+def _log_sync(kind, result, pulled):
+    """One line per sync in the server's log (stderr: tw-web.log, or server.out on a phone); a failure
+    adds everything gittw said, indented. Until 2026-10-23 a failure showed only on screen."""
+    stamp = time.strftime('%d/%b/%Y %H:%M:%S')
+    if result['success']:
+        got = ', '.join(f'{n} from {st}' for st, n in pulled.items()) or 'nothing new'
+        print(f'[{stamp}] sync ({kind}) ok: {got}', file=sys.stderr, flush=True)
+        return
+    note = _sync_note(result['stderr'], result['stdout'], result.get('returncode', 1))
+    lines = [l for l in (result['stdout'] + '\n' + result['stderr']).splitlines() if l.strip()]
+    print(f'[{stamp}] sync ({kind}) failed: {note}' + ''.join(f'\n  {l}' for l in lines),
+          file=sys.stderr, flush=True)
+
+def _sync_now(message='', kind='manual'):
     """One sync, alone (no task command runs meanwhile). Returns run_command's dict plus 'pulled'."""
     gittw, td = _gittw(), _task_dir()
     if not gittw:
@@ -2013,6 +2027,7 @@ def _sync_now(message=''):
         result = run_task_command(['task', 'sync'])
         if lines:
             result['stdout'] = '\n'.join(lines + [result['stdout']])
+        _log_sync(kind, result, {})
         return {**result, 'pulled': {}}
     with _git_net_lock, _data_lock.exclusive():
         old = _git_head(td)
@@ -2027,10 +2042,11 @@ def _sync_now(message=''):
                       _sync_note(result['stderr'], result['stdout'], result.get('returncode', 1)))
     if result['success']:
         _auto_sync['pending'] = None
+    _log_sync(kind, result, pulled)
     return {**result, 'pulled': pulled}
 
 def _auto_sync_run():
-    r = _sync_now()
+    r = _sync_now(kind='auto')
     if r['success'] and r['pulled']:
         _sse_broadcast({'type': 'synced', 'pulled': r['pulled']})
 
@@ -2041,7 +2057,7 @@ def _auto_sync_loop():
             if _auto_sync_due({**_auto_sync, 'enabled': _auto_sync_enabled()}, time.time()):
                 _auto_sync_run()
         except Exception as e:      # never let the thread die
-            print(f'auto sync: {e}')
+            print(f'auto sync: {e}', file=sys.stderr, flush=True)
 
 @app.route('/api/sync/status')
 def sync_status():

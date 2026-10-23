@@ -199,6 +199,11 @@ from. A sync and `task` never run at the same time: a sync waits for running com
 wait for a sync (usually a few seconds), so a pull can't land between task reading and rewriting
 its data files.
 
+**Every sync is in the server log** (`tw-web.log`; on a phone started by tw-mobilize,
+`~/.cache/tw-web/server.out`), manual or automatic: one line when it works (`sync (auto) ok: 2 from
+s5`), and when it fails the reason plus everything gittw said, so a message that flashed past on screen
+can be read later: `grep -A12 'sync (' tw-web.log`.
+
 File links (annotations, the `file` launcher) open with `termux-open` on Termux, which has no `xdg-open`.
 
 ---
