@@ -22,7 +22,7 @@ GUARDED = {'nav.js'}
 
 
 def test_pages_using_tw_filter_load_it():
-    # check-refs tracks top-level names only, so it can't see TW.filter / TW.sort: check here
+    # check-refs tracks top-level names only, so it can't see TW.filter / TW.sort / TW.recur: check here
     # that every page whose scripts use them loads tw-filter.js after tw-api.js and before them.
     import importlib.util
     root = TEST.parents[2]
@@ -32,9 +32,9 @@ def test_pages_using_tw_filter_load_it():
     for page in sorted(root.glob('*.html')):
         units = [u for u in refs.page_units(page, root) if isinstance(u, str)]
         users = [u for u in units if u != 'tw-filter.js' and u not in GUARDED
-                 and ('TW.filter' in (root / u).read_text() or 'TW.sort' in (root / u).read_text())]
+                 and any(n in (root / u).read_text() for n in ('TW.filter', 'TW.sort', 'TW.recur'))]
         if not users:
             continue
-        assert 'tw-filter.js' in units, f'{page.name} uses TW.filter/TW.sort ({users}) without tw-filter.js'
+        assert 'tw-filter.js' in units, f'{page.name} uses TW.filter/TW.sort/TW.recur ({users}) without tw-filter.js'
         at = units.index('tw-filter.js')
         assert units.index('tw-api.js') < at < min(units.index(u) for u in users), f'{page.name}: load order'

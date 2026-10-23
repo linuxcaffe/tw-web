@@ -350,6 +350,12 @@ body.cal-page .app-container {
 .fc-pri-dot.fc-pri-high { background: #e74c3c; }
 .fc-pri-dot.fc-pri-med  { background: #f39c12; }
 .fc-pri-dot.fc-pri-low  { background: #27ae60; }
+/* Recurrence ring, as on the cards (styles.css) but compact for month, week and day cells:
+   green an instance, violet a template */
+.fc-pri-dot.recur-instance,
+.fc-pri-dot.recur-template { outline: 1px solid; outline-offset: 1px; margin: 3px 5px 0 2px; }
+.fc-pri-dot.recur-instance { outline-color: #27ae60; }
+.fc-pri-dot.recur-template { outline-color: #8e44ad; }
 
 /* Narrow viewport: shrink font */
 @media (max-width: 768px) { .fc-ev-wrap { font-size: 0.70rem; } }

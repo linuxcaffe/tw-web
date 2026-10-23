@@ -153,7 +153,10 @@ class TaskCardManager {
         else if (task.scheduled)             card.dataset.type = 'scheduled';
         else if (task.due)                   card.dataset.type = 'due';
 
-        const dotHtml     = priClass ? `<span class="card-pri-dot ${priClass}"></span>` : '';
+        // A ring round the dot marks a recurring template or instance; without a priority, the ring alone
+        const recur       = TW.recur.kind(task);
+        const recurClass  = recur ? ` recur-${recur}` : '';
+        const dotHtml     = (priClass || recur) ? `<span class="card-pri-dot ${priClass}${recurClass}"></span>` : '';
         const metaContent = proj + dueHtml + schedHtml + durHtml + tagsHtml;
         const metaHtml    = metaContent ? `<div class="card-meta">${metaContent}</div>` : '';
         if (anns.length) card.dataset.annotated = '1';

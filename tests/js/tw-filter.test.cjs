@@ -8,7 +8,7 @@ const vm = require('vm');
 const ctx = { TW: {}, window: {} };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', '..', 'tw-filter.js'), 'utf8'), ctx);
-const { filter: F, sort: S } = ctx.TW;
+const { filter: F, sort: S, recur: R } = ctx.TW;
 
 // Arrays made inside the vm context have another Array prototype: compare as JSON
 const eq = (a, b) => assert.strictEqual(JSON.stringify(a), JSON.stringify(b));
@@ -129,5 +129,12 @@ t('sort does not mutate its input', () => {
 });
 t('sort tags joins them; missing sorts first', () =>
     eq(desc(S.tasks(tasks, 'tags', false)), ['Write spec', 'File taxes', 'Call Bob', 'Buy milk']));
+
+// TW.recur: recurrence-overhaul's template and instance, and built-in 2.6.2's parent and child
+t('recur: template is status:recurring', () => eq(R.kind({ status: 'recurring', r: 'P30D' }), 'template'));
+t('recur: overhaul instance has rtemplate', () => eq(R.kind({ status: 'pending', rtemplate: 'c54a' }), 'instance'));
+t('recur: built-in child has parent', () => eq(R.kind({ status: 'waiting', parent: 'c54a', imask: 3 }), 'instance'));
+t('recur: a done instance is still one', () => eq(R.kind({ status: 'completed', rtemplate: 'c54a' }), 'instance'));
+t('recur: plain task is neither', () => eq(R.kind({ status: 'pending' }), ''));
 
 console.log(`tw-filter: ${n} passed`);

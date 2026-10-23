@@ -72,6 +72,7 @@ tw-api.js:function isFilterOnly
 app.py:def get_commands
 tw-filter.js:TW.filter =
 tw-filter.js:TW.sort =
+tw-filter.js:TW.recur =
 tw-filter.js:function matchesNav
 tw-filter.js:function priRank
 tw-filter.js:function setVirtual

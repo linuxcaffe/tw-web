@@ -527,6 +527,12 @@ h2 {
 .card-pri-dot.pri-high { background: #e74c3c; }
 .card-pri-dot.pri-med  { background: #f39c12; }
 .card-pri-dot.pri-low  { background: #27ae60; }
+/* Recurrence ring round the dot: green an instance, violet a template (TW.recur). An outline takes
+   no space, and its offset leaves a transparent gap, so it reads on any background. */
+.card-pri-dot.recur-instance,
+.card-pri-dot.recur-template { outline: 1.5px solid; outline-offset: 1.5px; }
+.card-pri-dot.recur-instance { outline-color: #27ae60; }
+.card-pri-dot.recur-template { outline-color: #8e44ad; }
 .card-meta {
     display: flex;
     flex-wrap: wrap;

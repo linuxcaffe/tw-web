@@ -193,3 +193,17 @@ TW.filter = (() => {
     return { parseModifier, matchAttr, matchTags, matchesNav, navTasks, addDefaults,
              setVirtual, getVirtual, tagTerms, virtualTerms };
 })();
+
+// ── TW.recur ──────────────────────────────────────────────────────────────────
+// A recurring task's part, for the ring round its priority dot (cards and calendar events).
+// recurrence-overhaul: the template is status:recurring, an instance carries rtemplate.
+// Built-in 2.6.2 recurrence: the same status for the parent, and `parent` on each child.
+TW.recur = (() => {
+    function kind(task) {
+        if (!task) return '';
+        if (task.status === 'recurring') return 'template';
+        if (task.rtemplate || task.parent) return 'instance';
+        return '';
+    }
+    return { kind };
+})();

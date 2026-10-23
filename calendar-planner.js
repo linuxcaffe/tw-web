@@ -277,9 +277,11 @@ function renderEventContent(arg) {
 
     // Priority dot inside the title, floated left — only indents the first line;
     // subsequent lines are clear of the float and flow edge-to-edge.
-    if (pc) {
+    // A ring round it marks a recurring template or instance (TW.recur); without a priority, the ring alone
+    const recur = TW.recur.kind(task);
+    if (pc || recur) {
         const dot = document.createElement('span');
-        dot.className = `fc-pri-dot fc-pri-${pc}`;
+        dot.className = 'fc-pri-dot' + (pc ? ` fc-pri-${pc}` : '') + (recur ? ` recur-${recur}` : '');
         title.appendChild(dot);
     }
     title.appendChild(document.createTextNode(desc));
