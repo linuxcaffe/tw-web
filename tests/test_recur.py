@@ -65,3 +65,19 @@ def test_a_hooks_refusal_comes_back_without_override_notices(client, app_module,
     assert not body['success']
     assert body['error'].startswith('ERROR: a chained template')
     assert 'override' not in body['error'] and 'use rend:' in body['error']
+
+
+def test_the_recur_button_lists_live_templates_only(app_module, monkeypatch):
+    # 2026-10-23: a deleted template keeps its r, so `r.any:` listed it under Recur as a ghost.
+    # A live template is status:recurring; a deleted or completed one isn't.
+    class Shown:
+        stdout = 'recurrence.field=r\n'
+    monkeypatch.setattr(app_module.subprocess, 'run', lambda *a, **k: Shown)
+    assert app_module._get_recurrence_filter() == 'status:recurring'
+
+
+def test_native_recurrence_keeps_the_virtual_tag(app_module, monkeypatch):
+    class Shown:
+        stdout = 'recurrence.field=recur\n'
+    monkeypatch.setattr(app_module.subprocess, 'run', lambda *a, **k: Shown)
+    assert app_module._get_recurrence_filter() == '+RECURRING'

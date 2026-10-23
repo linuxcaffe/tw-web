@@ -404,7 +404,8 @@ _watcher_thread.start()
 def _get_recurrence_filter():
     """Return the TW filter string for the 'recurring' status button.
     Reads recurrence.field from tw-web.rc (via task _show):
-      recurrence.field=r    → r.any:    (recurrence-overhaul hook)
+      recurrence.field=r    → status:recurring (recurrence-overhaul's live templates; not r.any:,
+                              which a deleted template still matches: it keeps its r)
       recurrence.field=recur or unset → +RECURRING (standard TW)
     Uses rc.hooks=off so slow on-exit hooks don't block Flask startup.
     """
@@ -417,7 +418,7 @@ def _get_recurrence_filter():
             if line.startswith('recurrence.field='):
                 field = line.split('=', 1)[1].strip()
                 if field and field != 'recur':
-                    return f'{field}.any:'
+                    return 'status:recurring'
     except Exception:
         pass
     return '+RECURRING'
