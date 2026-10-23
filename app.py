@@ -2002,11 +2002,13 @@ def _rebase_stopped(td):
 
 def _log_sync(kind, result, pulled):
     """One line per sync in the server's log (stderr: tw-web.log, or server.out on a phone); a failure
-    adds everything gittw said, indented. Until 2026-10-23 a failure showed only on screen."""
+    adds everything gittw said, indented, and a success its warnings (gittw 0.3.5: a mirror refused). Until 2026-10-23 a failure showed only on screen."""
     stamp = time.strftime('%d/%b/%Y %H:%M:%S')
     if result['success']:
         got = ', '.join(f'{n} from {st}' for st, n in pulled.items()) or 'nothing new'
-        print(f'[{stamp}] sync ({kind}) ok: {got}', file=sys.stderr, flush=True)
+        said = [l for l in result['stderr'].splitlines() if l.strip()]    # gittw's warnings (a mirror)
+        print(f'[{stamp}] sync ({kind}) ok: {got}' + ''.join(f'\n  {l}' for l in said),
+              file=sys.stderr, flush=True)
         return
     note = _sync_note(result['stderr'], result['stdout'], result.get('returncode', 1))
     lines = [l for l in (result['stdout'] + '\n' + result['stderr']).splitlines() if l.strip()]

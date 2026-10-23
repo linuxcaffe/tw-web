@@ -357,3 +357,15 @@ def test_a_sync_that_works_logs_one_line(client, gittw, capsys):
 def test_an_automatic_sync_says_so(gittw, app_module, capsys):
     app_module._auto_sync_run()
     assert 'sync (auto) ok' in capsys.readouterr().err
+
+
+def test_a_sync_that_works_with_a_warning_logs_the_warning(client, gittw, app_module, monkeypatch, capsys):
+    # gittw 0.3.5: a mirror that refused the push is a warning on a sync that worked
+    warn = ('gittw: the mirror git@github.com:me/data.git refused the push (non-fast-forward); the main '
+            'remote has everything.\n  To make the mirror match it: git -C /t push --force x HEAD:master\n')
+    monkeypatch.setattr(app_module, 'run_command', lambda args, timeout=None, env=None: {
+        'success': True, 'stdout': 'Pushing...\nSync complete.\n', 'stderr': warn, 'returncode': 0})
+    client.post('/api/sync', headers=TRUSTED, json={})
+    err = capsys.readouterr().err
+    assert 'sync (manual) ok' in err and '  gittw: the mirror git@github.com:me/data.git refused' in err
+    assert '  To make the mirror match it' in err
