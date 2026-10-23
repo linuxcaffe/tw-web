@@ -66,6 +66,15 @@ check(async pg => {
 - **Holidays, moon phases, seasons:** the seed taskrc has none (the Agenda checks count date lines).
   Wrap a check in `withHolidays([[name, dayOffset, lastOffset?, {kind, time}?], …], async key => …)`:
   it appends `holiday.*` entries to the scratch taskrc and restores it afterwards.
+- **Recurrence (templates, instances, the hook's notes):** wrap a check in `withRecurrence(async () => …)`:
+  it copies recurrence-overhaul's hooks from `~/dev/tw-recurrence_overhaul-hook` (or `$TW_E2E_RECURRENCE`)
+  into the scratch dir, turns hooks on with its `recurrence.rc` (the `r`, `type`, `rend`… UDAs) and points
+  `TW_TASK_DIR` at the scratch data (the hooks' spool and logs default to `~/.task`). `editor-recur` uses it.
+  The seed taskrc keeps 2.6.2's own recurrence on, which refuses a `status:recurring` task without `recur`:
+  import templates only inside `withRecurrence` (its rc sets `recurrence=no`). Settings read at server start
+  (`recurrence.field`, so the Recur status button's filter) can't be changed by a check.
+- **2.6.2 exports a waiting task as `status: pending`** (waiting is a virtual tag since 2.6): a check that
+  needs a non-pending status must use completed, deleted or a template.
 - **Red against main's views:** for a page fix, copy the touched view files aside, `git show main:<file> >
   <file>`, run the new check (it must fail), then copy them back.
 - Bug checks go in `tests/e2e/xfail.txt` until the fix. Read the `xfail` reason line in the output, so a
