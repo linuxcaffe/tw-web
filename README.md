@@ -4,6 +4,15 @@ A powerful, mobile-friendly web interface for [Taskwarrior](https://taskwarrior.
 installable as a PWA, usable from any browser, including on Android via Termux.
 Part of the [awesome-taskwarrior](https://github.com/linuxcaffe/awesome-taskwarrior) ecosystem.
 
+**On a phone, two ways:**
+- **Connected, over Tailscale:** the phone's browser opens your laptop's tw-web through
+  [Tailscale](https://tailscale.com) (`tw-web-launch.sh` listens there; see [Network access](#network-access)).
+  Nothing to set up on the phone but the Tailscale app; the laptop has to be on, and both online.
+- **On Android itself, with [tw-mobilize](https://github.com/linuxcaffe/tw-mobilize):** the phone becomes
+  a station of its own: Taskwarrior 2.6.2, your tasks and tw-web all run in Termux and work offline, and
+  [gittw](https://github.com/linuxcaffe/gittw) syncs them with your other stations whenever it's online
+  (automatically, from tw-web). Three lines in Termux set it up: see [Android / Termux](#android--termux).
+
 ---
 
 ## TL;DR
@@ -92,6 +101,11 @@ Runtime files (log, PID, hook prompts, spool) live in a private folder: `$XDG_RU
 ### Android / Termux
 
 tw-web runs entirely inside Termux — no root, no external server required.
+
+**The quick way:** [tw-mobilize](https://github.com/linuxcaffe/tw-mobilize)'s quick start, three lines in
+Termux. `mobilize init` installs Taskwarrior 2.6.2, clones your gittw task repo, sets up tw-web with its
+launcher, and checks the result; `mobilize android` then walks through the phone's own settings. The
+steps below are what it does, for doing it by hand.
 
 #### Termux prerequisites
 
