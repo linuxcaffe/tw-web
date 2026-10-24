@@ -111,10 +111,10 @@ function initializeCalendar() {
         nowIndicator:         true,
         allDaySlot:           true,      // date-only (midnight) tasks; the grid starts at cal_day_start
         editable:             true,      // drag + resize on scheduled events
-        // Touch: a drag starts after this long a press, before which a moving finger scrolls the page.
+        // Touch: a drag starts after this long a press (setupTouch keeps the page still meanwhile).
         // FullCalendar's 1 s turned most grab-and-move attempts into a scroll (user 2026-10-24).
-        eventLongPressDelay:  350,
-        selectLongPressDelay: 350,
+        eventLongPressDelay:  LONG_PRESS,
+        selectLongPressDelay: LONG_PRESS,
         droppable:            true,      // accept external drags from sidebar
         eventMinHeight:       18,
         stickyHeaderDates:       true,      // day names stay visible while scrolling time grid
@@ -158,6 +158,10 @@ function initializeCalendar() {
             const p = info.event.extendedProps;
             if (p?.layer) info.el.title = info.event.title + (p.detail ? ` (${p.detail})` : '');
         },
+        eventDragStart:   () => { _fcDragging = true; },    // a drag is never a swipe (setupTouch)
+        eventDragStop:    () => { _fcDragging = false; },
+        eventResizeStart: () => { _fcDragging = true; },
+        eventResizeStop:  () => { _fcDragging = false; },
         eventDrop:    handleEventDrop,
         eventResize:  handleEventResize,
         eventReceive: handleEventReceive,
@@ -171,6 +175,7 @@ function initializeCalendar() {
     calendar.addEventSource(layerEventSource());
     calendar.render();
     setupExternalDrag();
+    setupTouch();
     zoomTitle('week');
     zoomTitle('day');
 
@@ -381,6 +386,91 @@ function setupEventListeners() {
         else if (e.key === 'ArrowLeft')  { e.preventDefault(); calendar.prev();  updateCalendarTitle(); }
         else if (e.key === 'ArrowRight') { e.preventDefault(); calendar.next();  updateCalendarTitle(); }
     });
+}
+
+// ── Touch: hold to grab, swipe sideways for next/prev ─────────────────────────
+// A drag starts after LONG_PRESS ms. A finger wobbles a few px while it waits, and the first wobble
+// used to start the page's own scroll, which FullCalendar can't stop once it runs: the timescale
+// moved with the task (user 2026-10-24, Brave on the phone). So during the hold a move under
+// GRAB_SLOP px is cancelled and the page never starts; a longer one before the hold ends is a swipe
+// or a scroll, as always. While FullCalendar's drag runs, the page is held still here too (see move).
+// A decided sideways swipe goes to the next or previous range: the grid follows the finger, slides
+// out, and the new range slides in from the other side. A drag, a resize or a selection never swipes.
+const LONG_PRESS = 350, GRAB_SLOP = 10;
+const SWIPE_MIN = 60, SWIPE_WIDTH = 0.25, SWIPE_MS = 600;   // px, of the width, ms (any time past half the width)
+let _fcDragging = false;   // eventDragStart/Stop, eventResizeStart/Stop
+let _sliding    = false;   // a slide is running: touches wait for it
+
+function setupTouch() {
+    const el = document.getElementById('calendar');
+    const harness = () => el.querySelector('.fc-view-harness');
+    const still = matchMedia('(prefers-reduced-motion: reduce)');
+    let t = null;   // this touch: where and when it started, free (past the hold rule), axis 'x' | 'y'
+
+    function slide(h, to, ms, then) {
+        h.style.transition = still.matches || !ms ? 'none' : `transform ${ms}ms ease-out`;
+        h.style.transform  = to ? `translateX(${to}px)` : '';
+        if (then) setTimeout(then, still.matches ? 0 : ms);
+    }
+    function back() {
+        const h = harness();
+        if (h?.style.transform) slide(h, 0, 150, () => { h.style.transition = ''; });
+    }
+    function go(dir) {   // 1 next, -1 previous
+        const h = harness(), w = h.offsetWidth;
+        _sliding = true;
+        slide(h, -dir * w, 120, () => {
+            dir > 0 ? calendar.next() : calendar.prev();
+            updateCalendarTitle();
+            const n = harness();
+            slide(n, dir * w, 0);
+            n.offsetWidth;   // start the slide in from there
+            slide(n, 0, 160, () => { n.style.transition = ''; _sliding = false; });
+        });
+    }
+
+    // The moves go to the element the finger landed on, even after a refresh redraws it and takes it
+    // out of the page; then they never bubble up, and FullCalendar's page-wide scroll blocker (on
+    // window) misses them while its drag goes on: the page scrolled with the task. So listen there,
+    // as FullCalendar does, and hold the page still while one of its drags runs.
+    function move(e) {
+        if (_fcDragging) { if (e.cancelable) e.preventDefault(); return; }
+        if (!t) return;
+        if (e.touches.length !== 1) { t = null; back(); return; }
+        const p = e.touches[0], dx = p.clientX - t.x, dy = p.clientY - t.y;
+        if (!t.free) {
+            if (e.timeStamp - t.at >= LONG_PRESS + 50) { t.free = true; return; }   // held: FullCalendar's
+            if (Math.hypot(dx, dy) < GRAB_SLOP) { if (e.cancelable) e.preventDefault(); return; }
+            t.free = true;
+            t.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+            // A swipe: FullCalendar would still start a selection or a drag when its press timer runs
+            // out. It never starts one once the page scrolled during the press, so say it did.
+            if (t.axis === 'x') window.dispatchEvent(new Event('scroll'));
+        }
+        if (t.axis !== 'x') return;
+        if (el.querySelector('.fc-event-mirror')) { t.axis = null; back(); return; }
+        if (e.cancelable) e.preventDefault();
+        slide(harness(), dx, 0);
+    }
+    function end(e) {
+        for (const [type, fn] of [['touchmove', move], ['touchend', end], ['touchcancel', end]])
+            e.target.removeEventListener(type, fn);
+        if (!t || t.axis !== 'x') { t = null; if (e.type === 'touchcancel') back(); return; }
+        const p = e.changedTouches[0], dx = p.clientX - t.x, dy = p.clientY - t.y, w = el.clientWidth;
+        const far = Math.abs(dx) >= Math.max(SWIPE_MIN, w * SWIPE_WIDTH) && Math.abs(dx) > 2 * Math.abs(dy);
+        const decided = e.type === 'touchend' && far && (e.timeStamp - t.at <= SWIPE_MS || Math.abs(dx) >= w / 2);
+        t = null;
+        decided ? go(dx < 0 ? 1 : -1) : back();
+    }
+    el.addEventListener('touchstart', e => {
+        const p = e.touches[0];
+        t = e.touches.length === 1 && !_sliding ? { x: p.clientX, y: p.clientY, at: e.timeStamp, free: false, axis: null } : null;
+        if (e.touches.length !== 1) return;
+        e.target.addEventListener('touchmove', move, { passive: false });
+        e.target.addEventListener('touchend', end);
+        e.target.addEventListener('touchcancel', end);
+    }, { passive: true });
+    el.addEventListener('touchmove', () => {}, { passive: false });   // the calendar can always hold the page
 }
 
 // ── Zoom ──────────────────────────────────────────────────────────────────────
