@@ -38,7 +38,7 @@ check(async pg => {
 
     await pg.click('#tw-logo-btn');
     await pg.click('[data-menu="sync"]');
-    await sleep(600);
+    await sleep(800);
     const box = await pg.locator('#tw-sync-changes').textContent();
     for (const want of ['Incoming: 3 changes from s5', 'Stations: s5 synced 2 h ago', 'yoga (this one) synced just now',
                         '1 commit here, not pushed yet', 'stopped in the middle of a rebase', 'rebase --abort', 'last try failed 10 min ago: Could not resolve host']) {
@@ -58,8 +58,7 @@ check(async pg => {
     if (!(await pg.locator('#tws-sync-auto').isVisible())) await pg.locator('.tws-section-hdr', { hasText: 'General' }).click();
     expect(await pg.locator('#tws-sync-auto').isChecked(), 'Sync automatically is not on by default');
     await pg.locator('#tws-sync-auto').uncheck();
-    await pg.click('button[type=submit]:has-text("Save")');
-    await sleep(600);
+    await sleep(800);
     const cfg = await pg.evaluate(() => fetch('/api/config').then(r => r.json()));
     expect(cfg.sync_auto === false, `sync_auto after unchecking and saving: ${cfg.sync_auto}`);
 });

@@ -1,4 +1,4 @@
-// The Settings form edits the zoom steps: a step changed and made the default there is where
+// The Settings form edits the zoom steps (saved as they change): a step changed and made the default there is where
 // Week opens after a reload.
 const { check, expect, B, sleep } = require('./lib.cjs');
 check(async pg => {
@@ -15,7 +15,6 @@ check(async pg => {
     await first.locator('.tws-zoom-slot').selectOption('00:20:00');
     await first.locator('.tws-zoom-start').fill('07:00');
     await first.locator('input[type=radio]').check();
-    await pg.click('button[type=submit]:has-text("Save")');
     await sleep(800);
     const z = await pg.evaluate(() => fetch('/api/config').then(r => r.json()).then(c => c.cal_zoom.week));
     expect(z.default === 0 && JSON.stringify(z.steps) ===

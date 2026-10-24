@@ -61,7 +61,6 @@ check(async pg => {
     expect(await pg.inputValue('#tws-cal-lat') === '43.65', 'latitude not Toronto by default');
     await pg.fill('#tws-cal-lat', '25.76');
     await pg.fill('#tws-cal-lon', '-80.19');
-    await pg.click('button[type=submit]:has-text("Save")');
     await sleep(800);
     const cfg = await pg.evaluate(() => fetch('/api/config').then(r => r.json()));
     expect(cfg.cal_latitude === 25.76 && cfg.cal_longitude === -80.19 && cfg.cal_daylight === true,

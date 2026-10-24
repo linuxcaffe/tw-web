@@ -247,7 +247,7 @@ cp tw-web-native-host.json ~/.mozilla/native-messaging-hosts/tw_web_launcher.jso
 
 ## Configuration
 
-Settings are stored in `settings.json` (auto-created, not committed). Edit via the **Settings** panel in the side menu, or directly:
+Settings are stored in `settings.json` (auto-created, not committed). Edit via the **Settings** panel in the side menu (each change saves as you make it; "Saved" shows beside its section), or directly:
 
 ```json
 {

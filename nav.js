@@ -619,6 +619,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     cursor: pointer; text-align: left;
 }
 .tws-section-hdr:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.85); }
+.tws-section-status { margin-left: auto; font-weight: 400; letter-spacing: 0; text-transform: none; color: rgba(255,255,255,0.45); }
+.tws-section-status.error { color: #e74c3c; }
 .tws-section-arrow { font-size: 9px; transition: transform 0.15s ease; display: inline-block; color: rgba(255,255,255,0.35); }
 
 /* notification toast */
@@ -1714,6 +1716,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             bd.style.display      = isOpen ? '' : 'none';
             hdr.appendChild(arrow);
             hdr.appendChild(_mk('span', { text: title }));
+            hdr.appendChild(_mk('span', { cls: 'tws-section-status' }));   // "Saved", or why not
             hdr.addEventListener('click', () => {
                 const nowOpen = bd.style.display !== 'none';
                 bd.style.display      = nowOpen ? 'none' : '';
@@ -1734,7 +1737,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             const cInp   = _inp('', 'text', { cls: 'tws-launch-cmd',   placeholder: 'command {value}', value: cmd, css: 'flex:1' });
             const delBtn = _mk('button', { type: 'button', cls: 'tws-launch-del', title: 'Remove',
                 css: 'background:none;border:none;color:rgba(255,255,255,0.35);cursor:pointer;font-size:16px;padding:0 4px', text: '✕' });
-            delBtn.addEventListener('click', () => row.remove());
+            delBtn.addEventListener('click', () => { const sec = row.closest('.tws-section'); row.remove(); _saveSoon(sec, 0); });
             row.appendChild(lInp); row.appendChild(cInp); row.appendChild(delBtn);
             return row;
         }
@@ -1927,19 +1930,32 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         devNote.innerHTML = '<h3>Developer settings</h3><p>Edit <code style="font-size:11px;color:rgba(255,255,255,0.55)">config.py</code> for DEVELOPER_MODE and DEBUG_FILE.</p>';
         form.appendChild(devNote);
 
-        // Save row
-        const saveRow = _mk('div', { cls: 'tw-settings-row', css: 'border:none;justify-content:flex-end;gap:8px;padding-top:12px;padding-bottom:16px' });
-        const status  = _mk('span', { id: 'tws-status', css: 'font-size:12px;color:rgba(255,255,255,0.45)' });
-        const saveBtn = _mk('button', { type: 'submit', cls: 'tw-pick-item',
-            css: 'width:auto;padding:6px 16px;border:1px solid rgba(255,255,255,0.2);border-radius:4px', text: 'Save' });
-        saveRow.appendChild(status); saveRow.appendChild(saveBtn);
-        form.appendChild(saveRow);
-
         body.appendChild(form);
 
-        // ── Form submit ───────────────────────────────────────────────────────
-        form.addEventListener('submit', async e => {
-            e.preventDefault();
+        // ── Save on change ────────────────────────────────────────────────────
+        // No Save button (it sat below every section, out of sight): a change saves the whole form
+        // half a second after the last keystroke or pick, and says so on that section's header.
+        // A pending save still runs after the panel closes: the detached form keeps its values.
+        let _saveTimer = null, _saveSec = null, _saving = Promise.resolve();
+        function _saveSoon(sec, ms = 500) {
+            if (sec) _saveSec = sec;
+            clearTimeout(_saveTimer);
+            _saveTimer = setTimeout(() => { const s = _saveSec; _saving = _saving.then(() => _save(s)); }, ms);
+        }
+        function _status(sec, text, error = false) {
+            const el = sec?.querySelector('.tws-section-status');
+            if (!el) return;
+            el.textContent = text;
+            el.classList.toggle('error', error);
+            clearTimeout(el._t);
+            if (text && !error) el._t = setTimeout(() => { el.textContent = ''; }, 2000);
+        }
+        const _onEdit = e => _saveSoon(e.target.closest('.tws-section'), e.type === 'change' ? 0 : 500);
+        form.addEventListener('input', _onEdit);
+        form.addEventListener('change', _onEdit);
+        form.addEventListener('submit', e => { e.preventDefault(); _saveSoon(null, 0); });   // Enter in a field
+
+        async function _save(sec) {
             const notifVal  = parseInt(form.querySelector('#tws-notif').value, 10);
             const kanbanVal = form.querySelector('#tws-kanban').value;
             const calStart  = form.querySelector('#tws-cal-start').value;
@@ -1972,8 +1988,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 const cmd = row.querySelector('.tws-launch-cmd')?.value.trim();
                 if (lbl && cmd) launchers[lbl] = cmd;
             });
-            if (isNaN(notifVal) || notifVal < 0) { status.textContent = 'Invalid timeout'; return; }
-            status.textContent = 'Saving…';
+            if (isNaN(notifVal) || notifVal < 0) { _status(sec, 'Invalid timeout', true); return; }
+            _status(sec, 'Saving…');
             try {
                 const r = await fetch('/api/config', {
                     method: 'POST',
@@ -2005,11 +2021,10 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 if (d.success) {
                     window.twNotifTimeout = notifVal;
                     if (typeof resetLaunchersCache === 'function') resetLaunchersCache();
-                    status.textContent = 'Saved';
-                    setTimeout(() => { status.textContent = ''; }, 2000);
-                } else { status.textContent = d.error || 'Error'; }
-            } catch (e) { status.textContent = TW.api.networkError(e); }
-        });
+                    _status(sec, 'Saved');
+                } else { _status(sec, d.error || 'Error', true); }
+            } catch (e) { _status(sec, TW.api.networkError(e), true); }
+        }
     }
 
     // ── Sync dialog ───────────────────────────────────────────────────────────
