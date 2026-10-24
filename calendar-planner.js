@@ -111,6 +111,10 @@ function initializeCalendar() {
         nowIndicator:         true,
         allDaySlot:           true,      // date-only (midnight) tasks; the grid starts at cal_day_start
         editable:             true,      // drag + resize on scheduled events
+        // Touch: a drag starts after this long a press, before which a moving finger scrolls the page.
+        // FullCalendar's 1 s turned most grab-and-move attempts into a scroll (user 2026-10-24).
+        eventLongPressDelay:  350,
+        selectLongPressDelay: 350,
         droppable:            true,      // accept external drags from sidebar
         eventMinHeight:       18,
         stickyHeaderDates:       true,      // day names stay visible while scrolling time grid
