@@ -82,6 +82,13 @@ check(async pg => {
 - Playwright is borrowed from `~/dev/nb-web-tests/e2e/node_modules` (or `$TW_E2E_PLAYWRIGHT`); tw-web has
   no install of its own.
 - Use substrings that are unique among the seeds: `hasText: 'eta home due'` also matched "beta home due".
+- **Settings last the whole run:** `run.py` re-seeds the task data before each check, not the scratch
+  `settings.json`. A check that changes Settings posts the defaults back at its end
+  (`calendar-zoom-settings`, `settings-save-on-change`).
+- **Touch checks:** drive touches with CDP `Input.dispatchTouchEvent` in an `isMobile`/`hasTouch` context
+  (`calendar-touch-drag`, `calendar-swipe`). Wobble the finger a few px during a long press: a perfectly
+  still press passed while the real phone (Brave) scrolled the page with the grabbed task. In Month a
+  dragged task is `.fc-event-dragging`; in Week and Day, `.fc-event-mirror`.
 
 ### One-off probes and screenshots
 

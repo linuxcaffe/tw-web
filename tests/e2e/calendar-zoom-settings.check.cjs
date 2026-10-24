@@ -29,7 +29,7 @@ check(async pg => {
         return [calendar.getOption('slotDuration'), top && top.dataset.time];
     });
     expect(at[1] === '07:00:00' && JSON.stringify(at[0]).includes('20'), `Week opened at ${JSON.stringify(at)}`);
-    // settings.json is the app folder's: put the defaults back for the checks that follow
+    // the scratch settings last the whole run: put the defaults back for the checks that follow
     await pg.evaluate(() => fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cal_zoom: { week: { steps: [['00:15', '08:00'], ['00:30', '08:00'], ['01:00', '00:00']], default: 1 },
                                            day:  { steps: [['00:15', '08:00'], ['00:30', '08:00'], ['01:00', '00:00']], default: 1 } } }) }));
