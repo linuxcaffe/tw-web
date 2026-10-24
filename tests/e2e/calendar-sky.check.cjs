@@ -1,6 +1,6 @@
 // The moon's phases and the seasons in the Calendar (tw-events sky.rc; user 2026-10-17: "mark at
 // its time"): Week and Day draw a mark across the day's column at the moment, with its icon (hover:
-// name and time), and keep it out of the all-day row; Month shows a chip with the icon. Zoom steps
+// name and time), and keep it out of the all-day row; Month shows its icon on the day's top row. Zoom steps
 // don't move it off its time.
 const { check, expect, B, sleep, withHolidays } = require('./lib.cjs');
 const mon = -((new Date().getDay() + 6) % 7);          // this week's Monday
@@ -41,9 +41,8 @@ check(async pg => withHolidays([
 
     await pg.click('.view-btn[data-view="month"]');
     await sleep(800);
-    const chips = await pg.$$eval('.tw-layer-moment', els => els.map(e => ({ text: e.textContent, title: e.title })));
-    expect(chips.some(c => c.text.includes('🌕 Full Moon') && c.title.includes('15:30')),
-           `month chips: ${JSON.stringify(chips)}`);
+    const icons = await pg.$$eval('.tw-day-icon', els => els.map(e => ({ text: e.textContent, title: e.title })));
+    expect(icons.some(c => c.text === '🌕' && c.title === 'Full Moon 15:30'), `month icons: ${JSON.stringify(icons)}`);
     expect(await pg.$$eval('.tw-sky-mark', e => e.length) === 0, 'marks left over in Month');
 
     await pg.click('.view-btn[data-view="week"]');

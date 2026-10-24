@@ -592,3 +592,20 @@ body.cal-page .app-container {
     pointer-events: auto; cursor: default;
 }
 .tw-sky-mark.tw-sky-mine { border-top: 1px solid var(--tw-mine-border); }   /* your own events: solid, green */
+.tw-sky-label {                     /* Day view: the moment's name and time, left of its icon */
+    position: absolute; right: 1.5rem; top: -0.6em;
+    font-size: 0.7rem; line-height: 1; white-space: nowrap;
+    padding: 0 3px; border-radius: 3px;
+    color: var(--tw-sky-text); background: var(--fc-page-bg-color, #fff);
+}
+.tw-sky-mark.tw-sky-mine .tw-sky-label { color: var(--tw-mine-text); }
+/* Month: a moment with an icon is just the icon, on the day's top row left of the number */
+.fc .fc-daygrid-day-top .tw-day-icons {
+    display: flex; align-items: center; gap: 1px;
+    margin-right: 2px; font-size: 0.75rem; line-height: 1;
+    min-width: 0; flex-wrap: wrap; justify-content: flex-end;   /* a narrow cell wraps them, never spills */
+}
+.tw-day-icon { cursor: pointer; }
+@media (max-width: 600px) {
+    .fc .fc-daygrid-day-top .tw-day-icons { font-size: 0.6rem; gap: 0; margin-right: 0; }
+}

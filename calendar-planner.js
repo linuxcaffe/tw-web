@@ -122,7 +122,8 @@ function initializeCalendar() {
         dayMaxEvents:            true,      // month view: "+N more" instead of overflowing
         weekNumbers:             true,      // ISO week numbers in gutter (TW users love these)
         weekNumberFormat:        { week: 'narrow' },  // "W16" compact style
-        views: { timeGridWeek: { dayHeaderFormat: { weekday: 'short' } } },   // the title has the dates
+        views: { timeGridWeek: { dayHeaderFormat: { weekday: 'short' } },    // the title has the dates
+                 dayGridMonth: { weekNumbers: false } },                     // Week shows its W number; Month needs the width
         // row size, drag snap and start hour come from the view's zoom step (applyZoom)
         ...zoomOptions(_zoomStep(_fcToZoomView(_calSettings.cal_default_view || 'timeGridWeek'))),
         scrollTimeReset:         false,      // don't jump back on week/day navigation
@@ -560,14 +561,17 @@ function processTasksForCalendar(scheduledTasks) {
     _calEventSource = calendar.addEventSource(events);
 }
 
-// ── Layers: things that aren't tasks (TW.layers: holidays, the moon, the seasons) ──
+// ── Layers: things that aren't tasks (TW.layers: holidays, your events, the moon, the seasons, clocks) ──
 // Their own event source, separate from the tasks' (_calEventSource): FullCalendar asks for the
 // visible range. All-day, never editable, not counted, not narrowed by the nav filter; a click
 // does nothing (eventClick), hover gives the title and detail (eventDidMount). A moment (a moon
-// phase, a solstice) is a chip with its icon in Month, and a mark at its time in Week and Day
-// (paintLayerMarks), where the all-day row stays for holidays.
+// phase, a clock change, a timed event of yours) is a mark at its time in Week and Day, with its
+// text beside it in Day; in Month one with an icon is just the icon, left of the day number
+// (paintLayerMarks; user 2026-10-24: the chips ate the cells). Holidays stay all-day chips.
 let _layerMoments = [];   // the moments in the visible range, for the marks
 let _layerGrid    = null; // was the last fetch for a time grid? (Month ↔ Week/Day refetches)
+// Drawn by paintLayerMarks instead of as a chip: a mark in Week/Day, an icon in Month
+const _layerPainted = (it, grid) => it.at && (grid || it.icon);
 
 function layerEventSource() {
     const key = TW.layers.dayKey;
@@ -581,7 +585,7 @@ function layerEventSource() {
             TW.layers.fetch(key(info.start), key(last), _calSettings).then(items => {
                 _layerMoments = items.filter(it => it.at);
                 scheduleLayerMarks();
-                success(items.filter(it => !(grid && it.at)).map(it => ({
+                success(items.filter(it => !_layerPainted(it, grid)).map(it => ({
                     id:            `layer-${it.layer}-${it.start}-${it.title}`,
                     title:         it.icon ? `${it.icon} ${it.title}` : it.title,
                     start:         iso(it.start),
@@ -610,12 +614,17 @@ function scheduleLayerMarks() {
     _layerMarkFrame = requestAnimationFrame(paintLayerMarks);
 }
 // Week/Day: a dashed line across the moment's day column at its time, with its icon at the right;
-// hover the icon for the name and time. Placed by percentage of the 24-hour grid, like the
-// daylight stripe, so zoom steps don't move it.
+// hover the icon for the name and time; Day view, with the room, writes them beside it. Placed by
+// percentage of the 24-hour grid, like the daylight stripe, so zoom steps don't move it.
+// Month: each moment with an icon is the icon on its day's top row, left of the day number; hover
+// for the name and time, a click or a tap opens that day (Month's own clicks need a long press on
+// a phone, and a tap on an icon should just work).
 function paintLayerMarks() {
-    document.querySelectorAll('#calendar .tw-sky-mark').forEach(el => el.remove());
-    if (!calendar?.view.type.startsWith('timeGrid')) return;
+    document.querySelectorAll('#calendar .tw-sky-mark, #calendar .tw-day-icons').forEach(el => el.remove());
     const pad = n => String(n).padStart(2, '0');
+    if (calendar?.view.type === 'dayGridMonth') return paintMonthIcons();
+    if (!calendar?.view.type.startsWith('timeGrid')) return;
+    const day = calendar.view.type === 'timeGridDay';
     for (const it of _layerMoments) {
         const d = it.at;
         const frame = document.querySelector(`#calendar .fc-timegrid-col[data-date="${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}"] .fc-timegrid-col-frame`);
@@ -627,8 +636,36 @@ function paintLayerMarks() {
         icon.className   = 'tw-sky-icon';
         icon.textContent = it.icon || '•';
         icon.title       = `${it.title} ${it.time}`;
+        if (day) {
+            const label = document.createElement('span');
+            label.className   = 'tw-sky-label';
+            label.textContent = icon.title;
+            mark.appendChild(label);
+        }
         mark.appendChild(icon);
         frame.appendChild(mark);
+    }
+}
+
+function paintMonthIcons() {
+    const iso = k => `${k.slice(0, 4)}-${k.slice(4, 6)}-${k.slice(6, 8)}`;
+    for (const it of _layerMoments.filter(it => _layerPainted(it, false))) {
+        const top = document.querySelector(`#calendar .fc-daygrid-day[data-date="${iso(it.start)}"] .fc-daygrid-day-top`);
+        if (!top) continue;
+        let box = top.querySelector('.tw-day-icons');
+        if (!box) {
+            box = document.createElement('span');
+            box.className = 'tw-day-icons';
+            top.appendChild(box);                       // the top row is row-reverse: left of the number
+        }
+        const icon = document.createElement('span');
+        icon.className   = `tw-day-icon tw-day-icon-${it.layer}`;
+        icon.textContent = it.icon;
+        icon.title       = `${it.title} ${it.time}`;
+        // FullCalendar's own press (select → goToDay) mustn't start under it; the click is ours
+        for (const type of ['mousedown', 'touchstart']) icon.addEventListener(type, e => e.stopPropagation(), { passive: true });
+        icon.addEventListener('click', e => { e.stopPropagation(); goToDay(it.at); });
+        box.appendChild(icon);
     }
 }
 
