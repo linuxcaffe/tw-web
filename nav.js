@@ -1842,6 +1842,17 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             hd.appendChild(_note('From the taskrc\'s holiday.* entries (tw-events: events init). The Agenda also shows them on the date lines of days with tasks, however far ahead.'));
             bd.appendChild(hd);
 
+            // Your own events: tw-events' my-events.txt and the ghosts of tasks (events add), in mine.rc
+            const me = _mk('div', { cls: 'tw-settings-row stack' });
+            me.appendChild(_mk('div', { cls: 'tw-settings-label', text: 'My events' }));
+            const meLine = _mk('div', { css: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' });
+            const meOn = _mk('input', { type: 'checkbox', id: 'tws-cal-mine', checked: cfg.cal_mine !== false,
+                                        title: 'Show your own events in the Calendar and the Agenda' });
+            meLine.append(meOn, dim('your events and the ghosts of tasks'));
+            me.appendChild(meLine);
+            me.appendChild(_note('From tw-events: ~/.task/config/my-events.txt, and events add <id> for a ghost of a task that stays after the task is done. Never edited here.'));
+            bd.appendChild(me);
+
             // The moon's phases and the seasons: tw-events' sky.rc (events.moon, events.seasons)
             const sk = _mk('div', { cls: 'tw-settings-row stack' });
             sk.appendChild(_mk('div', { cls: 'tw-settings-label', text: 'Moon & seasons' }));
@@ -1938,6 +1949,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             const calHolidays = form.querySelector('#tws-cal-holidays').checked;
             const calMoon     = form.querySelector('#tws-cal-moon').checked;
             const calSeasons  = form.querySelector('#tws-cal-seasons').checked;
+            const calMine     = form.querySelector('#tws-cal-mine').checked;
             const hdDaysVal   = parseInt(form.querySelector('#tws-agenda-holiday-days').value, 10);
             const calZoom   = {};
             ['week', 'day'].forEach(view => {
@@ -1975,6 +1987,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                         cal_holidays:         calHolidays,
                         cal_moon:             calMoon,
                         cal_seasons:          calSeasons,
+                        cal_mine:             calMine,
                         ...(isNaN(hdDaysVal) ? {} : { agenda_holiday_days: hdDaysVal }),
                         ...(isNaN(calLat) ? {} : { cal_latitude: calLat }),
                         ...(isNaN(calLon) ? {} : { cal_longitude: calLon }),

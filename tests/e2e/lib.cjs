@@ -55,7 +55,8 @@ function task(...args) {
 // Holidays as tw-holidata writes them, appended to the scratch taskrc for one check and taken
 // out again after it (run.py re-seeds the data between checks, not the taskrc).
 // days: [[name, offsetFromToday, lastOffset?, moment?]] or [[name, 'YYYYMMDD']];
-// moment {kind: 'moon'|'season', time: 'HH:MM' local} makes it a tw-events sky entry (.kind, .at UTC)
+// moment {kind: 'moon'|'season'|'mine', time: 'HH:MM' local} makes it a tw-events entry (.kind, .at UTC);
+// {kind: 'mine'} with no time is one of your own all-day events
 async function withHolidays(days, fn) {
     guard();
     const rc = process.env.TASKRC;
@@ -65,6 +66,7 @@ async function withHolidays(days, fn) {
     const lines = days.flatMap(([name, a, b, moment], i) => {
         const k = `holiday.hde2e${i}`;
         const first = typeof a === 'string' ? a : key(a);
+        if (moment && !moment.time) return [`${k}.name=${name}`, `${k}.date=${first}`, `${k}.kind=${moment.kind}`];
         if (moment) {
             const d = new Date(+first.slice(0, 4), +first.slice(4, 6) - 1, +first.slice(6, 8),
                                ...moment.time.split(':').map(Number));

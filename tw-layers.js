@@ -1,4 +1,4 @@
-// tw-web — calendar layers: things that aren't tasks (holidays, the moon's phases, the seasons), drawn by the
+// tw-web — calendar layers: things that aren't tasks (holidays, your own events, the moon's phases, the seasons), drawn by the
 // Calendar and the Agenda, never edited, never counted, untouched by the nav filter.
 // Loads after tw-api.js, which declares TW. Plan: tw:docs/tw-holidays-and-layers-plan.md.
 //
@@ -63,8 +63,10 @@ TW.layers = (() => {
 
 // ── The taskrc's holiday.* entries (/api/holidays; tw-events writes them) ──────────────────────
 // One request per range per page, split into layers by kind: holidays (all-day, amber, and the
-// Agenda gives them lines of their own), the moon's phases and the seasons (moments: .at, UTC,
-// shown on their local day with a time and an icon; they only annotate existing Agenda lines).
+// Agenda gives them lines of their own), your own events (tw-events' my-events.txt and the ghosts
+// of tasks: all-day or a moment, green, lines of their own too), the moon's phases and the seasons
+// (moments: .at, UTC, shown on their local day with a time and an icon; they only annotate
+// existing Agenda lines).
 (() => {
     const memo = new Map();   // 'start-end' → Promise of the route's entries
     function entries(start, end) {
@@ -84,7 +86,8 @@ TW.layers = (() => {
     };
     const hhmm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     const ICONS = { 'New Moon': '🌑', 'First Quarter': '🌓', 'Full Moon': '🌕', 'Last Quarter': '🌗' };
-    const icon = h => ICONS[h.title] || (/Solstice/.test(h.title) ? '☀️' : /Equinox/.test(h.title) ? '⚖️' : '');
+    const icon = h => h.kind === 'mine' ? '📌'
+        : ICONS[h.title] || (/Solstice/.test(h.title) ? '☀️' : /Equinox/.test(h.title) ? '⚖️' : '');
 
     function layer(id, label, kind, setting, makesBars) {
         TW.layers.register({
@@ -104,6 +107,7 @@ TW.layers = (() => {
         });
     }
     layer('holidays', 'Holidays', 'holiday', 'cal_holidays', true);
+    layer('mine',     'My events', 'mine',   'cal_mine',     true);
     layer('moon',     'Moon',     'moon',    'cal_moon',     false);
     layer('seasons',  'Seasons',  'season',  'cal_seasons',  false);
 })();

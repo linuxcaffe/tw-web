@@ -85,7 +85,7 @@ def settings_file(app_module, monkeypatch, tmp_path):
 def test_setting_defaults(client, settings_file):
     cfg = client.get('/api/config').get_json()
     assert cfg['cal_holidays'] is True and cfg['agenda_holiday_days'] == 30
-    assert cfg['cal_moon'] is True and cfg['cal_seasons'] is True
+    assert cfg['cal_moon'] is True and cfg['cal_seasons'] is True and cfg['cal_mine'] is True
 
 
 def test_setting_save(client, settings_file):
@@ -96,7 +96,7 @@ def test_setting_save(client, settings_file):
     assert cfg['cal_holidays'] is False and cfg['agenda_holiday_days'] == 60
 
 
-@pytest.mark.parametrize('patch', [{'cal_holidays': 'maybe'}, {'cal_moon': 'maybe'}, {'cal_seasons': 2}, {'agenda_holiday_days': -1},
+@pytest.mark.parametrize('patch', [{'cal_holidays': 'maybe'}, {'cal_moon': 'maybe'}, {'cal_seasons': 2}, {'cal_mine': 'maybe'}, {'agenda_holiday_days': -1},
                                    {'agenda_holiday_days': 400}])
 def test_setting_refused(client, settings_file, patch):
     assert client.post('/api/config', json=patch, headers=ORIGIN).status_code == 400

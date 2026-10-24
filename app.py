@@ -152,6 +152,7 @@ _SETTINGS_SCHEMA = {
     'cal_holidays':         {'type': None, 'default': True, 'coerce': _valid_bool},
     'cal_moon':             {'type': None, 'default': True, 'coerce': _valid_bool},   # tw-events' sky.rc
     'cal_seasons':          {'type': None, 'default': True, 'coerce': _valid_bool},
+    'cal_mine':             {'type': None, 'default': True, 'coerce': _valid_bool},   # tw-events' mine.rc
     'agenda_holiday_days':  {'type': int,  'default': 30,
                               'validate': lambda v: 0 <= v <= 366},
     'pty_height':           {'type': int,  'default': 240,
@@ -1127,7 +1128,8 @@ def _holiday_date_parser(fmt):
 def get_holidays():
     """The CLI's holidays: holiday.<key>.name with .date (or .start/.end), as `task calendar`
     shows them. tw-events writes them and adds .type/.region; its moon phases and seasons are
-    holiday entries too, with .kind (moon, season; else holiday) and .at (the moment, UTC).
+    holiday entries too, with .kind (moon, season, mine: your own events; else holiday) and .at
+    (the moment, UTC).
     tw-web never fetches or computes them.
     ?start=YYYYMMDD&end=YYYYMMDD (inclusive, both optional) keeps those that overlap."""
     start, end = request.args.get('start', ''), request.args.get('end', '')

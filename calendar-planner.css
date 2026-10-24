@@ -566,10 +566,15 @@ body.cal-page .app-container {
 }
 
 /* Layer items (TW.layers): holidays as quiet all-day bars; no grab cursor, they don't move.
+   Your own events: green bars, or (with a time) a chip in Month and a solid mark in Week/Day.
    Moments (moon, seasons): a plain chip in Month; in Week/Day a dashed mark at their time. */
 .fc .tw-layer-holidays, .fc .tw-layer-holidays .fc-event-main {
     background: var(--tw-holiday-bg); border-color: var(--tw-holiday-border); color: var(--tw-holiday-text);
 }
+.fc .tw-layer-mine:not(.tw-layer-moment), .fc .tw-layer-mine:not(.tw-layer-moment) .fc-event-main {
+    background: var(--tw-mine-bg); border-color: var(--tw-mine-border); color: var(--tw-mine-text);
+}
+.fc .tw-layer-mine.tw-layer-moment, .fc .tw-layer-mine.tw-layer-moment .fc-event-main { color: var(--tw-mine-text); }
 .fc .tw-layer { cursor: default; }
 .fc .tw-layer .fc-ev-title { font-style: italic; }
 .fc .tw-layer-moment, .fc .tw-layer-moment .fc-event-main {
@@ -586,3 +591,4 @@ body.cal-page .app-container {
     font-size: 0.75rem; line-height: 1;
     pointer-events: auto; cursor: default;
 }
+.tw-sky-mark.tw-sky-mine { border-top: 1px solid var(--tw-mine-border); }   /* your own events: solid, green */
