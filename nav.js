@@ -1853,7 +1853,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             me.appendChild(_note('From tw-events: ~/.task/config/my-events.txt, and events add <id> for a ghost of a task that stays after the task is done. Never edited here.'));
             bd.appendChild(me);
 
-            // The moon's phases and the seasons: tw-events' sky.rc (events.moon, events.seasons)
+            // The moon's phases, the seasons, the clock changes: tw-events' sky.rc (events.moon, .seasons, .clock)
             const sk = _mk('div', { cls: 'tw-settings-row stack' });
             sk.appendChild(_mk('div', { cls: 'tw-settings-label', text: 'Moon & seasons' }));
             const skLine = _mk('div', { css: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' });
@@ -1861,9 +1861,11 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                                           title: "Show the moon's phases" });
             const seasOn = _mk('input', { type: 'checkbox', id: 'tws-cal-seasons', checked: cfg.cal_seasons !== false,
                                           title: 'Show the solstices and equinoxes' });
-            skLine.append(moonOn, dim('moon phases'), seasOn, dim('solstices & equinoxes'));
+            const clockOn = _mk('input', { type: 'checkbox', id: 'tws-cal-clock', checked: cfg.cal_clock !== false,
+                                           title: 'Show the moments the clocks go forward and back' });
+            skLine.append(moonOn, dim('moon phases'), seasOn, dim('solstices & equinoxes'), clockOn, dim('clock changes'));
             sk.appendChild(skLine);
-            sk.appendChild(_note('A mark at their time in Week and Day, an icon in Month, on the Agenda\'s date lines. tw-events computes them: events init --moon yes --seasons yes.'));
+            sk.appendChild(_note('A mark at their time in Week and Day, an icon in Month, on the Agenda\'s date lines. tw-events computes them: events init --moon yes --seasons yes --clock yes.'));
             bd.appendChild(sk);
         }));
 
@@ -1950,6 +1952,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             const calMoon     = form.querySelector('#tws-cal-moon').checked;
             const calSeasons  = form.querySelector('#tws-cal-seasons').checked;
             const calMine     = form.querySelector('#tws-cal-mine').checked;
+            const calClock    = form.querySelector('#tws-cal-clock').checked;
             const hdDaysVal   = parseInt(form.querySelector('#tws-agenda-holiday-days').value, 10);
             const calZoom   = {};
             ['week', 'day'].forEach(view => {
@@ -1988,6 +1991,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                         cal_moon:             calMoon,
                         cal_seasons:          calSeasons,
                         cal_mine:             calMine,
+                        cal_clock:            calClock,
                         ...(isNaN(hdDaysVal) ? {} : { agenda_holiday_days: hdDaysVal }),
                         ...(isNaN(calLat) ? {} : { cal_latitude: calLat }),
                         ...(isNaN(calLon) ? {} : { cal_longitude: calLon }),

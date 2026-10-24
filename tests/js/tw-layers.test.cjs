@@ -15,6 +15,8 @@ const ctx = { TW: { api: { get: async url => { calls.push(url); return { success
     // tw-events' own events (my-events.txt → mine.rc): a run of days, and a ghost with a time
     { start: '20261224', end: '20261227', title: 'Cottage', type: '', region: '', kind: 'mine', at: '' },
     { start: '20261229', end: '20261229', title: 'Dentist', type: '', region: '', kind: 'mine', at: '20261229T193000Z' },
+    // tw-events' clock changes: 06:00 UTC is 01:00 EST in Toronto, the new time
+    { start: '20261101', end: '20261101', title: 'Clocks back (EST)', type: '', region: '', kind: 'clock', at: '20261101T060000Z' },
 ] }; } } },
     Date, Math, Promise, console: { warn() {} } };
 vm.createContext(ctx);
@@ -48,7 +50,7 @@ t('byDay orders days, then layers by registration, then titles', () => {
     eq(m.get('20261012').map(i => i.title), ['Alpha Day', 'Zed Day', 'Full moon']);
 });
 
-t('fetch: one request, four layers by kind; a moment falls on its local day', async () => {
+t('fetch: one request, five layers by kind; a moment falls on its local day', async () => {
     calls.length = 0;
     const items = await L.fetch('20261001', '20261231', {});
     eq(items.map(i => [i.layer, i.title, i.start, i.icon || '', i.time || '']), [
@@ -57,26 +59,28 @@ t('fetch: one request, four layers by kind; a moment falls on its local day', as
         ['mine', 'Dentist', '20261229', '📌', '14:30'],             // Toronto (EST)
         ['moon', 'Full Moon', '20261026', '🌕', '00:11'],          // Toronto (EDT)
         ['seasons', 'December Solstice', '20261221', '☀️', '15:50'], // Toronto (EST)
+        ['clock', 'Clocks back (EST)', '20261101', '🕐', '01:00'],
     ]);
     eq(calls, ['/api/holidays?start=20261001&end=20261231']);
     eq(items.find(i => i.title === 'Full Moon').at, '2026-10-26T04:11:42.000Z');
 });
 
 t('each layer has its own switch', async () => {
-    eq((await L.fetch('20261001', '20261231', { cal_moon: false, cal_seasons: false })).map(i => i.layer), ['holidays', 'mine', 'mine']);
-    eq((await L.fetch('20261001', '20261231', { cal_holidays: false })).map(i => i.layer), ['mine', 'mine', 'moon', 'seasons']);
-    eq((await L.fetch('20261001', '20261231', { cal_mine: false })).map(i => i.layer), ['holidays', 'moon', 'seasons']);
+    eq((await L.fetch('20261001', '20261231', { cal_moon: false, cal_seasons: false, cal_clock: false })).map(i => i.layer), ['holidays', 'mine', 'mine']);
+    eq((await L.fetch('20261001', '20261231', { cal_holidays: false })).map(i => i.layer), ['mine', 'mine', 'moon', 'seasons', 'clock']);
+    eq((await L.fetch('20261001', '20261231', { cal_mine: false })).map(i => i.layer), ['holidays', 'moon', 'seasons', 'clock']);
+    eq((await L.fetch('20261001', '20261231', { cal_clock: false })).map(i => i.layer), ['holidays', 'mine', 'mine', 'moon', 'seasons']);
 });
 
 t('my events: a run of days keeps its range; they make Agenda lines, the sky does not', async () => {
     const cottage = (await L.get('mine').items('20261201', '20261231')).find(i => i.title === 'Cottage');
     eq([cottage.start, cottage.end], ['20261224', '20261227']);
-    eq(['holidays', 'mine', 'moon', 'seasons'].map(id => L.get(id).makesBars), [true, true, false, false]);
+    eq(['holidays', 'mine', 'moon', 'seasons', 'clock'].map(id => L.get(id).makesBars), [true, true, false, false, false]);
 });
 
 t('a failing layer gives nothing; the others still come', async () => {
     L.register({ id: 'broken', items: async () => { throw new Error('no'); } });
-    eq((await L.fetch('20261001', '20261231', {})).map(i => i.layer), ['holidays', 'mine', 'mine', 'moon', 'seasons']);
+    eq((await L.fetch('20261001', '20261231', {})).map(i => i.layer), ['holidays', 'mine', 'mine', 'moon', 'seasons', 'clock']);
 });
 
 t('one request per range per page, shared by the layers', async () => {

@@ -567,7 +567,7 @@ body.cal-page .app-container {
 
 /* Layer items (TW.layers): holidays as quiet all-day bars; no grab cursor, they don't move.
    Your own events: green bars, or (with a time) a chip in Month and a solid mark in Week/Day.
-   Moments (moon, seasons): a plain chip in Month; in Week/Day a dashed mark at their time. */
+   Moments (moon, seasons, clock changes): a plain chip in Month; in Week/Day a dashed mark at their time. */
 .fc .tw-layer-holidays, .fc .tw-layer-holidays .fc-event-main {
     background: var(--tw-holiday-bg); border-color: var(--tw-holiday-border); color: var(--tw-holiday-text);
 }

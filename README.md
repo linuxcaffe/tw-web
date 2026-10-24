@@ -278,13 +278,15 @@ uda.priority.values=1,2,3,4,5,6,H,M,L
 | List | `/` | Filterable task list; card or list layout |
 | Kanban | `/kanban.html` | Tasks as cards in `state` UDA columns |
 | Agenda | `/agenda.html` | Scheduled and due tasks in chronological order; holidays on the date lines, with a line of their own up to 30 days ahead (Settings) |
-| Calendar | `/calendar-planner.html` | Day/week/month views; drag tasks onto dates and times; a cyan stripe in the time column marks sunrise to sunset; holidays as amber all-day bars, your own events (tw-events) in green, the moon's phases and the seasons as a mark at their time |
+| Calendar | `/calendar-planner.html` | Day/week/month views; drag tasks onto dates and times; a cyan stripe in the time column marks sunrise to sunset; holidays as amber all-day bars, your own events (tw-events) in green, the moon's phases, the seasons and the clock changes as a mark at their time |
 
 ### Holidays
 
 The Calendar and the Agenda show the holidays your taskrc defines (`holiday.<name>.name` with `.date`, or `.start`/`.end`), the same ones `task calendar` shows. tw-web reads them with `task _show` and never fetches them itself. [tw-events](https://github.com/linuxcaffe/tw-events) writes them from holidata.net for your locale and region (`tw -I events`, then `events init --locale en-CA --regions ON`). They can't be moved or opened, aren't counted, and ignore the nav filter. Settings → Calendar → Holidays turns them off and sets how far ahead the Agenda gives a holiday with no tasks its own line.
 
 tw-events can also compute the moon's phases and the solstices and equinoxes (`events init --moon yes --seasons yes`), as holiday entries with their moment (`.kind`, `.at`). tw-web draws each as a dashed mark at its time in Week and Day views (its icon at the right; hover for the name and time), an icon in Month, and on the date line of the day in the Agenda (never a line of its own). Settings → Calendar → Moon & seasons.
+
+The days the clocks change (tw-events 0.4.0+, `events init --clock yes`: "Clocks forward (EDT)", "Clocks back (EST)", from the machine's own time zone) are drawn the same way, with 🕐. Settings → Calendar → Moon & seasons → clock changes.
 
 Your own events come from tw-events too (0.3.0+): the lines of `~/.task/config/my-events.txt` (`2026-10-29 14:30  Dentist`, `--04-12  Anne's birthday`) and the ghosts of tasks made with `events add <id>`, which stay on the calendar after the task is done or deleted. An all-day one is a green bar; a timed one is a solid green mark at its time in Week and Day with 📌, a chip in Month. In the Agenda they follow the date and, like holidays, give a day a line of its own. tw-web never edits them: change the file, or delete the ghost's lines. Settings → Calendar → My events.
 

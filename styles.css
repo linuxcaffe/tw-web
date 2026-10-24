@@ -1243,7 +1243,7 @@ a.ann-link:hover { text-decoration: underline; }
     font-style: italic;
     color: var(--tw-holiday-text);
 }
-.agenda-layer-moon, .agenda-layer-seasons { color: var(--tw-sky-text); font-style: normal; }
+.agenda-layer-moon, .agenda-layer-seasons, .agenda-layer-clock { color: var(--tw-sky-text); font-style: normal; }
 .agenda-layer-mine { color: var(--tw-mine-text); font-style: normal; }
 .agenda-date-header.today .agenda-layer { color: inherit; }
 .agenda-nothing {
