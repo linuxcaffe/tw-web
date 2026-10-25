@@ -39,7 +39,7 @@ Doc changes owed or made are tracked in `tw:docs/tw-web-doc-updates.md`: add a l
 | `kanban.js`, `agenda.js`, `calendar-planner.js` | | The other three views, each with its own `.html` page |
 | `sun.js` | 40 | `TW.sun`: sunrise, sunset and civil twilight for a date and place (the Calendar's cyan daylight stripe, `cal_daylight`/`cal_latitude`/`cal_longitude`). Pure, unit-tested in Node (`tests/js/sun.test.cjs`) |
 | `tw-layers.js` | 115 | `TW.layers`: things that aren't tasks, for the Calendar (`layerEventSource`, `paintLayerMarks`) and the Agenda (`agendaLayerDays`): never editable, never counted, untouched by the nav filter. Five layers from the taskrc's `holiday.*` entries (`/api/holidays`, written by tw-events), split by `.kind`: holidays (all-day; `cal_holidays`, `agenda_holiday_days`), your own events (`mine`: tw-events' `my-events.txt` and ghosts of tasks; all-day or a moment, Agenda lines of their own; `cal_mine`), the moon's phases, the seasons and the clock changes (moments, `.at`: a mark at their time in Week/Day; `cal_moon`, `cal_seasons`, `cal_clock`). Helpers pure, unit-tested in Node (`tests/js/tw-layers.test.cjs`). Plan: `tw:docs/tw-holidays-and-layers-plan.md` |
-| `sw.js` | 50 | Service worker shell cache (`CACHE = 'tw-web-vN'`) |
+| `sw.js` | 60 | Service worker: shell assets **network first**, its cache (`CACHE = 'tw-web-vN'`) only when the server doesn't answer (cache-first ran a stale mix of files after a day of updates) |
 | `tw-web-launch.sh` | | How the user runs it: Flask + Epiphany PWA; `--clean` wipes SW caches and restarts |
 | `tw-web-native-host.py` | | Firefox native-messaging host (start/stop/status) for `firefox/` |
 | `tests/` | | pytest suite (see Testing) |

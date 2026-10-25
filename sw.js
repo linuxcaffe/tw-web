@@ -1,7 +1,7 @@
-// tw-web service worker — minimal shell cache for PWA installability
+// tw-web service worker — shell cache for PWA installability and for when the server is down
 // API calls always go to network; only app shell assets are cached.
 
-const CACHE = 'tw-web-v222';
+const CACHE = 'tw-web-v223';
 const SHELL = [
     '/', '/index.html', '/styles.css',
     '/nav.js', '/tw-api.js', '/tw-filter.js', '/main.js', '/task-card.js', '/task-editor.js', '/task-editor-templates.html',
@@ -37,11 +37,22 @@ self.addEventListener('fetch', e => {
     // clients.claim() has been removed so there is no SW-activation race
     // that would invalidate in-flight responses.
     if (e.request.url.includes('/api/')) return;
+    if (e.request.method !== 'GET' || new URL(e.request.url).origin !== self.location.origin) return;
 
-    // App shell: cache-first, network fallback
+    // App shell: network first, the cache only when the server doesn't answer. Cache-first ran a
+    // stale mix of old and new files after a day of updates, until tw-web-launch.sh --clean
+    // (2026-10-24). The server is local or on Tailscale, so asking it first costs nothing; each
+    // good answer refreshes the cache for the next time it's down.
     e.respondWith(
-        caches.match(e.request)
-            .then(cached => cached || fetch(e.request))
-            .catch(() => fetch(e.request))
+        fetch(e.request)
+            .then(res => {
+                if (res.ok) {
+                    const copy = res.clone();
+                    e.waitUntil(caches.open(CACHE).then(c => c.put(e.request, copy)));
+                }
+                return res;
+            })
+            .catch(() => caches.match(e.request, { ignoreSearch: true })
+                .then(cached => cached || Promise.reject(new Error('offline, and not cached'))))
     );
 });
