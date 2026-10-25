@@ -46,6 +46,10 @@ function calPriClass(pri) {
     return '';
 }
 
+// A reload opens Week and Day at their start hour (scrollToHour), not where the browser would put
+// the page back (user 2026-10-24)
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
 // ── DOMContentLoaded ──────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
     const _step = (name, fn) => { try { fn(); } catch(e) { console.error(`Calendar: ${name} failed`, e); throw e; } };
@@ -190,7 +194,7 @@ function initializeCalendar() {
         fitCalHeight();
         // Double RAF: let FC finish its setOption re-render before scrolling
         requestAnimationFrame(() => {
-            calendar.scrollToTime(zoomOptions(_zoomStep(_fcToZoomView(calendar.view.type))).scrollTime);
+            scrollToHour(zoomOptions(_zoomStep(_fcToZoomView(calendar.view.type))).scrollTime);
         });
     });
     window.addEventListener('resize', fitCalHeight);
@@ -508,8 +512,27 @@ function applyZoom(view) {
     calendar.setOption('snapDuration', opts.snapDuration);
     // FullCalendar keeps the label cells a new row size shares (07:00 at 30 and at 60 min), so no
     // mount event fires: check the daylight stripe once it has redrawn
-    requestAnimationFrame(() => { calendar.scrollToTime(opts.scrollTime); paintDaylight(); });
+    requestAnimationFrame(() => { scrollToHour(opts.scrollTime); paintDaylight(); });
     zoomTitle(view);
+}
+
+// Put a time at the top of the grid. FullCalendar's scrollToTime scrolls its own scroller; on a
+// narrow screen the height is auto and the page scrolls instead, so there it did nothing and Week
+// and Day always opened at midnight (user 2026-10-24). Then the page scrolls that row to just
+// under the sticky day names. Prev, Next and a swipe don't come here: they keep where you were.
+function scrollToHour(time) {
+    calendar.scrollToTime(time);
+    const scroller = document.querySelector('#calendar .fc-timegrid-body')?.closest('.fc-scroller');
+    if (!scroller || scroller.scrollHeight > scroller.clientHeight) return;
+    const lanes = [...document.querySelectorAll('#calendar .fc-timegrid-slot-lane')];
+    const lane  = lanes.filter(l => l.dataset.time <= time).pop() || lanes[0];
+    const head  = document.querySelector('#calendar .fc-col-header');
+    if (!lane || !head) return;
+    for (let i = 0; i < 3; i++) {   // the day names stick only once the page has scrolled: measure again
+        const off = lane.getBoundingClientRect().top - head.getBoundingClientRect().bottom;
+        if (Math.abs(off) < 1) break;
+        window.scrollBy(0, off);
+    }
 }
 
 // The view button's tooltip names its current step

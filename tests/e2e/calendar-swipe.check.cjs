@@ -23,7 +23,7 @@ check(async pg => {
         await p.evaluate(v => calendar.changeView(v), view);
         await sleep(400);
         const box = await p.$eval('.fc-view-harness', e => { const r = e.getBoundingClientRect();
-            return { x: r.left + r.width / 2, y: Math.min(r.top + 200, innerHeight - 100) }; });
+            return { x: r.left + r.width / 2, y: innerHeight / 2 }; });   // Week and Day open scrolled down
         const s0 = await start();
         await swipe(box.x + 100, box.y, -200, 10);
         const s1 = await start();

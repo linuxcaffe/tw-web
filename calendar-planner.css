@@ -144,6 +144,9 @@ body.cal-page .app-container {
 
 #calendar {
     width: 100%;
+    /* a swipe slides the grid sideways (setupTouch): clip it, or the page's scroll jumped when it
+       slid in from the right. clip, not hidden: hidden would make a scroller and unstick the day names */
+    overflow-x: clip;
 }
 
 /* ── Tasks column (right, fixed width — never shrinks, never clips) ── */
