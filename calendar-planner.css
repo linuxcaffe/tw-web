@@ -28,8 +28,9 @@ body {
     overflow-x: hidden;
 }
 
-/* nav.js inserts #tw-nav-bar (50px) + #tw-btn-bar (50px) before .app-container.
-   body as flex column keeps total height = 100vh. */
+/* nav.js inserts #tw-nav-bar and #tw-btn-bar (50px each above BP.bars, taller where they wrap) before
+   .app-container; body as a flex column keeps the total at 100vh. On a phone (BP.phone) the page scrolls
+   instead: see the max-width 768px block below. */
 body.cal-page {
     display: flex;
     flex-direction: column;

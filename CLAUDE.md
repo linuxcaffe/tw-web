@@ -30,7 +30,7 @@ Doc changes owed or made are tracked in `tw:docs/tw-web-doc-updates.md`: add a l
 | File | Lines | Role |
 |---|---|---|
 | `app.py` | ~1900 | The whole server: guard, settings, `run_task_command`, every `/api/*` route, `/ws/pty`, SSE, static route |
-| `nav.js` | ~2350 | Shared chrome on every page: nav bar, filter/command bar, sidebars, Settings (Server: restart/stop), PTY console (`openPty(cmd, {kind})`, `offerTerminal`), hook prompts, the update pill under the menu logo (`_checkVersion`, `_applyUpdate`: `/api/version`, `/api/update`), and the server watch (`_initServerWatch`: `/api/ping` on load, every 30 s while visible and on `tw-server-check`; a banner while the server doesn't answer, with "Open Termux" on a phone) |
+| `nav.js` | ~2350 | Shared chrome on every page: the layout table `BP` and `--tw-nav-h` (see Layout), nav bar, filter/command bar, sidebars, Settings (Server: restart/stop), PTY console (`openPty(cmd, {kind})`, `offerTerminal`), hook prompts, the update pill under the menu logo (`_checkVersion`, `_applyUpdate`: `/api/version`, `/api/update`), and the server watch (`_initServerWatch`: `/api/ping` on load, every 30 s while visible and on `tw-server-check`; a banner while the server doesn't answer, with "Open Termux" on a phone) |
 | `tw-api.js` | 129 | `TW.store` (the shared task cache), `TW.api.write` (every task write goes through it, so every write empties the cache), `TW.api.handleWriteResult` (hook signals: PTY, deferred offer, timeout) `TW.api.networkError` (a fetch that threw: "tw-web server isn't answering" when no one answered, and asks nav.js to check) and `TW.commands` (command mode's command words, from `/api/commands`) |
 | `tw-filter.js` | 246 | `TW.filter` (the nav bar's filter, priority, project and tags inputs, with modifiers: one set of rules for every view; virtual tags like `+OVERDUE` match the UUIDs `task` gives `/api/vtags`, fetched by nav.js `_syncVtags` and cached in `TW.store`), `TW.sort` (`PRI_ORDER` 1–6 H M L, the List's sort) and `TW.recur` (template or instance, for the ring round the priority dot; a template's offsets as dates and back). Pure functions, unit-tested in Node (`tests/js/`) |
 | `main.js` | ~410 | List view (`TaskWarriorUI`) |
@@ -74,10 +74,11 @@ python3 -m pytest -q tests/                 # ~1 s; never touches ~/.task
 taskutil web probe --port 5000              # live attack-surface check (~/dev/tw-taskutil)
 python3 .tools/check-guards.py              # every identifier in .guards still exists
 python3 .tools/check-refs.py                # each page's scripts define what they use, in order
+python3 .tools/check-breakpoints.py         # every layout width comes from nav.js's BP table
 python3 tests/e2e/run.py [name…]            # headless page checks, scratch server only (~2 min)
 ```
 
-The pre-commit hook (`.tools/pre-commit`) runs all three local checks and blocks a red commit; bypass a
+The pre-commit hook (`.tools/pre-commit`) runs the local checks and blocks a red commit; bypass a
 deliberate work-in-progress commit with `--no-verify`. Install it once per clone:
 `ln -sf ../../.tools/pre-commit .git/hooks/pre-commit` (worktrees share it).
 
@@ -108,6 +109,42 @@ deliberate work-in-progress commit with `--no-verify`. Install it once per clone
 - **Stopping processes:** never `pkill`/`pgrep` a bare `"python3 app.py"`. nb-web runs one too, and the
   pattern also matches your own shell's command line. Use the anchored pattern
   `pgrep -f '^(/usr/bin/)?python3 app\.py$'` and kill only PIDs whose `/proc/<pid>/cwd` is your folder.
+
+## Layout
+
+One layout per width, the same for a mouse or a finger: the user tests the phone layout by narrowing the
+laptop window, and `d225a36` (a pointer-type split) was reverted for it (`b088013`). Plan and history:
+`tw:docs/tw-web-layout-plan.md`.
+
+- **Breakpoints** (max-width, CSS px) are `BP` at the top of `nav.js`, the one table. `@media` can't read a
+  variable, so each query repeats its number with a `/* bp: <name> */` tag; `check-breakpoints.py` (pre-commit)
+  fails an untagged or mismatched one, and any JS that tests a width with a number. JS uses `twNav.narrow`
+  (`bars`), `twNav.phone` (`phone`) or `twNav.bp`.
+
+  | Name | px | What changes |
+  |---|---|---|
+  | `calTasks` | 1024 | Calendar: the Unscheduled column hides |
+  | `bars` | 860 | nav and button bars wrap, the brand reads "Task", short month names; List/Agenda Tags sidebar hides |
+  | `projects` | 800 | List/Agenda Projects sidebar hides |
+  | `phone` | 768 | the phone layout: the Calendar's page scroll and sticky rows; smaller fonts, stacked forms |
+  | `compact` | 600 | Calendar card chrome flattened, day icons shrink |
+  | `tiny` | 480 | smallest event font, full-width buttons |
+
+  The **working minimum** is 358 CSS px (the status pill row at 133%, the user's call): below it nothing has to fit.
+- **Scroll models**, one per page and width; they're right, keep them:
+
+  | Page | Wide | Phone (≤ `phone`) |
+  |---|---|---|
+  | List, Agenda | page scroll; sticky nav bar and sidebars | page scroll; sticky nav bar; sidebars hidden |
+  | Kanban | `body` 100vh; the columns scroll | the same |
+  | Calendar | `body` 100vh; FullCalendar's own scroller | page scroll; nav bar, date row and day names stick (Month: day names only) |
+
+- **Only `#tw-nav-bar` sticks**; the button bar scrolls away. Anything that sticks below the nav bar uses
+  `--tw-nav-h`, which `nav.js` measures on every page (fallback `50px`); the Calendar adds `--cal-bar-h`. Never
+  guess a bar's height.
+- **Layout shots** (`tests/e2e/layout-shots-100`/`-133`): six views at four widths and two zooms, top and after the
+  wheel. A change that should leave the layout alone compares 96/96 before and after (`.tools/compare-shots.sh`;
+  verify skill). An Epiphany-only glitch: rule out its state first (`tw-web-launch.sh --clean`, the PWA's zoom).
 
 ## Critical invariants
 
