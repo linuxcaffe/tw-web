@@ -151,8 +151,8 @@ body {
     background: var(--bg2);
     border-right: 1px solid var(--border);
     position: sticky;
-    top: calc(var(--tw-nav-h, 50px) + var(--tw-btn-h, 50px));   /* below the nav and button bars (nav.js measures them) */
-    max-height: calc(100vh - var(--tw-nav-h, 50px) - var(--tw-btn-h, 50px));
+    top: var(--tw-nav-h, 50px);   /* right under the sticky nav bar (nav.js measures it); the button bar scrolls away */
+    max-height: calc(100vh - var(--tw-nav-h, 50px));
     overflow-y: auto;
     padding-bottom: 16px;
 }

@@ -55,7 +55,6 @@ nav.js:stateToParams
 nav.js:initProjectsSidebar
 nav.js:initTagsSidebar
 nav.js:--tw-nav-h
-nav.js:--tw-btn-h
 nav.js:offerTerminal
 
 # ── Classes and methods the four views share ─────────────────────────────────
