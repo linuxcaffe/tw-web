@@ -402,8 +402,12 @@ function setupEventListeners() {
 // or a scroll, as always. While FullCalendar's drag runs, the page is held still here too (see move).
 // A decided sideways swipe goes to the next or previous range: the grid follows the finger, slides
 // out, and the new range slides in from the other side. A drag, a resize or a selection never swipes.
+// A pinch in Week or Day steps through the view's zoom steps, by row size: one step for every
+// PINCH_STEP the fingers spread or close, the time between them staying put (user 2026-10-24).
+// The grid's touch-action (calendar-planner.css) keeps the browser's page zoom off it.
 const LONG_PRESS = 350, GRAB_SLOP = 10;
 const SWIPE_MIN = 60, SWIPE_WIDTH = 0.25, SWIPE_MS = 600;   // px, of the width, ms (any time past half the width)
+const PINCH_STEP = 1.4;   // the fingers' distance grows or shrinks by this much for a step
 let _fcDragging = false;   // eventDragStart/Stop, eventResizeStart/Stop
 let _sliding    = false;   // a slide is running: touches wait for it
 
@@ -412,6 +416,9 @@ function setupTouch() {
     const harness = () => el.querySelector('.fc-view-harness');
     const still = matchMedia('(prefers-reduced-motion: reduce)');
     let t = null;   // this touch: where and when it started, free (past the hold rule), axis 'x' | 'y'
+    let pinch = null;   // two fingers in Week or Day: their distance at the last step
+    const apart = e => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    const midY  = e => (e.touches[0].clientY + e.touches[1].clientY) / 2;
 
     function slide(h, to, ms, then) {
         h.style.transition = still.matches || !ms ? 'none' : `transform ${ms}ms ease-out`;
@@ -439,8 +446,15 @@ function setupTouch() {
     // out of the page; then they never bubble up, and FullCalendar's page-wide scroll blocker (on
     // window) misses them while its drag goes on: the page scrolled with the task. So listen there,
     // as FullCalendar does, and hold the page still while one of its drags runs.
+    function pinchMove(e) {
+        if (e.cancelable) e.preventDefault();
+        const d = apart(e), r = d / pinch.d;
+        if (r < PINCH_STEP && r > 1 / PINCH_STEP) return;
+        if (zoomStepBy(r > 1 ? -1 : 1, midY(e))) pinch.d = d;
+    }
     function move(e) {
         if (_fcDragging) { if (e.cancelable) e.preventDefault(); return; }
+        if (pinch) { if (e.touches.length === 2) pinchMove(e); return; }
         if (!t) return;
         if (e.touches.length !== 1) { t = null; back(); return; }
         const p = e.touches[0], dx = p.clientX - t.x, dy = p.clientY - t.y;
@@ -461,6 +475,7 @@ function setupTouch() {
     function end(e) {
         for (const [type, fn] of [['touchmove', move], ['touchend', end], ['touchcancel', end]])
             e.target.removeEventListener(type, fn);
+        if (pinch) { if (e.touches.length < 2) pinch = null; return; }
         if (!t || t.axis !== 'x') { t = null; if (e.type === 'touchcancel') back(); return; }
         const p = e.changedTouches[0], dx = p.clientX - t.x, dy = p.clientY - t.y, w = el.clientWidth;
         const far = Math.abs(dx) >= Math.max(SWIPE_MIN, w * SWIPE_WIDTH) && Math.abs(dx) > 2 * Math.abs(dy);
@@ -471,7 +486,11 @@ function setupTouch() {
     el.addEventListener('touchstart', e => {
         const p = e.touches[0];
         t = e.touches.length === 1 && !_sliding ? { x: p.clientX, y: p.clientY, at: e.timeStamp, free: false, axis: null } : null;
-        if (e.touches.length !== 1) return;
+        if (e.touches.length === 2 && !_fcDragging && calendar.view.type.startsWith('timeGrid')) {
+            pinch = { d: apart(e) };
+            back();
+            window.dispatchEvent(new Event('scroll'));   // FullCalendar's press timer then starts no drag (see move)
+        }
         e.target.addEventListener('touchmove', move, { passive: false });
         e.target.addEventListener('touchend', end);
         e.target.addEventListener('touchcancel', end);
@@ -508,14 +527,58 @@ function zoomOptions([slot, start]) {
     return { slotDuration: slot, snapDuration: slot < '00:15:00' ? slot : '00:15:00', scrollTime: start };
 }
 
-function applyZoom(view) {
+// anchorY: a pinch's centre (a window y). The time there stays there; otherwise the step's start
+// hour goes to the top.
+function applyZoom(view, anchorY) {
     const opts = zoomOptions(_zoomStep(view));
+    const at   = anchorY == null ? null : _timeAtY(anchorY);
     calendar.setOption('slotDuration', opts.slotDuration);
     calendar.setOption('snapDuration', opts.snapDuration);
     // FullCalendar keeps the label cells a new row size shares (07:00 at 30 and at 60 min), so no
     // mount event fires: check the daylight stripe once it has redrawn
-    requestAnimationFrame(() => { scrollToHour(opts.scrollTime); paintDaylight(); });
+    requestAnimationFrame(() => {
+        if (at == null) scrollToHour(opts.scrollTime);
+        else _scrollGridBy(_yOfTime(at) - anchorY);
+        paintDaylight();
+    });
     zoomTitle(view);
+}
+
+// A pinch: the next finer (dir -1) or coarser (1) step of the current view by row size, whatever
+// their order in Settings. False at the end of the range.
+function zoomStepBy(dir, anchorY) {
+    const view = _fcToZoomView(calendar.view.type);
+    if (!view) return false;
+    _zoomStep(view);   // makes sure _zoomAt has the view
+    const steps = _zoomConf(view).steps;
+    const order = steps.map((_, i) => i).sort((a, b) => steps[a][0].localeCompare(steps[b][0]) || a - b);
+    const next  = order[order.indexOf(_zoomAt[view]) + dir];
+    if (next === undefined) return false;
+    _zoomAt[view] = next;
+    applyZoom(view, anchorY);
+    return true;
+}
+
+// The grid's slot rows as spans of minutes, for a time at a window y and back
+function _slotSpans() {
+    const lanes = [...document.querySelectorAll('#calendar .fc-timegrid-slot-lane')];
+    const mins  = l => { const [h, m] = l.dataset.time.split(':').map(Number); return h * 60 + m; };
+    return lanes.map((l, i) => ({ r: l.getBoundingClientRect(), from: mins(l), to: i + 1 < lanes.length ? mins(lanes[i + 1]) : 1440 }));
+}
+function _timeAtY(y) {
+    for (const s of _slotSpans()) if (y < s.r.bottom) return s.from + Math.max(0, y - s.r.top) / s.r.height * (s.to - s.from);
+    return 1440;
+}
+function _yOfTime(m) {
+    const spans = _slotSpans();
+    for (const s of spans) if (m < s.to) return s.r.top + (m - s.from) / (s.to - s.from) * s.r.height;
+    return spans.length ? spans[spans.length - 1].r.bottom : 0;
+}
+// The grid scrolls inside FullCalendar's scroller, or with the page on a narrow screen
+function _scrollGridBy(dy) {
+    const sc = document.querySelector('#calendar .fc-timegrid-body')?.closest('.fc-scroller');
+    if (sc && sc.scrollHeight > sc.clientHeight) sc.scrollTop += dy;
+    else window.scrollBy(0, dy);
 }
 
 // Put a time at the top of the grid. FullCalendar's scrollToTime scrolls its own scroller; on a

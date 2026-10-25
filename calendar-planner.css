@@ -148,6 +148,9 @@ body.cal-page .app-container {
        slid in from the right. clip, not hidden: hidden would make a scroller and unstick the day names */
     overflow-x: clip;
 }
+/* a pinch over Week's and Day's grid steps their zoom (setupTouch), not the browser's page zoom */
+#calendar[data-view="week"] .fc-view-harness,
+#calendar[data-view="day"]  .fc-view-harness { touch-action: pan-y; }
 
 /* ── Tasks column (right, fixed width — never shrinks, never clips) ── */
 .tasks-column {
