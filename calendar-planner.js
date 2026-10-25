@@ -201,6 +201,9 @@ function initializeCalendar() {
     if (col) new ResizeObserver(fitCalHeight).observe(col);
 }
 
+// The phone layout: the page scrolls, not the calendar (calendar-planner.css, the same query)
+const PAGE_SCROLL = matchMedia('(max-width: 768px) and (pointer: coarse)');
+
 function fitCalHeight() {
     if (!calendar) return;
     // narrow screens: the sticky date row sits below the nav bar, the day names below both (calendar-planner.css)
@@ -208,7 +211,7 @@ function fitCalHeight() {
     if (nav) document.documentElement.style.setProperty('--tw-nav-h', nav.offsetHeight + 'px');
     const bar = document.querySelector('.cal-topbar');   // the date row, sticky on narrow screens too
     if (bar) document.documentElement.style.setProperty('--cal-bar-h', bar.offsetHeight + 'px');
-    if (window.innerWidth <= 768) {
+    if (PAGE_SCROLL.matches) {
         calendar.setOption('height', 'auto');
         return;
     }

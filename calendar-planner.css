@@ -459,7 +459,10 @@ body.cal-page .app-container {
 
 /* ── Mobile vertical scroll: cal-topbar scrolls away, calendar expands ── */
 /* Only touches height/overflow — does NOT change the width flex layout     */
-@media (max-width: 768px) {
+/* Narrow AND a finger: a narrow window with a mouse keeps the desktop layout, where the calendar
+   scrolls in its own box. There the wheel scrolled the page and WebKit misplaced the sticky bars
+   (user 2026-10-24, Epiphany at about half width). calendar-planner.js: PAGE_SCROLL. */
+@media (max-width: 768px) and (pointer: coarse) {
     /* The page scrolls here (height auto): in Week and Day the date row sticks below the sticky nav
        bar and the day names below it, so the title stays in sight after a swipe (user 2026-10-24); the all-day row
        scrolls away. calendar-planner.js keeps both heights in --tw-nav-h and --cal-bar-h. */

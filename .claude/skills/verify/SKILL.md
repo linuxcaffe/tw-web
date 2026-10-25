@@ -97,9 +97,16 @@ drop `tests/e2e/zz-<name>.check.cjs` (`fs.writeFileSync` to the scratchpad, or
 `pg.screenshot({ path })`), run `python3 tests/e2e/run.py zz-<name>`, read the file, delete the
 check. A probe that found a real bug becomes a proper check instead (red first).
 
-**Browser engine:** the harness has Playwright's Chromium only, but the user's PWA runs in Epiphany
-(WebKit). A layout bug that won't reproduce here may be WebKit's (known bug 15, sticky headers);
-`npx playwright install webkit` (~100 MB, `~/.cache/ms-playwright`) is the next step, not yet done.
+**Browser engine:** the user's PWA runs in Epiphany (WebKitGTK). Playwright's WebKit is installed
+(`~/.cache/ms-playwright/webkit-2311`, from `~/dev/nb-web-tests/e2e`). It needs `libavif13`, which
+isn't on yoga: `apt-get download libavif13 libgav1-0 libyuv0`, `dpkg -x` them, and the three `.so`
+files were copied into the bundle's `minibrowser-wpe/lib` and `minibrowser-gtk/lib` (no sudo). A probe
+launches it itself: `require('<nb-web-tests>/e2e/node_modules/playwright').webkit.launch()`, run with
+`PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1`. It is headless WPE, not real GTK scrolling: the wheel
+chatter of 2026-10-24 didn't reproduce in it; the user's screen recording (`ffmpeg -vf fps=4` frames)
+showed it. GNOME records with Ctrl+Alt+Shift+R.
+- **The phone layout is `(max-width: 768px) and (pointer: coarse)`**: a check of it needs a touch
+  context (`isMobile`, `hasTouch`); a narrow viewport alone is the desktop layout.
 
 ## Traps (each one happened)
 
