@@ -1,5 +1,5 @@
 // Mobile tweaks (user, 2026-10-17): at the width where the brand shortens to "Task" (nav.js
-// BREAK, 860 px), the Calendar's Day and Week titles drop the year, so both arrows fit. Each
+// BP.bars, 860 px), the Calendar's Day and Week titles drop the year, so both arrows fit. Each
 // view's browser tab names the view: List, Kanban, Agenda, Calendar. Month names are in full on a wide
 // screen and short on a narrow one, in every view (user, 2026-10-25).
 const { check, expect, B, sleep } = require('./lib.cjs');

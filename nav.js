@@ -18,7 +18,18 @@
     'use strict';
 
     // ── Config ────────────────────────────────────────────────────────────────
-    const BREAK    = 860;            // px — stack bars AND shorten brand name
+    // Layout breakpoints (max-width, CSS px): the one table (tw:docs/tw-web-layout-plan.md). @media can't read a
+    // variable, so the stylesheets repeat the numbers, each query tagged /* bp: <name> */, and
+    // .tools/check-breakpoints.py holds every width to this table. JS tests twNav.narrow / twNav.phone.
+    // The phone layout is width alone, never pointer type (b088013); 358 CSS px is the working minimum.
+    const BP = {
+        calTasks: 1024,   // Calendar: the Unscheduled column hides
+        bars:      860,   // nav and button bars wrap, the brand reads "Task", short month names (twNav.narrow); List/Agenda tags sidebar hides
+        projects:  800,   // List/Agenda projects sidebar hides
+        phone:     768,   // the phone layout: the Calendar's page scroll and sticky rows (twNav.phone); smaller fonts, stacked forms
+        compact:   600,   // Calendar card chrome flattened, day icons shrink
+        tiny:      480,   // smallest event font, full-width buttons
+    };
     const DEBOUNCE = 400;            // ms — filter input debounce
 
     const STATE_KEY    = 'tw-nav-state';
@@ -233,8 +244,9 @@
     window.twNav = { getState, setState, stateToParams, setCount, setGrandTotal, getGrandTotal,
                      openSyncDialog, initProjectsSidebar, initTagsSidebar, showNotification, showOutput,
                      setRawFilter, clearRawFilter, openPty,
-                     // matches at BREAK, where the bars stack and the brand reads "Task"
-                     narrow: window.matchMedia(`(max-width: ${BREAK}px)`) };
+                     // BP.bars, where the bars stack and the brand reads "Task"; BP.phone, the phone layout
+                     narrow: window.matchMedia(`(max-width: ${BP.bars}px)`),
+                     phone:  window.matchMedia(`(max-width: ${BP.phone}px)`), bp: BP };
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     function activePage() {
@@ -664,8 +676,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 }
 #tw-server-banner button:hover, #tw-server-banner a:hover { background: rgba(255,255,255,0.28); }
 
-/* responsive — stack both bars at BREAK */
-@media (max-width: ${BREAK}px) {
+/* responsive — stack both bars at BP.bars */
+@media (max-width: ${BP.bars}px) {
     #tw-nav-bar {
         height: auto; flex-wrap: wrap; padding: 5px 10px; gap: 4px;
     }
@@ -1095,7 +1107,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             document.body.insertBefore(el, document.body.firstChild));
 
         // The sticky nav bar's height, for what sticks below it (.list-sidebar, the Calendar's sticky rows):
-        // measured here on every page, not guessed; the pages' CSS falls back to the 50px it is above BREAK
+        // measured here on every page, not guessed; the pages' CSS falls back to the 50px it is above BP.bars
         new ResizeObserver(() =>
             document.documentElement.style.setProperty('--tw-nav-h', navBar.offsetHeight + 'px')
         ).observe(navBar);

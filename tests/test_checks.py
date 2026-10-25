@@ -1,4 +1,5 @@
-"""The static checks the pre-commit hook runs (.tools/check-refs.py, .tools/check-guards.py).
+"""The static checks the pre-commit hook runs (.tools/check-refs.py, .tools/check-guards.py,
+.tools/check-breakpoints.py).
 
 Each rule is shown failing on a small made-up page and, where possible, on a mutated copy
 of the real pages, so a check that silently stops checking shows up here.
@@ -21,6 +22,7 @@ def _load(name):
 
 refs = _load('check-refs')
 guards = _load('check-guards')
+bps = _load('check-breakpoints')
 
 
 def site(tmp_path, files):
@@ -189,3 +191,62 @@ def test_guard_deleting_the_request_guard_is_caught(tmp_path):
     (tmp_path / 'app.py').write_text(app)
     out = guards.check(tmp_path)
     assert len(out) == 1 and '_guard_request' in out[0]
+
+
+# ── check-breakpoints: every width from nav.js's BP table ─────────────────────
+NAV_BP = 'const BP = {\n    bars: 860,\n    phone: 768,\n};\n'
+
+
+def run_bps(repo, capsys):
+    code = bps.main(repo)
+    return code, capsys.readouterr().out
+
+
+def test_breakpoints_real_files_are_clean(capsys):
+    assert run_bps(REPO, capsys) == (0, '')
+
+
+def test_breakpoints_tagged_query_ok(tmp_path, capsys):
+    site(tmp_path, {'nav.js': NAV_BP + 'const css = `@media (max-width: ${BP.bars}px) { x }`;\n',
+                    'a.css': '@media (max-width: 768px) {   /* bp: phone */\n}\n'})
+    assert run_bps(tmp_path, capsys) == (0, '')
+
+
+def test_breakpoints_untagged_wrong_and_unknown(tmp_path, capsys):
+    site(tmp_path, {'nav.js': NAV_BP + 'const css = `@media (max-width: ${BP.huge}px) { x }`;\n',
+                    'a.css': '@media (max-width: 700px) {\n}\n'
+                             '@media (max-width: 760px) { /* bp: phone */ }\n'
+                             '@media (min-width: 860px) { /* bp: wide */ }\n'})
+    code, out = run_bps(tmp_path, capsys)
+    assert code == 1
+    assert 'nav.js:5' in out and 'BP.huge' in out
+    assert 'a.css:1' in out and 'no /* bp' in out
+    assert 'a.css:3' in out and 'is 768px, the query says 760px' in out
+    assert 'a.css:4' in out and '"wide" is not in' in out
+
+
+def test_breakpoints_js_numbers(tmp_path, capsys):
+    site(tmp_path, {'nav.js': NAV_BP,
+                    'v.js': 'if (window.innerWidth <= 768) a();\n'
+                            'const m = matchMedia("(max-width: 600px)");\n'
+                            'const r = matchMedia("(prefers-reduced-motion: reduce)");\n'
+                            'if (twNav.phone.matches) b();\n'})
+    code, out = run_bps(tmp_path, capsys)
+    assert code == 1 and 'v.js:1' in out and 'v.js:2' in out and 'v.js:3' not in out and 'v.js:4' not in out
+
+
+def test_breakpoints_vendored_skipped_and_no_table(tmp_path, capsys):
+    site(tmp_path, {'nav.js': NAV_BP, 'fullcalendar.min.css': '@media (max-width: 123px) {}\n'})
+    assert run_bps(tmp_path, capsys) == (0, '')
+    site(tmp_path, {'nav.js': 'const BREAK = 860;\n'})
+    assert run_bps(tmp_path, capsys)[0] == 1
+
+
+def test_breakpoints_mutation_real_css_moves_a_width(tmp_path, capsys):
+    for f in list(REPO.glob('*.css')) + list(REPO.glob('*.js')) + list(REPO.glob('*.html')):
+        shutil.copy(f, tmp_path / f.name)
+    css = (tmp_path / 'calendar-planner.css').read_text()
+    assert css.count('@media (max-width: 1024px)') == 1
+    (tmp_path / 'calendar-planner.css').write_text(css.replace('@media (max-width: 1024px)', '@media (max-width: 1000px)'))
+    code, out = run_bps(tmp_path, capsys)
+    assert code == 1 and 'calTasks' in out

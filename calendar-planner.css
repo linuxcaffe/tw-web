@@ -364,8 +364,8 @@ body.cal-page .app-container {
 .fc-pri-dot.recur-template { outline-color: #8e44ad; }
 
 /* Narrow viewport: shrink font */
-@media (max-width: 768px) { .fc-ev-wrap { font-size: 0.70rem; } }
-@media (max-width: 480px) { .fc-ev-wrap { font-size: 0.64rem; } }
+@media (max-width: 768px) { .fc-ev-wrap { font-size: 0.70rem; } }   /* bp: phone */
+@media (max-width: 480px) { .fc-ev-wrap { font-size: 0.64rem; } }   /* bp: tiny */
 
 /* Month view event dots */
 .fc-daygrid-event .fc-ev-wrap { height: auto; align-items: center; }
@@ -452,14 +452,14 @@ body.cal-page .app-container {
 /* ===================================
    Responsive
    =================================== */
-@media (max-width: 1024px) {
+@media (max-width: 1024px) {   /* bp: calTasks */
     .tasks-column { display: none; }
     .calendar-column { flex: 1 1 100%; }
 }
 
 /* ── Mobile vertical scroll: cal-topbar scrolls away, calendar expands ── */
 /* Only touches height/overflow — does NOT change the width flex layout     */
-@media (max-width: 768px) {
+@media (max-width: 768px) {   /* bp: phone */
     /* The page scrolls here (height auto): in Week and Day the date row sticks below the sticky nav
        bar and the day names below it, so the title stays in sight after a swipe (user 2026-10-24); the all-day row
        scrolls away. calendar-planner.js keeps both heights in --tw-nav-h and --cal-bar-h. */
@@ -478,7 +478,7 @@ body.cal-page .app-container {
     #calendar { height: auto; }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 600px) {   /* bp: compact */
     /* Flatten card chrome — every pixel counts on mobile */
     .main-content {
         padding: 0;
@@ -619,6 +619,6 @@ body.cal-page .app-container {
     min-width: 0; flex-wrap: wrap; justify-content: flex-end;   /* a narrow cell wraps them, never spills */
 }
 .tw-day-icon { cursor: pointer; }
-@media (max-width: 600px) {
+@media (max-width: 600px) {   /* bp: compact */
     .fc .fc-daygrid-day-top .tw-day-icons { font-size: 0.6rem; gap: 0; margin-right: 0; }
 }

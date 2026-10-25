@@ -180,8 +180,8 @@ body {
 .list-sidebar .tw-panel-error { color: var(--red); padding: 10px 12px; font-size: 12px; }
 
 /* Responsive: tags hide first, then projects */
-@media (max-width: 860px)  { .list-tags-sidebar  { display: none; } }
-@media (max-width: 800px)  { .list-proj-sidebar  { display: none; } }
+@media (max-width: 860px)  { .list-tags-sidebar  { display: none; } }   /* bp: bars */
+@media (max-width: 800px)  { .list-proj-sidebar  { display: none; } }   /* bp: projects */
 
 /* List page header row */
 .list-header {
@@ -1175,7 +1175,7 @@ a.ann-link:hover { text-decoration: underline; }
 }
 
 /* Responsive Design */
-@media (max-width: 768px) {
+@media (max-width: 768px) {   /* bp: phone */
     .container {
         padding: 15px;
     }
@@ -1208,7 +1208,7 @@ a.ann-link:hover { text-decoration: underline; }
     }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 480px) {   /* bp: tiny */
     .btn {
         width: 100%;
         justify-content: center;

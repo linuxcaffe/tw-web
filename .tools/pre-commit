@@ -3,7 +3,8 @@
 #   ln -sf ../../.tools/pre-commit .git/hooks/pre-commit
 #
 # 1. Bump the service-worker cache when a shell asset is staged.
-# 2. Block the commit if a load-bearing identifier is gone (.guards), the pages' scripts
+# 2. Block the commit if a load-bearing identifier is gone (.guards), a layout width isn't from
+#    nav.js's BP table (check-breakpoints), the pages' scripts
 #    are mis-wired (check-refs), or the test suite is red (~1 s, never touches ~/.task).
 # Bypass for a deliberate work-in-progress commit: git commit --no-verify
 
@@ -33,6 +34,7 @@ done
 STATUS=0
 python3 .tools/check-guards.py || STATUS=1
 python3 .tools/check-refs.py >/dev/null || { python3 .tools/check-refs.py; STATUS=1; }
+python3 .tools/check-breakpoints.py || STATUS=1
 log=$(mktemp)
 python3 -m pytest -q -x tests/ >"$log" 2>&1 || { tail -20 "$log"; STATUS=1; }
 rm -f "$log"

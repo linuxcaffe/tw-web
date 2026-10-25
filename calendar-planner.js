@@ -207,7 +207,7 @@ function fitCalHeight() {
     // below both (calendar-planner.css)
     const bar = document.querySelector('.cal-topbar');   // the date row, sticky on narrow screens too
     if (bar) document.documentElement.style.setProperty('--cal-bar-h', bar.offsetHeight + 'px');
-    if (window.innerWidth <= 768) {
+    if (window.twNav?.phone?.matches) {
         calendar.setOption('height', 'auto');
         return;
     }
