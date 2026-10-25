@@ -106,6 +106,13 @@ launches it itself: `require('<nb-web-tests>/e2e/node_modules/playwright').webki
 drawn in stale places while the wheel scrolls (2026-10-24, Epiphany only, not Firefox) didn't show in
 it. The user's screen recordings did (GNOME: Ctrl+Alt+Shift+R; `ffmpeg -vf fps=4` for frames), and
 for Epiphany-only bugs the user tries a scratch server's URL in Epiphany itself.
+- **A change that should leave the layout alone: compare the layout shots.** `layout-shots-100` and
+  `-133` (shared `tests/e2e/layout.cjs`) shoot six views at four widths, top and after the wheel. Take
+  "before" from a detached worktree of main (`git worktree add --detach ../tw-web-base main`; copy the
+  branch's `layout.cjs` in if it changed) and "after" on the branch, in one session, then
+  `.tools/compare-shots.sh <before> <after>`; crop a differing pair side by side (PIL) to see it. A
+  run interrupted mid-way leaves its scratch server up: `.tools/scratch-server.sh down` in that worktree.
+  The working minimum is 358 CSS px (the status pill row at 133%, user's call).
 - **An Epiphany-only glitch: rule out its state first.** `tw-web-launch.sh --clean` (service-worker
   caches and processes) cured a "fully busted" List and Agenda on 2026-10-24 that no code had caused.
   The PWA keeps a zoom level per *host* (every localhost port): `sqlite3 "file:<profile>/ephy-history.db?mode=ro"
