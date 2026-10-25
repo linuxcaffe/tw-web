@@ -1094,6 +1094,15 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         [backdrop, sideMenu, cmdOutput, filterBar, btnBar, navBar].forEach(el =>
             document.body.insertBefore(el, document.body.firstChild));
 
+        // The bars' heights, for what sits below them (.list-sidebar, the Calendar's sticky rows): measured
+        // here on every page, not guessed; the pages' CSS falls back to the 50px each is above BREAK
+        const measureBars = new ResizeObserver(() => {
+            document.documentElement.style.setProperty('--tw-nav-h', navBar.offsetHeight + 'px');
+            document.documentElement.style.setProperty('--tw-btn-h', btnBar.offsetHeight + 'px');
+        });
+        measureBars.observe(navBar);
+        measureBars.observe(btnBar);
+
         // Sync dialog — appended to body, managed entirely by nav.js
         const syncDlg = document.createElement('div');
         syncDlg.id = 'tw-sync-dialog';

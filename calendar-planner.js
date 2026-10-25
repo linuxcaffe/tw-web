@@ -203,9 +203,8 @@ function initializeCalendar() {
 
 function fitCalHeight() {
     if (!calendar) return;
-    // narrow screens: the sticky date row sits below the nav bar, the day names below both (calendar-planner.css)
-    const nav = document.getElementById('tw-nav-bar');
-    if (nav) document.documentElement.style.setProperty('--tw-nav-h', nav.offsetHeight + 'px');
+    // narrow screens: the sticky date row sits below the nav bar (--tw-nav-h, from nav.js), the day names
+    // below both (calendar-planner.css)
     const bar = document.querySelector('.cal-topbar');   // the date row, sticky on narrow screens too
     if (bar) document.documentElement.style.setProperty('--cal-bar-h', bar.offsetHeight + 'px');
     if (window.innerWidth <= 768) {
