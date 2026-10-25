@@ -646,20 +646,24 @@ function showView(view) {
     );
 }
 
-// The title above the calendar. Narrow (twNav.narrow, where the brand reads "Task"), Day and
-// Week drop the year so both arrows fit: "October 17", "Oct 12 – 18".
+// The title above the calendar: month names in full, short where the brand reads "Task" (twNav.narrow,
+// user 2026-10-25), and there Day and Week drop the year so both arrows fit:
+// "October 17, 2026" → "Oct 17", "October 12 – 18, 2026" → "Oct 12 – 18", "October 2026" → "Oct 2026".
 function updateCalendarTitle() {
     const titleEl = document.getElementById('calendar-title');
     if (titleEl) {
-        const v = calendar.view;
+        const v      = calendar.view;
+        const narrow = !!window.twNav?.narrow?.matches;
+        const month  = narrow ? 'short' : 'long';
+        const year   = narrow ? {} : { year: 'numeric' };
         let text = v.title;
-        if (window.twNav?.narrow?.matches) {
-            if (v.type === 'timeGridDay') {
-                text = calendar.formatDate(v.currentStart, { month: 'long', day: 'numeric' });
-            } else if (v.type === 'timeGridWeek') {
-                const last = new Date(v.currentEnd.getTime() - 86400000);
-                text = calendar.formatRange(v.currentStart, last, { month: 'short', day: 'numeric' });
-            }
+        if (v.type === 'timeGridDay') {
+            text = calendar.formatDate(v.currentStart, { month, day: 'numeric', ...year });
+        } else if (v.type === 'timeGridWeek') {
+            const last = new Date(v.currentEnd.getTime() - 86400000);
+            text = calendar.formatRange(v.currentStart, last, { month, day: 'numeric', ...year, separator: ' \u2013 ' });
+        } else if (v.type === 'dayGridMonth') {
+            text = calendar.formatDate(v.currentStart, { month, year: 'numeric' });
         }
         titleEl.textContent = text;
     }
