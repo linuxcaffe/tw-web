@@ -102,11 +102,10 @@ check. A probe that found a real bug becomes a proper check instead (red first).
 isn't on yoga: `apt-get download libavif13 libgav1-0 libyuv0`, `dpkg -x` them, and the three `.so`
 files were copied into the bundle's `minibrowser-wpe/lib` and `minibrowser-gtk/lib` (no sudo). A probe
 launches it itself: `require('<nb-web-tests>/e2e/node_modules/playwright').webkit.launch()`, run with
-`PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1`. It is headless WPE, not real GTK scrolling: the wheel
-chatter of 2026-10-24 didn't reproduce in it; the user's screen recording (`ffmpeg -vf fps=4` frames)
-showed it. GNOME records with Ctrl+Alt+Shift+R.
-- **The phone layout is `(max-width: 768px) and (pointer: coarse)`**: a check of it needs a touch
-  context (`isMobile`, `hasTouch`); a narrow viewport alone is the desktop layout.
+`PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1`. It is headless WPE, not WebKitGTK: the sticky nav bar
+drawn in stale places while the wheel scrolls (2026-10-24, Epiphany only, not Firefox) didn't show in
+it. The user's screen recordings did (GNOME: Ctrl+Alt+Shift+R; `ffmpeg -vf fps=4` for frames), and
+for Epiphany-only bugs the user tries a scratch server's URL in Epiphany itself.
 
 ## Traps (each one happened)
 
