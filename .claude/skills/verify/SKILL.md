@@ -106,6 +106,15 @@ launches it itself: `require('<nb-web-tests>/e2e/node_modules/playwright').webki
 drawn in stale places while the wheel scrolls (2026-10-24, Epiphany only, not Firefox) didn't show in
 it. The user's screen recordings did (GNOME: Ctrl+Alt+Shift+R; `ffmpeg -vf fps=4` for frames), and
 for Epiphany-only bugs the user tries a scratch server's URL in Epiphany itself.
+- **An Epiphany-only glitch: rule out its state first.** `tw-web-launch.sh --clean` (service-worker
+  caches and processes) cured a "fully busted" List and Agenda on 2026-10-24 that no code had caused.
+  The PWA keeps a zoom level per *host* (every localhost port): `sqlite3 "file:<profile>/ephy-history.db?mode=ro"
+  "select url, zoom_level from hosts"`, profile `~/.local/share/org.gnome.Epiphany.WebApp-tw-web-*`; it read
+  1.33, and WebKitGTK draws sticky bars in stale places at such zooms. The user opens another port in
+  that profile with `epiphany --application-mode "--profile=<profile>" http://localhost:<port>/`.
+- **Bisect servers for code older than 73ff769** (2026-10-22) need a fake `HOME`: those versions
+  hard-code `~/.task` for git. `HOME=<tmp>/home` with `.task` linked to the scratch data, and
+  `PYTHONUSERBASE=~/.local` so Flask still imports.
 
 ## Traps (each one happened)
 
