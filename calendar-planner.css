@@ -464,8 +464,9 @@ body.cal-page .app-container {
     /* The page scrolls here (height auto): in Week and Day the date row sticks below the sticky nav
        bar and the day names below it, so the title stays in sight after a swipe (user 2026-10-24); the all-day row
        scrolls away. calendar-planner.js keeps both heights in --tw-nav-h and --cal-bar-h. */
-    body.cal-page .cal-topbar { position: sticky; top: var(--tw-nav-h, 0px); z-index: 20; }
+    body.cal-page .cal-topbar { position: sticky; top: var(--tw-nav-h, 0px); z-index: 20; will-change: transform; }
     .fc .fc-scrollgrid-section-header.fc-scrollgrid-section-sticky > * {
+        will-change: transform;   /* the sticky day names: their own layer, like the nav bar (WebKitGTK) */
         top: calc(var(--tw-nav-h, 0px) + var(--cal-bar-h, 0px));
     }
     /* Month doesn't open scrolled down: its date row scrolls away and its day names stick to the nav bar */

@@ -273,6 +273,7 @@
     display: flex; justify-content: space-between; align-items: center;
     height: 50px; padding: 0 14px 0 0; background: #1a1a1a;
     position: sticky; top: 0; z-index: 9999;
+    will-change: transform;   /* its own layer: WebKitGTK (Epiphany) flickered the sticky bar on scroll */
     box-shadow: 0 2px 6px rgba(0,0,0,0.4); gap: 8px; box-sizing: border-box;
 }
 #tw-btn-bar {

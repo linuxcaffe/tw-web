@@ -151,6 +151,7 @@ body {
     background: var(--bg2);
     border-right: 1px solid var(--border);
     position: sticky;
+    will-change: transform;   /* its own layer, like the nav bar (WebKitGTK) */
     top: var(--tw-nav-h, 50px);   /* right under the sticky nav bar (nav.js measures it); the button bar scrolls away */
     max-height: calc(100vh - var(--tw-nav-h, 50px));
     overflow-y: auto;
