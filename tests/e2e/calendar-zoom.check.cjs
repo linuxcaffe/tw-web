@@ -32,9 +32,11 @@ check(async pg => {
     await pg.setViewportSize({ width: 400, height: 800 });
     await sleep(800);
     await pg.evaluate(() => window.scrollTo(0, 600)); await sleep(400);
-    const r = await pg.evaluate(() => ({
+    const r = await pg.evaluate(() => ({   // Week: the date row sticks under the nav bar, the day names under it
         nav: document.getElementById('tw-nav-bar').getBoundingClientRect().bottom,
+        bar: document.querySelector('.cal-topbar').getBoundingClientRect(),
         head: document.querySelector('.fc-col-header').getBoundingClientRect().top,
     }));
-    expect(Math.abs(r.head - r.nav) <= 2, `narrow: day headers at ${r.head}, nav bar ends at ${r.nav}`);
+    expect(Math.abs(r.bar.top - r.nav) <= 2 && Math.abs(r.head - r.bar.bottom) <= 2,
+        `narrow: date row at ${r.bar.top}–${r.bar.bottom}, day headers at ${r.head}, nav bar ends at ${r.nav}`);
 });
