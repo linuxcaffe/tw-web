@@ -323,7 +323,9 @@ OVERDUE          # tags: a virtual tag (+DUE, +TODAY, -BLOCKED, …)
 < M              # priority lower than Medium (L)
 ```
 
-The Projects sidebar (left) and Tags sidebar (right) let you click to filter by project or tag. Tags in active mode show only the tags present in the currently visible task set, sorted by frequency.
+The Projects sidebar (left) and Tags sidebar (right) let you click to filter by project or tag. Tags in active mode show only the tags present in the currently visible task set, sorted by frequency. **No project** and **No tags** at the top of each list pick the tasks without one (`.none:`).
+
+**One filter, every view.** The filter bar, its modifiers, No project/No tags and the nav bar's context apply the same way in the List, Kanban (Unassigned column included) and Agenda. The Calendar is the one exception: its events follow only the status buttons, and its Unscheduled list follows the context and the filter. The CLI's own context (`task context …`) never applies; tw-web takes context only from the nav bar.
 
 **Virtual tags** are the upper-case tags Taskwarrior works out from other fields: `DUE`, `OVERDUE`, `TODAY`, `ACTIVE`, `BLOCKED`, `READY`, `WAITING` and the rest of the list in `man task`. Type one in the tags input, with `+`/`-` or `.has:`/`.hasnt:` like any tag, and mix them with real tags (`home OVERDUE`). Taskwarrior decides which tasks match (`task +OVERDUE _uuids`), so they mean exactly what they mean on the command line, `rc.due` and all. The Tags sidebar and panel list them in a third mode, **[active] [all] [virtual]**; hover one for its description. Upper case matters: `next` is a tag, `NEXT` is too (2.6.2 has no virtual `NEXT`), `DUE` is virtual.
 
