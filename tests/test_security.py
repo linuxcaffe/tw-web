@@ -137,7 +137,7 @@ def test_app_assets_served(client, path):
     '/config.py', '/package.json', '/package-lock.json', '/tw-web-launch.sh',
     '/tw-web-native-host.py', '/tw-web-native-host.json', '/requirements.txt',
     '/README.md', '/tests/conftest.py', '/firefox/manifest.json', '/docs/fix_port_5000_in_use.md',
-    '/rollup.cm.config.js', '/playwright.config.js', '/codemirror-entry.js',
+    '/rollup.cm.config.js', '/playwright.config.js', '/codemirror-entry.js', '/tw-web.install', '/tw-web.meta',
 ])
 def test_repo_internals_not_served(client, path):
     assert client.get(path, headers=LOCAL).status_code == 404

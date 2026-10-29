@@ -60,6 +60,15 @@ You can manage your entire task system from a phone, a tablet, or a browser tab 
 
 ### Linux
 
+**With [awesome-taskwarrior](https://github.com/linuxcaffe/awesome-taskwarrior)'s `tw`:** `tw -I tw-web` clones
+it from Codeberg (GitHub if Codeberg doesn't answer) into `~/.local/share/tw-web`, installs its Python packages
+(in a `.venv` where the system's Python is managed by its package manager) and adds tw-web to your app menu;
+then start it with `~/.local/share/tw-web/tw-web-launch.sh`. `tw -u tw-web` updates it (fast-forward, only on a
+clean `main`). A checkout of your own, named in `~/.task/local.rc` (`tw-web.dir = ~/dev/tw-web`), is used as it
+is and never updated or removed by tw. No Taskwarrior yet: `tw -I taskwarrior`.
+
+By hand:
+
 ```bash
 # 1. Clone the repo
 git clone https://github.com/linuxcaffe/tw-web.git
@@ -117,7 +126,7 @@ pkg install python git openssh
 pip install flask flask-cors flask-sock tabulate
 ```
 
-> **Taskwarrior version:** The Termux package manager provides TW3 (`pkg install taskwarrior`), which tw-web does not support. tw-web requires **Taskwarrior 2.6.x** — install it manually. A pre-built `aarch64` `.deb` for Termux is included in the [gittw repo](https://github.com/linuxcaffe/gittw).
+> **Taskwarrior version:** The Termux package manager provides TW3 (`pkg install taskwarrior`), which tw-web does not support. tw-web requires **Taskwarrior 2.6.x**: [taskwarrior-2.6](https://github.com/linuxcaffe/taskwarrior-2.6) installs it in one line (the `task2` deb for `aarch64`).
 
 #### Clone and start
 

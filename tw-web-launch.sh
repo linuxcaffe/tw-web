@@ -6,7 +6,11 @@
 #   tw-web-launch.sh --clean   wipe stale SW cache first, then launch
 #   tw-web-launch.sh --stop    stop the Flask server
 
-FLASK_DIR="$HOME/dev/tw-web"
+# The folder this script is in (a symlink to it works too): ~/dev/tw-web, or wherever tw -I tw-web put it
+FLASK_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+# tw-web's own venv when it has one (tw -I tw-web makes one where the system refuses pip)
+PYTHON="$FLASK_DIR/.venv/bin/python"
+[ -x "$PYTHON" ] || PYTHON=python3
 # Private runtime dir — same path app.py computes (security review S9)
 RUN_DIR="${XDG_RUNTIME_DIR:-$HOME/.cache}/tw-web"
 mkdir -p -m 700 "$RUN_DIR"
@@ -17,7 +21,7 @@ FLASK_PID_FILE="$RUN_DIR/tw-web.pid"
 # $FLASK_DIR — never every "python3 app.py" (nb-web runs one too).
 stop_tw_web_procs() {
     local found=1
-    for p in $(pgrep -f '^(/usr/bin/)?python3 app\.py$'); do
+    for p in $(pgrep -f '^([^ ]*/)?python3? app\.py$'); do
         if [ "$(readlink "/proc/$p/cwd")" = "$FLASK_DIR" ]; then
             kill "$p" 2>/dev/null && found=0
         fi
@@ -92,7 +96,7 @@ else
     echo "tw-web-launch: starting Flask server..."
     cd "$FLASK_DIR" || { echo "ERROR: $FLASK_DIR not found"; exit 1; }
     # localhost + Tailscale only (never 0.0.0.0): see tw:docs/tw-web-dev-infra-plan.md, S2
-    TW_WEB_TAILSCALE=1 python3 app.py > "$FLASK_LOG" 2>&1 &
+    TW_WEB_TAILSCALE=1 "$PYTHON" app.py > "$FLASK_LOG" 2>&1 &
     FLASK_PID=$!
     echo "$FLASK_PID" > "$FLASK_PID_FILE"
 
@@ -111,6 +115,11 @@ else
 fi
 
 # ── Launch Epiphany PWA (detaches; server keeps running) ─────────────────────
-epiphany-browser --application-mode \
-    "--profile=$EPIPHANY_PROFILE" \
-    "$FLASK_URL" &
+# Without that web app (a new machine), the default browser
+if command -v epiphany-browser >/dev/null && [ -d "$EPIPHANY_PROFILE" ]; then
+    epiphany-browser --application-mode \
+        "--profile=$EPIPHANY_PROFILE" \
+        "$FLASK_URL" &
+else
+    xdg-open "$FLASK_URL" >/dev/null 2>&1 &
+fi
