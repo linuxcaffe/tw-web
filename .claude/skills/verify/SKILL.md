@@ -140,6 +140,16 @@ for Epiphany-only bugs the user tries a scratch server's URL in Epiphany itself.
 - **The pre-commit hook bumps `sw.js`** and blocks on a failing guard, reference check or test. Don't
   bump `CACHE` by hand (CLAUDE.md invariant 11), and don't `--no-verify` past a check you haven't read.
 
+## The installer (`tw-web.install`, `tw -I tw-web`)
+
+Run it against a throwaway HOME, never this checkout: `HOME=$(mktemp -d) bash tw-web.install install`
+(clones Codeberg, else GitHub; ~20 s). Cases (2026-10-28): fresh clone; rerun (up to date); `git reset --hard
+HEAD~3` then rerun (updated); a local edit and a branch (not updated); a `local.rc` with `tw-web.dir = ~/x`
+pointing at a copy (adopted, never pulled); a non-tw-web folder in the way (fails); `remove` (folder stays).
+Smoke the clone with `TW_WEB_PORT=5099 .venv/bin/python app.py` and `curl :5099/api/ping`. On yoga itself,
+compare `rev-parse HEAD`, `status --porcelain` and the folder listing before and after `tw -I tw-web`: adopting
+must change nothing. `tests/test_security.py` checks the installer files are never served.
+
 ## When to update this skill
 
 Whenever verification needed something not written here, or something here steered you wrong. Fix it
