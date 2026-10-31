@@ -7,6 +7,7 @@ A lightweight Flask server for the tw-web Taskwarrior PWA
 from flask import Flask, jsonify, request, send_from_directory, Response
 from flask_cors import CORS
 from flask_sock import Sock
+import signal
 import subprocess
 import json
 import os
@@ -633,23 +634,41 @@ def run_task_command(args, readonly=False, extra_overrides=None, extra_env=None)
             'returncode': -1
         }
 
-def run_command(args, timeout=TASK_TIMEOUT, env=None):
-    """Run an arbitrary command (not task). Returns same dict as run_task_command."""
+def run_command(args, timeout=TASK_TIMEOUT, env=None, grace=10):
+    """Run an arbitrary command (not task). Returns same dict as run_task_command.
+
+    It runs in its own session: a hangup that reaches tw-web (its terminal closing) doesn't reach
+    it. One that runs over is sent SIGTERM, with its group, and gets `grace` seconds to stop
+    cleanly (gittw 0.3.8 undoes a pull it's stopped in), then SIGKILL: a kill alone left gittw's
+    repo stopped mid-rebase (s5, 2026-10-30)."""
     try:
-        result = subprocess.run(
-            args, capture_output=True, text=True,
-            env={**_TW_ENV, **(env or {})}, timeout=timeout
-        )
-        return {
-            'success': result.returncode == 0,
-            'stdout': result.stdout,
-            'stderr': result.stderr,
-            'returncode': result.returncode
-        }
-    except subprocess.TimeoutExpired:
-        return {'success': False, 'stdout': '', 'stderr': f'Command timed out after {timeout}s.', 'returncode': -1}
+        proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                env={**_TW_ENV, **(env or {})}, start_new_session=True)
     except Exception as e:
         return {'success': False, 'stdout': '', 'stderr': str(e), 'returncode': -1}
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        for sig, wait in ((signal.SIGTERM, grace), (signal.SIGKILL, None)):
+            try:
+                os.killpg(proc.pid, sig)
+            except ProcessLookupError:
+                pass
+            try:
+                out, err = proc.communicate(timeout=wait)
+                break
+            except subprocess.TimeoutExpired:
+                continue
+        said = (err or '').strip()
+        return {'success': False, 'stdout': out or '',
+                'stderr': f'Command timed out after {timeout}s.' + (f'\n{said}' if said else ''),
+                'returncode': -1}
+    return {
+        'success': proc.returncode == 0,
+        'stdout': out,
+        'stderr': err,
+        'returncode': proc.returncode
+    }
 
 # ── Hook signals → the terminal console (CONVENTIONS §2, §3) ────────────────
 def _console_cmd(args):

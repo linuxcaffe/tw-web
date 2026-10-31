@@ -369,3 +369,30 @@ def test_a_sync_that_works_with_a_warning_logs_the_warning(client, gittw, app_mo
     err = capsys.readouterr().err
     assert 'sync (manual) ok' in err and '  gittw: the mirror git@github.com:me/data.git refused' in err
     assert '  To make the mirror match it' in err
+
+
+# ── run_command's timeout: terminate first, kill only after a grace period ─────
+# gittw (0.3.8) undoes a pull it was stopped in, but a SIGKILL can't be caught: subprocess.run's
+# timeout sent one, which left the repo stopped mid-rebase. The command runs in its own session,
+# so a hangup that reaches tw-web (s5, 2026-10-30: its Termux session closed) doesn't reach it.
+
+def test_a_command_that_runs_over_is_terminated_and_can_clean_up(app_module):
+    t0 = time.monotonic()
+    r = app_module.run_command(['sh', '-c', 'trap "echo cleaned up >&2; exit 3" TERM; sleep 30 & wait'],
+                               timeout=0.5, grace=5)
+    assert time.monotonic() - t0 < 4
+    assert not r['success'] and 'timed out after 0.5s' in r['stderr']
+    assert 'cleaned up' in r['stderr'], 'what it said while stopping is kept'
+
+
+def test_a_command_that_ignores_terminate_is_killed_after_the_grace(app_module):
+    t0 = time.monotonic()
+    r = app_module.run_command(['sh', '-c', 'trap "" TERM; sleep 30; sleep 30'], timeout=0.3, grace=0.5)
+    assert time.monotonic() - t0 < 4, 'the whole group is killed, its sleep too'
+    assert not r['success'] and 'timed out' in r['stderr']
+
+
+def test_a_command_runs_in_its_own_session(app_module):
+    r = app_module.run_command(['sh', '-c', 'ps -o sid= -p $$'])
+    import os
+    assert r['success'] and int(r['stdout']) != os.getsid(0)
