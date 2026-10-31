@@ -355,19 +355,36 @@ _PROMPT_DIR = _private_dir(_RUN_DIR / 'prompts')
 # which offers an "Open in terminal" banner so the user can run it manually.
 _SPOOL_DIR = _private_dir(_RUN_DIR / 'spool')
 
+def _hook_reason(text):
+    """A hook's reason (tw_needs_pty's "reason", a spooled .reason) as one short line of text."""
+    line = (text or '').strip().split('\n')[0]
+    line = re.sub(r'[\x00-\x1f\x7f]+', ' ', line).strip()
+    return line[:200]
+
 def _drain_spool():
-    """Read and delete all *.cmd files from the spool dir; return list of command strings."""
-    cmds = []
+    """Read and delete all *.cmd files from the spool dir, each with its <unique>.reason
+    (CONVENTIONS §3); return [{'cmd', 'reason'}]. A reason without its command is deleted too."""
+    spooled = []
     try:
         for f in sorted(_SPOOL_DIR.glob('*.cmd')):
             try:
-                cmds.append(f.read_text().strip())
+                cmd = f.read_text().strip()
                 f.unlink()
             except Exception:
+                continue
+            reason = ''
+            rf = f.with_suffix('.reason')
+            try:
+                reason = _hook_reason(rf.read_text())
+                rf.unlink()
+            except Exception:
                 pass
+            spooled.append({'cmd': cmd, 'reason': reason})
+        for rf in _SPOOL_DIR.glob('*.reason'):
+            rf.unlink(missing_ok=True)
     except Exception:
         pass
-    return cmds
+    return spooled
 
 _sse_clients: dict[int, Queue] = {}
 _sse_lock = threading.Lock()
@@ -597,7 +614,7 @@ def run_task_command(args, readonly=False, extra_overrides=None, extra_env=None)
             # Drain any spool files written by hooks
             spooled = _drain_spool()
             if spooled:
-                out['deferred_cmds'] = spooled
+                out['deferred'] = spooled
         return out
     except subprocess.TimeoutExpired:
         return {
@@ -660,9 +677,10 @@ def _detect_signal(stderr, sig_type):
 def _hook_signals(result, args):
     """The write-result signals for the browser (tw-api.js handleWriteResult), from one
     run_task_command result. args is the command that ran; the console runs it as kind 'task'.
-      needs_pty + cmd     a hook needs a terminal (tw_needs_pty, or the legacy marker)
+      needs_pty + cmd     a hook needs a terminal (tw_needs_pty, or the legacy marker); + reason
+                          when the hook said why
       timed_out + cmd     the call hit TASK_TIMEOUT: offer to run it in the console
-      deferred_cmd        a hook spooled a shell command (offered as kind 'shell')
+      deferred_cmd        a hook spooled a shell command (offered as kind 'shell'); + deferred_reason
     """
     out = {}
     if result.get('timed_out'):
@@ -672,9 +690,14 @@ def _hook_signals(result, args):
         sig = _detect_signal(stderr, 'tw_needs_pty')
         if sig is not None or TW_INTERACTIVE_MARKER in stderr:
             out.update(needs_pty=True, cmd=(sig or {}).get('cmd') or _console_cmd(args))
-    dc = _deferred_cmd(result)
+            reason = _hook_reason(str((sig or {}).get('reason') or ''))
+            if reason:
+                out['reason'] = reason
+    dc = _deferred(result)
     if dc:
-        out['deferred_cmd'] = dc
+        out['deferred_cmd'] = dc['cmd']
+        if dc['reason']:
+            out['deferred_reason'] = dc['reason']
     return out
 
 
@@ -1436,10 +1459,10 @@ def _write_error(result, fallback):
     """A failed write's reason: what the hook or task said, less the override notices."""
     return '\n'.join(_stderr_lines(result)) or result.get('stderr') or fallback
 
-def _deferred_cmd(result):
-    """The first command a hook spooled during this write (CONVENTIONS §3), or None."""
-    cmds = result.get('deferred_cmds', [])
-    return cmds[0] if cmds else None
+def _deferred(result):
+    """The first command a hook spooled during this write, {'cmd', 'reason'} (CONVENTIONS §3), or None."""
+    spooled = result.get('deferred', [])
+    return spooled[0] if spooled else None
 
 def _export_one(task_id):
     """The task as it is now, or None (read-only export)."""

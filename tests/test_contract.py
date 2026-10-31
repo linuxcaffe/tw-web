@@ -93,8 +93,31 @@ def test_spool_files_are_drained_once(app_module):
     (d / '0001.cmd').write_text("hledger add 2026-10-13 'Buy milk'\n")
     (d / 'ignored.txt').write_text('not a command')
     try:
-        assert app_module._drain_spool() == ["hledger add 2026-10-13 'Buy milk'"]
+        assert app_module._drain_spool() == [{'cmd': "hledger add 2026-10-13 'Buy milk'", 'reason': ''}]
         assert app_module._drain_spool() == []
         assert not (d / '0001.cmd').exists()
     finally:
         (d / 'ignored.txt').unlink(missing_ok=True)
+
+
+def test_spool_reason_is_read_and_removed_with_its_command(app_module):
+    # §3: <unique>.reason beside <unique>.cmd, one line; a reason without its command is removed too
+    d = app_module._SPOOL_DIR
+    (d / '0002.cmd').write_text("annn --annotate x completed\n")
+    (d / '0002.reason').write_text("annn: write a note for 'Plan'\x1b[31m (completed)\nsecond line\n")
+    (d / 'stray.reason').write_text("no command\n")
+    assert app_module._drain_spool() == [
+        {'cmd': 'annn --annotate x completed', 'reason': "annn: write a note for 'Plan' [31m (completed)"}]
+    assert list(d.glob('*.reason')) == []
+
+
+def test_reasons_reach_the_page(app_module):
+    sig = app_module._hook_signals(
+        {'success': False, 'stderr': '{"type": "tw_needs_pty", "cmd": "12 delete", "reason": "deps-mgmt: asks"}'},
+        ['task', '12', 'delete'])
+    assert sig == {'needs_pty': True, 'cmd': '12 delete', 'reason': 'deps-mgmt: asks'}
+    sig = app_module._hook_signals(
+        {'success': True, 'deferred': [{'cmd': 'annn x', 'reason': 'annn: a note'}]}, ['task', '12', 'done'])
+    assert sig == {'deferred_cmd': 'annn x', 'deferred_reason': 'annn: a note'}
+    sig = app_module._hook_signals({'success': True, 'deferred': [{'cmd': 'annn x', 'reason': ''}]}, ['task', '12', 'done'])
+    assert sig == {'deferred_cmd': 'annn x'}

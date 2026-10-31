@@ -48,7 +48,7 @@ You can manage your entire task system from a phone, a tablet, or a browser tab 
 
 **PTY console** — a real pseudo-terminal embedded in the page (via WebSocket + xterm.js). Commands run here have a genuine TTY, so Taskwarrior hooks that read from `/dev/tty` work exactly as they do in a real terminal.
 
-**tw_needs_pty** — a signal hooks can emit when they need interactive input. tw-web detects it on any write (as it does the older `TW_INTERACTIVE_REQUIRED` marker) and opens the PTY console with the same command. A write that hits the 15 s limit, or a hook that queues a command for later, gets an "Open in terminal" offer instead. The contract is [awesome-taskwarrior's CONVENTIONS.md](https://github.com/linuxcaffe/awesome-taskwarrior/blob/main/CONVENTIONS.md).
+**tw_needs_pty** — a signal hooks can emit when they need interactive input. tw-web detects it on any write (as it does the older `TW_INTERACTIVE_REQUIRED` marker) and opens the PTY console with the same command. A write that hits the 15 s limit, or a hook that queues a command for later, gets an "Open in terminal" offer instead. When the hook says why (`tw_needs_pty`'s `reason`, a spooled command's `.reason` file), that line titles the console or the offer. The contract is [awesome-taskwarrior's CONVENTIONS.md](https://github.com/linuxcaffe/awesome-taskwarrior/blob/main/CONVENTIONS.md).
 
 **Filter mode / Command mode** — the nav bar toggles between structured filter inputs (description, priority, project, tags) and a free-form command input. Filter-only expressions set a raw filter; anything with a command word opens in the PTY console. The command words are Taskwarrior's own (`task _commands` and `task _aliases`), so custom reports and aliases count.
 

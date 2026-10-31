@@ -91,7 +91,7 @@ def test_needs_pty_on_any_write(client, task_returns, method, url, body, cmd):
 
 
 def test_spooled_command_is_offered(client, task_returns):
-    task_returns({'success': True, 'deferred_cmds': ["hledger add 'Buy milk'"]})
+    task_returns({'success': True, 'deferred': [{'cmd': "hledger add 'Buy milk'", 'reason': ''}]})
     r = client.post('/api/task/12/stop', headers=O).get_json()
     assert r['deferred_cmd'] == "hledger add 'Buy milk'"
 

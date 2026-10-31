@@ -126,7 +126,8 @@
     let _ptyTerm = null;
 
     // kind 'task' runs `task <cmd>`, 'shell' runs a shell command line; an empty cmd opens a shell
-    async function openPty(cmd, { autoClose = true, kind = 'task' } = {}) {
+    // reason: a hook's reason for the terminal (tw_needs_pty), shown before the command
+    async function openPty(cmd, { autoClose = true, kind = 'task', reason = '' } = {}) {
         const out = document.getElementById('tw-cmd-output');
         if (!out) return;
 
@@ -139,7 +140,8 @@
         }
 
         // Build output bar container
-        out.innerHTML = `<div id="tw-pty-titlebar"><span>${esc(cmd ? (kind === 'task' ? 'task ' + cmd : cmd) : 'terminal')}</span><button id="tw-cmd-output-close" title="Close">×</button></div><div id="tw-pty-container"></div><div id="tw-pty-resize-handle"></div>`;
+        const _ptyLabel = cmd ? (kind === 'task' ? 'task ' + cmd : cmd) : 'terminal';
+        out.innerHTML = `<div id="tw-pty-titlebar"><span>${esc(reason ? reason + ' · ' + _ptyLabel : _ptyLabel)}</span><button id="tw-cmd-output-close" title="Close">×</button></div><div id="tw-pty-container"></div><div id="tw-pty-resize-handle"></div>`;
         out.classList.add('active', 'pty-mode');
         out.querySelector('#tw-cmd-output-close')?.addEventListener('click', () => {
             out.classList.remove('pty-mode');

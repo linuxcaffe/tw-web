@@ -85,10 +85,14 @@ const TW = (() => {
     // The signals a write result can carry (app.py _hook_signals), handled the same way wherever
     // the write came from. Returns true when a hook asked for a terminal and the PTY console took
     // over, so the caller should do nothing else. cmd is what follows `task`; a spooled command
-    // is a shell command line (CONVENTIONS §3).
+    // is a shell command line (CONVENTIONS §3). A hook's reason (reason, deferred_reason), when it
+    // gave one, titles the console or the offer.
     function handleWriteResult(data) {
-        if (data.needs_pty) { window.twNav?.openPty(data.cmd); return true; }
-        if (data.deferred_cmd) window.twTerminal?.offerTerminal(data.deferred_cmd, { kind: 'shell' });
+        if (data.needs_pty) { window.twNav?.openPty(data.cmd, { reason: data.reason }); return true; }
+        if (data.deferred_cmd) {
+            window.twTerminal?.offerTerminal(data.deferred_cmd,
+                { kind: 'shell', ...(data.deferred_reason ? { title: data.deferred_reason } : {}) });
+        }
         if (data.timed_out && data.cmd) {
             window.twTerminal?.offerTerminal(data.cmd, { kind: 'task', title: 'Timed out — run in terminal?' });
         }
