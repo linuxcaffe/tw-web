@@ -670,7 +670,7 @@ class TaskEditor {
             if (TW.api.handleWriteResult(data)) { this.hide(); return; }
             if (data.success) {
                 this.hide();
-                this.onLogSuccess();
+                this.onLogSuccess(data.task || null);
             } else {
                 this.onSaveError(data.error || 'Failed to log task');
             }

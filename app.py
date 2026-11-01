@@ -855,6 +855,33 @@ def index():
     """Serve the main HTML page"""
     return send_from_directory('.', 'index.html')
 
+_ORIGIN_HOST = re.compile(r'[A-Za-z0-9.-]+(:\d{1,5})?')
+
+def _nb_origin():
+    """nb-web's origin (scheme://host[:port]) from the `nb` annotation launcher, or None.
+    Strictly validated: it goes into a CSP header and the embed page's postMessage target."""
+    from urllib.parse import urlsplit
+    template = (_load_settings().get('annotation_launchers') or {}).get('nb') or ''
+    try:
+        parts = urlsplit(template.replace('{value}', ''))
+    except ValueError:
+        return None
+    if parts.scheme not in ('http', 'https') or not _ORIGIN_HOST.fullmatch(parts.netloc or ''):
+        return None
+    return f'{parts.scheme}://{parts.netloc.lower()}'
+
+@app.route('/embed-add')
+def embed_add():
+    """tw-web's own Add dialog for nb-web to frame (tw-nb-interop M6): the task is added
+    here, with tw-web's endpoint and hooks; the page posts the new uuid to nb-web, which
+    makes the task's note. Only nb-web (the `nb` launcher's origin) may frame it."""
+    origin = _nb_origin()
+    html = Path('embed-add.html').read_text().replace('__NB_ORIGIN__', json.dumps(origin))
+    resp = Response(html, mimetype='text/html')
+    resp.headers['Content-Security-Policy'] = "frame-ancestors 'self'" + (f' {origin}' if origin else '')
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
 # Only top-level app assets are served — never subfolders, dotfiles, source,
 # settings or logs (security review S7). A new asset of these types needs no
 # change here.
@@ -1855,6 +1882,11 @@ def add_task():
         **signals,
     })
 
+def _completed_uuids():
+    """Uuids of every completed task, or None if task couldn't say."""
+    r = run_task_command(['task', 'status:completed', '_uuids'], readonly=True)
+    return set(r['stdout'].split()) if r['success'] else None
+
 @app.route('/api/task/log', methods=['POST'])
 def log_task():
     """Log a completed task via 'task log' — same args as add but marks done immediately."""
@@ -1883,9 +1915,25 @@ def log_task():
         args.append(f'due_duration:{data["due_duration"]}')
 
     args += ['--', data['description']]   # free text last, after `--` (S11)
+    # Like add, return the task (a logged task is one added already completed), so a page can
+    # use it; nb-web's embedded Add makes its note from the uuid (tw-nb-interop M6). +LATEST
+    # doesn't see logged tasks, and the output's wording depends on the user's rc.verbose,
+    # so: the one completed uuid that wasn't there before. None if that isn't exactly one.
+    before = _completed_uuids()
     result = run_task_command(args)
+    task = None
+    if result['success'] and before is not None:
+        new = (_completed_uuids() or set()) - before
+        if len(new) == 1:
+            export = run_task_command(['task', f'uuid:{new.pop()}', 'export'], readonly=True)
+            try:
+                found = json.loads(export['stdout']) if export['success'] else []
+                task = found[0] if found else None
+            except (json.JSONDecodeError, IndexError, KeyError):
+                task = None
     return jsonify({'success': result['success'],
                     'error':   result.get('stderr', '') if not result['success'] else None,
+                    'task': task,
                     'warnings': _warnings(result), **_hook_signals(result, args)})
 
 @app.route('/api/task/<task_id>/annotate', methods=['POST'])

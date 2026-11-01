@@ -124,7 +124,8 @@ def test_add_description_after_separator(client, captured):
 
 def test_log_description_after_separator(client, captured):
     client.post('/api/task/log', headers=LOCAL, json={'description': 'due:tomorrow'})
-    _free_text_after_separator(captured[0], 'due:tomorrow')
+    log = next(c for c in captured if 'log' in c)   # log also lists completed uuids around it
+    _free_text_after_separator(log, 'due:tomorrow')
 
 
 def test_annotate_after_separator(client, captured):

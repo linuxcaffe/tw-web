@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add task</title>
+    <!-- Served by /embed-add, which fills NB_ORIGIN and the frame-ancestors header. Add only:
+         tw-web's own dialog and /api/task/add; nb-web (the frame's parent) makes the note. -->
+    <script>(function(){var t=localStorage.getItem('tw-theme');if(t)document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body.tw-embed { background: transparent; margin: 0; }
+        body.tw-embed .task-editor-modal { background: transparent; }
+        #embed-error { display: none; margin: .5rem; padding: .4rem .6rem; border-radius: 6px;
+                       background: var(--bg2); color: var(--danger, var(--text)); border: 1px solid var(--border); }
+    </style>
+    <script src="tw-api.js"></script>
+    <script src="tw-filter.js"></script>
+    <script src="/codemirror-bundle.js"></script>
+    <script src="task-editor.js"></script>
+</head>
+<body class="tw-embed">
+<div id="embed-error" role="alert"></div>
+<script>
+const NB_ORIGIN = __NB_ORIGIN__;
+
+// Tell the page that framed us (nb-web) what happened. Kept on window for tests.
+let finished = false;
+function tell(msg) {
+    if (msg.type !== 'tw-add-ready') finished = true;
+    window.twEmbedLast = msg;
+    if (NB_ORIGIN && window.parent !== window) window.parent.postMessage(msg, NB_ORIGIN);
+}
+
+function showError(text) {
+    const el = document.getElementById('embed-error');
+    el.textContent = text;
+    el.style.display = 'block';
+}
+
+const embedEditor = new TaskEditor({
+    modalId: 'embed-task-editor',
+    showAllFields: true,
+    priorityFormat: 'letters',
+    language: 'en',
+    onSaveSuccess: task => tell({ type: 'tw-task-added', uuid: task && task.uuid,
+                                  description: task && task.description }),
+    // A logged task is one added already completed: it gets its note too (djp)
+    onLogSuccess:  task => tell({ type: 'tw-task-added', logged: true, uuid: task && task.uuid,
+                                  description: task && task.description }),
+    onSaveError:   err  => showError(err),
+    onCancel:      ()   => { if (!finished) tell({ type: 'tw-add-closed' }); },
+});
+
+// × and a click outside only hide the editor (Cancel also calls onCancel): report a hide
+// that wasn't a save or a log as closed. Deferred, since log hides before onLogSuccess.
+const hideEditor = embedEditor.hide.bind(embedEditor);
+embedEditor.hide = function () {
+    hideEditor();
+    setTimeout(() => { if (!finished) tell({ type: 'tw-add-closed' }); }, 0);
+};
+
+// Open in Add mode once the template has rendered, pre-filled from the query string.
+(function open(tries) {
+    const form = document.querySelector('#embed-task-editor #task-editor-form');
+    if (!form) { if (tries < 100) setTimeout(() => open(tries + 1), 30); return; }
+    embedEditor.show(null);
+    const q = new URLSearchParams(location.search);
+    for (const [key, id] of [['description', 'description'], ['project', 'project'],
+                             ['tags', 'tags'], ['deps', 'deps']]) {
+        const v = q.get(key);
+        const el = form.querySelector('#task-editor-' + id);
+        if (v && el) el.value = v;
+    }
+    form.querySelector('#task-editor-description')?.focus();
+    tell({ type: 'tw-add-ready' });
+})(0);
+</script>
+</body>
+</html>
