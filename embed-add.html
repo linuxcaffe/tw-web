@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add task</title>
-    <!-- Served by /embed-add, which fills NB_ORIGIN and the frame-ancestors header. Add only:
-         tw-web's own dialog and /api/task/add; nb-web (the frame's parent) makes the note. -->
+    <!-- Served by /embed-add and /embed-edit?uuid=, which fill NB_ORIGIN and the
+         frame-ancestors header. tw-web's own dialog and its own endpoints; nb-web (the frame's
+         parent) makes the note. -->
     <script>(function(){var t=localStorage.getItem('tw-theme');if(t)document.documentElement.setAttribute('data-theme',t);})();</script>
     <link rel="stylesheet" href="styles.css">
     <style>
@@ -23,11 +24,13 @@
 <div id="embed-error" role="alert"></div>
 <script>
 const NB_ORIGIN = __NB_ORIGIN__;
+const EDIT = location.pathname === '/embed-edit';
+const EDIT_UUID = new URLSearchParams(location.search).get('uuid') || '';
 
 // Tell the page that framed us (nb-web) what happened. Kept on window for tests.
 let finished = false;
 function tell(msg) {
-    if (msg.type !== 'tw-add-ready') finished = true;
+    if (msg.type !== 'tw-add-ready' && msg.type !== 'tw-edit-failed') finished = true;
     window.twEmbedLast = msg;
     if (NB_ORIGIN && window.parent !== window) window.parent.postMessage(msg, NB_ORIGIN);
 }
@@ -43,8 +46,8 @@ const embedEditor = new TaskEditor({
     showAllFields: true,
     priorityFormat: 'letters',
     language: 'en',
-    onSaveSuccess: task => tell({ type: 'tw-task-added', uuid: task && task.uuid,
-                                  description: task && task.description }),
+    onSaveSuccess: (task, isEdit) => tell({ type: isEdit ? 'tw-task-saved' : 'tw-task-added',
+                                            uuid: task && task.uuid, description: task && task.description }),
     // A logged task is one added already completed: it gets its note too (djp)
     onLogSuccess:  task => tell({ type: 'tw-task-added', logged: true, uuid: task && task.uuid,
                                   description: task && task.description }),
@@ -64,6 +67,7 @@ embedEditor.hide = function () {
 (function open(tries) {
     const form = document.querySelector('#embed-task-editor #task-editor-form');
     if (!form) { if (tries < 100) setTimeout(() => open(tries + 1), 30); return; }
+    if (EDIT) { openEdit(); return; }
     embedEditor.show(null);
     const q = new URLSearchParams(location.search);
     for (const [key, id] of [['description', 'description'], ['project', 'project'],
@@ -75,6 +79,23 @@ embedEditor.hide = function () {
     form.querySelector('#task-editor-description')?.focus();
     tell({ type: 'tw-add-ready' });
 })(0);
+
+// Edit mode: the task named by ?uuid=, filled in from tw-web's own copy. An unknown or bad
+// uuid says so here (and tells nb-web), rather than opening an empty Add form.
+async function openEdit() {
+    let task = null;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(EDIT_UUID)) {
+        try { task = await TW.api.get('/api/task/' + EDIT_UUID); } catch (_) { task = null; }
+    }
+    if (!task || task.uuid !== EDIT_UUID.toLowerCase()) {
+        showError(`No task ${EDIT_UUID || '(none given)'} in tw-web.`);
+        tell({ type: 'tw-edit-failed', uuid: EDIT_UUID });
+        return;
+    }
+    await embedEditor.show(task);
+    document.querySelector('#embed-task-editor #task-editor-description')?.focus();
+    tell({ type: 'tw-add-ready', edit: true });
+}
 </script>
 </body>
 </html>

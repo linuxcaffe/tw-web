@@ -871,10 +871,12 @@ def _nb_origin():
     return f'{parts.scheme}://{parts.netloc.lower()}'
 
 @app.route('/embed-add')
+@app.route('/embed-edit')
 def embed_add():
     """tw-web's own Add dialog for nb-web to frame (tw-nb-interop M6): the task is added
     here, with tw-web's endpoint and hooks; the page posts the new uuid to nb-web, which
-    makes the task's note. Only nb-web (the `nb` launcher's origin) may frame it."""
+    makes the task's note. /embed-edit?uuid= is the same page in Edit mode. Only nb-web (the
+    `nb` launcher's origin) may frame it."""
     origin = _nb_origin()
     html = Path('embed-add.html').read_text().replace('__NB_ORIGIN__', json.dumps(origin))
     resp = Response(html, mimetype='text/html')

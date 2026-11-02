@@ -55,3 +55,14 @@ def test_odd_launchers_never_widen_framing_or_reach_the_page(client, app_module,
 
 def test_other_pages_keep_their_headers(client):
     assert 'frame-ancestors' not in _csp(client.get('/'))
+
+
+# ── /embed-edit: the same page in Edit mode (tw-nb-interop, djp 2026-11-01) ─────────────
+
+def test_edit_page_is_the_same_page_with_the_same_framing(client, app_module, monkeypatch):
+    _launchers(app_module, monkeypatch, {'nb': 'http://localhost:5001/#{value}'})
+    r = client.get('/embed-edit?uuid=0badc0de-1234-4abc-8def-0123456789ab')
+    assert r.status_code == 200
+    assert _csp(r) == "frame-ancestors 'self' http://localhost:5001"
+    html = r.get_data(as_text=True)
+    assert 'task-editor.js' in html and 'tw-task-saved' in html
