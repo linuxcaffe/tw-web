@@ -506,6 +506,7 @@ class TaskEditor {
     
     clearForm() {
         this._shown = null;
+        this._annWritten = false;   // an annotation added, edited or deleted while this was open
         const form = this.modal.querySelector('#task-editor-form');
         if (form) form.reset();
         // Clear any leftover annotation state from a previous edit
@@ -603,6 +604,14 @@ class TaskEditor {
                     if (now[field] === this._shown[field]) keys.forEach(k => delete taskData[k]);
             }
             if (Object.keys(taskData).length === 0) {
+                // Annotations are written as they're added (their own "Save note"), so a Save
+                // with no changed field still saved something: follow up as any save does
+                // (the List redraws; an embedding nb-web hears tw-task-saved). Bug 17.
+                if (this._annWritten) {
+                    this.onSaveSuccess(this.currentTask, true);
+                    this.hide();
+                    return;
+                }
                 this.hide();
                 document.dispatchEvent(new CustomEvent('tw-show-notification',
                     { detail: { message: 'No changes', type: 'info' } }));
@@ -1009,14 +1018,13 @@ class TaskEditor {
             const uuid = this.currentTask?.uuid;
             if (!uuid) return;
 
-            if (existingText) {
-                await this._callAPI('PUT', `api/task/${uuid}/annotation`, {
-                    old_annotation: existingText,
-                    new_annotation: newText,
-                });
-            } else {
-                await this._callAPI('POST', `api/task/${uuid}/annotate`, { annotation: newText });
-            }
+            const r = existingText
+                ? await this._callAPI('PUT', `api/task/${uuid}/annotation`, {
+                      old_annotation: existingText,
+                      new_annotation: newText,
+                  })
+                : await this._callAPI('POST', `api/task/${uuid}/annotate`, { annotation: newText });
+            if (r?.success !== false) this._annWritten = true;
             await this._reloadAnnotations(uuid);
             this._hideAnnEditor();
         };
@@ -1047,6 +1055,7 @@ class TaskEditor {
         if (!uuid) return;
         const r = await this._callAPI('DELETE', `api/task/${uuid}/annotation`, { annotation: text });
         if (r?.success !== false) {
+            this._annWritten = true;
             row.remove();
             this._hideAnnEditor();
         }

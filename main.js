@@ -37,11 +37,9 @@ class TaskWarriorUI {
             if (typeof taskEditor !== 'undefined') taskEditor.show();
         });
 
-        // nav.js refresh button → show notification
-        document.addEventListener('tw-show-notification', (e) => {
-            const { message, type } = e.detail || {};
-            if (message) this.showNotification(message, type || 'success');
-        });
+        // Notifications: nav.js draws them (its tw-show-notification listener). Listening here
+        // too and answering with showNotification, which dispatches the same event, echoed
+        // every toast until the stack overflowed (bug 18).
 
         // Sync complete (fired by nav.js after a successful sync or undo)
         document.addEventListener('tw-sync-complete', () => {
