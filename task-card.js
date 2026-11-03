@@ -398,7 +398,12 @@ document.addEventListener('click', async e => {
         const tmpl = launchers[label];
         const resolved = tmpl.replace('{value}', encodeURIComponent(value));
         if (/^https?:\/\//.test(resolved)) {
-            window.open(resolved, 'nb-web');
+            // Same origin (the bundle: nb-web at /, tw-web at /tw/): in place, so Back returns.
+            // Elsewhere: a plain new tab. Never a named window: in an Epiphany web app,
+            // window.open(url, 'nb-web') made an empty popup and handed the URL to Firefox
+            // (tw-nb-interop M7 (d), 2026-11-03).
+            if (new URL(resolved, location.href).origin === location.origin) location.href = resolved;
+            else window.open(resolved, '_blank', 'noopener');
         } else {
             fetch('api/launch', {
                 method: 'POST',
