@@ -5,6 +5,7 @@
 #   tw-web-launch.sh           snapshot ~/.task, start server (if needed) + open app
 #   tw-web-launch.sh --clean   wipe stale SW cache first, then launch
 #   tw-web-launch.sh --stop    stop the Flask server
+#   tw-web-launch.sh --no-open start the server (if needed), open nothing (for a proxy bundle)
 
 # The folder this script is in (a symlink to it works too): ~/dev/tw-web, or wherever tw -I tw-web put it
 FLASK_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
@@ -113,6 +114,8 @@ else
     fi
     echo "tw-web-launch: server ready (pid $FLASK_PID)"
 fi
+
+[ "$1" = "--no-open" ] && exit 0   # the server is up; whoever asked opens it
 
 # ── Launch Epiphany PWA (detaches; server keeps running) ─────────────────────
 # Without that web app (a new machine), the default browser
