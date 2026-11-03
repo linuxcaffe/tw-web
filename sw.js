@@ -1,18 +1,18 @@
 // tw-web service worker — shell cache for PWA installability and for when the server is down
 // API calls always go to network; only app shell assets are cached.
 
-const CACHE = 'tw-web-v231';
+const CACHE = 'tw-web-v233';
 const SHELL = [
-    '/', '/index.html', '/styles.css',
-    '/nav.js', '/tw-api.js', '/tw-filter.js', '/main.js', '/task-card.js', '/task-editor.js', '/task-editor-templates.html',
-    '/agenda.html', '/agenda.js',
-    '/calendar-planner.html', '/calendar-planner.js', '/calendar-planner.css', '/sun.js', '/tw-layers.js',
-    '/fullcalendar.min.js', '/fullcalendar.min.css',
-    '/kanban.html', '/about.html', '/help.html',
-    '/xterm.js', '/xterm.css',
-    '/codemirror-bundle.js',
-    '/manifest.json', '/logo.svg', '/logo-192.png', '/logo-512.png',
-    '/favicon.png', '/taskwarrior.svg', '/tw-logo.png',
+    './', 'index.html', 'styles.css',
+    'nav.js', 'tw-api.js', 'tw-filter.js', 'main.js', 'task-card.js', 'task-editor.js', 'task-editor-templates.html',
+    'agenda.html', 'agenda.js',
+    'calendar-planner.html', 'calendar-planner.js', 'calendar-planner.css', 'sun.js', 'tw-layers.js',
+    'fullcalendar.min.js', 'fullcalendar.min.css',
+    'kanban.html', 'about.html', 'help.html',
+    'xterm.js', 'xterm.css',
+    'codemirror-bundle.js',
+    'manifest.json', 'logo.svg', 'logo-192.png', 'logo-512.png',
+    'favicon.png', 'taskwarrior.svg', 'tw-logo.png',
 ];
 
 self.addEventListener('install', e => {
@@ -27,7 +27,9 @@ self.addEventListener('activate', e => {
     // New SW takes effect on next navigation.
     e.waitUntil(
         caches.keys()
-            .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+            // Only our own old caches: on one origin with nb-web (a proxy, tw-nb-interop M7) the
+            // cache storage is shared, and nb-web's caches aren't ours to delete.
+            .then(keys => Promise.all(keys.filter(k => k.startsWith('tw-web-') && k !== CACHE).map(k => caches.delete(k))))
     );
 });
 
@@ -52,7 +54,7 @@ self.addEventListener('fetch', e => {
                 }
                 return res;
             })
-            .catch(() => caches.match(e.request, { ignoreSearch: true })
+            .catch(() => caches.open(CACHE).then(c => c.match(e.request, { ignoreSearch: true }))
                 .then(cached => cached || Promise.reject(new Error('offline, and not cached'))))
     );
 });

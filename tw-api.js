@@ -103,7 +103,7 @@ const TW = (() => {
     let _vocab = null;
     async function vocab() {
         if (!_vocab) {
-            const d = await get('/api/commands');
+            const d = await get('api/commands');
             if (!d.success) return null;
             _vocab = d;
         }

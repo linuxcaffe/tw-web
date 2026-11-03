@@ -17,14 +17,14 @@
     </style>
     <script src="tw-api.js"></script>
     <script src="tw-filter.js"></script>
-    <script src="/codemirror-bundle.js"></script>
+    <script src="codemirror-bundle.js"></script>
     <script src="task-editor.js"></script>
 </head>
 <body class="tw-embed">
 <div id="embed-error" role="alert"></div>
 <script>
 const NB_ORIGIN = __NB_ORIGIN__;
-const EDIT = location.pathname === '/embed-edit';
+const EDIT = location.pathname.endsWith('/embed-edit');
 const EDIT_UUID = new URLSearchParams(location.search).get('uuid') || '';
 
 // Tell the page that framed us (nb-web) what happened. Kept on window for tests.
@@ -85,7 +85,7 @@ embedEditor.hide = function () {
 async function openEdit() {
     let task = null;
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(EDIT_UUID)) {
-        try { task = await TW.api.get('/api/task/' + EDIT_UUID); } catch (_) { task = null; }
+        try { task = await TW.api.get('api/task/' + EDIT_UUID); } catch (_) { task = null; }
     }
     if (!task || task.uuid !== EDIT_UUID.toLowerCase()) {
         showError(`No task ${EDIT_UUID || '(none given)'} in tw-web.`);

@@ -75,9 +75,9 @@ async function kbReload(preserveView = false) {
         // Kanban is always pending-only; status filter is suppressed on this page
         const swimParams = 'status=pending' + (context ? '&context=' + encodeURIComponent(context) : '');
         const [colsData, swimData, orderData] = await Promise.all([
-            fetch('/api/kanban/columns').then(r => r.json()),
-            fetch('/api/tasks?' + swimParams).then(r => r.json()),
-            fetch('/api/kanban/order').then(r => r.json()),
+            fetch('api/kanban/columns').then(r => r.json()),
+            fetch('api/tasks?' + swimParams).then(r => r.json()),
+            fetch('api/kanban/order').then(r => r.json()),
         ]);
         kbColumns       = colsData.columns    || [];
         kbAllTasks      = swimData.tasks      || [];
@@ -558,7 +558,7 @@ document.addEventListener('keydown', e => {
 
 async function _kbSaveOrder(col, uuids) {
     try {
-        await fetch('/api/kanban/order', {
+        await fetch('api/kanban/order', {
             method:  'PUT',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ col, order: uuids }),
@@ -570,7 +570,7 @@ async function _kbSaveOrder(col, uuids) {
 }
 
 async function _kbSetState(uuid, newState) {
-    const d = await TW.api.write('PUT', `/api/task/${uuid}/modify`, { state: newState });
+    const d = await TW.api.write('PUT', `api/task/${uuid}/modify`, { state: newState });
     if (!d.success) document.dispatchEvent(new CustomEvent('tw-show-notification',
         { detail: { message: `Error: ${d.error || d.message}`, type: 'error' } }));
 }

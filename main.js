@@ -239,8 +239,8 @@ class TaskWarriorUI {
             // When a context is active, also fetch the unfiltered status total so the
             // denominator in filtered/total reflects all tasks in this status.
             const fetches = [
-                fetch('/api/tasks?' + params).then(r => r.json()),
-                needTotal ? fetch('/api/tasks?' + statusParams).then(r => r.json()) : Promise.resolve(null),
+                fetch('api/tasks?' + params).then(r => r.json()),
+                needTotal ? fetch('api/tasks?' + statusParams).then(r => r.json()) : Promise.resolve(null),
             ];
             const [tasksData, totalData] = await Promise.all(fetches);
 
@@ -391,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // ?add=1 — open the Add dialog on load (e.g. from Firefox extension shortcut)
     if (new URLSearchParams(window.location.search).get('add') === '1') {
-        history.replaceState({}, '', '/');
+        history.replaceState({}, '', location.pathname);
         setTimeout(() => document.dispatchEvent(new CustomEvent('tw-open-add')), 300);
     }
 

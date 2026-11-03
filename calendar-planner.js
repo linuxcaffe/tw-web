@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Load calendar settings before initialising the calendar
     try {
-        const r = await fetch('/api/config');
+        const r = await fetch('api/config');
         _calSettings = await r.json();
     } catch (_) { /* use defaults */ }
 
@@ -697,9 +697,9 @@ function loadTasks() {
 
     function _fetch(attempt) {
         Promise.all([
-            fetch('/api/tasks?'         + params    ).then(r => r.json()),
-            fetch('/api/tasks/planned?' + calParams ).then(r => r.json()),
-            fetch('/api/tasks/due?'     + calParams ).then(r => r.json()),
+            fetch('api/tasks?'         + params    ).then(r => r.json()),
+            fetch('api/tasks/planned?' + calParams ).then(r => r.json()),
+            fetch('api/tasks/due?'     + calParams ).then(r => r.json()),
         ])
         .then(([data, plannedData, dueData]) => {
             if (myId !== _loadId) return;   // superseded by a newer loadTasks() call
@@ -1004,7 +1004,7 @@ function applyFiltersAndDisplay() {
     let gt = window.twNav?.getGrandTotal(calParams) ?? null;
     window.twNav?.setCount(calendarTasks.length, gt ?? calendarTasks.length);
     if (gt === null && window.twNav) {
-        fetch('/api/tasks?' + calParams).then(r => r.json()).then(data => {
+        fetch('api/tasks?' + calParams).then(r => r.json()).then(data => {
             if (data.success && Array.isArray(data.tasks)) {
                 gt = data.tasks.length;
                 window.twNav.setGrandTotal(gt, calParams);
@@ -1277,7 +1277,7 @@ function showCalNotification(message, type = 'info') {
 
 // ── Backend API ───────────────────────────────────────────────────────────────
 async function modifyTaskInBackend(taskId, taskData) {
-    const d = await TW.api.write('PUT', `/api/task/${taskId}/modify`, taskData);
+    const d = await TW.api.write('PUT', `api/task/${taskId}/modify`, taskData);
     return { success: d.success, error: d.error || 'Unknown error' };
 }
 

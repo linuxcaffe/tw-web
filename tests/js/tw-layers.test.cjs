@@ -61,7 +61,7 @@ t('fetch: one request, five layers by kind; a moment falls on its local day', as
         ['seasons', 'December Solstice', '20261221', '☀️', '15:50'], // Toronto (EST)
         ['clock', 'Clocks back (EST)', '20261101', '🕐', '01:00'],
     ]);
-    eq(calls, ['/api/holidays?start=20261001&end=20261231']);
+    eq(calls, ['api/holidays?start=20261001&end=20261231']);   // relative: works under a proxy prefix
     eq(items.find(i => i.title === 'Full Moon').at, '2026-10-26T04:11:42.000Z');
 });
 
@@ -87,7 +87,7 @@ t('one request per range per page, shared by the layers', async () => {
     calls.length = 0;
     await L.get('holidays').items('20261101', '20261130');
     await L.get('moon').items('20261101', '20261130');
-    eq(calls, ['/api/holidays?start=20261101&end=20261130']);
+    eq(calls, ['api/holidays?start=20261101&end=20261130']);
 });
 
 (async () => {

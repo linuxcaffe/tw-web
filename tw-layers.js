@@ -73,7 +73,7 @@ TW.layers = (() => {
     function entries(start, end) {
         const k = `${start}-${end}`;
         if (!memo.has(k)) {
-            memo.set(k, TW.api.get(`/api/holidays?start=${start}&end=${end}`).then(d => {
+            memo.set(k, TW.api.get(`api/holidays?start=${start}&end=${end}`).then(d => {
                 if (!d.success) throw new Error(d.error || 'holidays');
                 return d.holidays;
             }).catch(err => { memo.delete(k); throw err; }));

@@ -294,7 +294,7 @@ class TaskEditor {
         // and the save below sends only what differs from what the form showed (bug 2).
         if (task?.uuid) {
             try {
-                const fresh = await TW.api.get(`/api/task/${task.uuid}`);
+                const fresh = await TW.api.get(`api/task/${task.uuid}`);
                 if (fresh?.uuid === task.uuid) task = fresh;
             } catch {}
         }
@@ -352,7 +352,7 @@ class TaskEditor {
         if (!sel) return;
         try {
             if (!TaskEditor._stateColumns) {
-                const d = await fetch('/api/kanban/columns').then(r => r.json());
+                const d = await fetch('api/kanban/columns').then(r => r.json());
                 TaskEditor._stateColumns = d.columns || [];
             }
             const current = sel.dataset.current || '';
@@ -487,7 +487,7 @@ class TaskEditor {
             if (revertBtn) {
                 revertBtn.onclick = async () => {
                     try {
-                        const d = await TW.api.write('POST', `/api/task/${task.uuid}/revert`);
+                        const d = await TW.api.write('POST', `api/task/${task.uuid}/revert`);
                         if (d.success) {
                             this.onSaveSuccess(d.task, true);
                             this.hide();
@@ -619,7 +619,7 @@ class TaskEditor {
     async saveTask(taskData, isEdit) {
         try {
             const taskDataForAPI = this.prepareTaskDataForAPI(taskData, isEdit);
-            const endpoint = isEdit ? `/api/task/${taskData.uuid}/modify` : '/api/task/add';
+            const endpoint = isEdit ? `api/task/${taskData.uuid}/modify` : 'api/task/add';
             const method = isEdit ? 'PUT' : 'POST';
             
             const data = await TW.api.write(method, endpoint, taskDataForAPI);
@@ -666,7 +666,7 @@ class TaskEditor {
     async logTask(taskData) {
         try {
             const prepared = this.prepareTaskDataForAPI(taskData, false);
-            const data = await TW.api.write('POST', '/api/task/log', prepared);
+            const data = await TW.api.write('POST', 'api/task/log', prepared);
             if (TW.api.handleWriteResult(data)) { this.hide(); return; }
             if (data.success) {
                 this.hide();
@@ -805,7 +805,7 @@ class TaskEditor {
         const until = this.modal.querySelector('#task-editor-until')?.closest('.te-date-field');
         if (until) { until.classList.remove('te-recur-unused'); until.title = ''; }
         let tpl = null;
-        try { tpl = await TW.api.get(`/api/task/${inst.rtemplate || inst.parent}`); } catch {}
+        try { tpl = await TW.api.get(`api/task/${inst.rtemplate || inst.parent}`); } catch {}
         if (this._recurInstance !== inst || !tpl?.uuid) return;   // the form moved on, or no template
         const rule = tpl.r || tpl.recur || '';
         note.textContent = `${head} · ${tpl.type === 'chain' ? 'chain' : 'period'} ${rule} · `;
@@ -884,7 +884,7 @@ class TaskEditor {
     // The project field suggests what the Projects sidebar lists (its active/all mode)
     async _loadProjectSuggestions() {
         const all = localStorage.getItem('tw-proj-mode') === 'all';
-        const d = await TW.api.get('/api/projects' + (all ? '' : '?active=1'));
+        const d = await TW.api.get('api/projects' + (all ? '' : '?active=1'));
         if (d.success) this.updateProjectSuggestions((d.projects || []).map(p => p.name));
     }
 
@@ -1010,12 +1010,12 @@ class TaskEditor {
             if (!uuid) return;
 
             if (existingText) {
-                await this._callAPI('PUT', `/api/task/${uuid}/annotation`, {
+                await this._callAPI('PUT', `api/task/${uuid}/annotation`, {
                     old_annotation: existingText,
                     new_annotation: newText,
                 });
             } else {
-                await this._callAPI('POST', `/api/task/${uuid}/annotate`, { annotation: newText });
+                await this._callAPI('POST', `api/task/${uuid}/annotate`, { annotation: newText });
             }
             await this._reloadAnnotations(uuid);
             this._hideAnnEditor();
@@ -1045,7 +1045,7 @@ class TaskEditor {
     async _deleteAnnotation(text, row) {
         const uuid = this.currentTask?.uuid;
         if (!uuid) return;
-        const r = await this._callAPI('DELETE', `/api/task/${uuid}/annotation`, { annotation: text });
+        const r = await this._callAPI('DELETE', `api/task/${uuid}/annotation`, { annotation: text });
         if (r?.success !== false) {
             row.remove();
             this._hideAnnEditor();
@@ -1054,7 +1054,7 @@ class TaskEditor {
 
     async _reloadAnnotations(uuid) {
         try {
-            const r = await fetch(`/api/task/${uuid}`);
+            const r = await fetch(`api/task/${uuid}`);
             const d = await r.json();
             const anns = Array.isArray(d.annotations) ? d.annotations : [];
             this._renderAnnotations(anns);

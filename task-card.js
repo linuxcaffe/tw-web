@@ -26,7 +26,7 @@ class TaskActionHandler {
         };
 
         const method = actionMap[action];
-        const endpoint = action === 'delete' ? `/api/task/${taskUuid}/delete` : `/api/task/${taskUuid}/${action}`;
+        const endpoint = action === 'delete' ? `api/task/${taskUuid}/delete` : `api/task/${taskUuid}/${action}`;
 
         try {
             const data = await TW.api.write(method, endpoint);
@@ -319,7 +319,7 @@ function resetLaunchersCache() { _annLaunchers = null; _getLaunchers(); }
 async function _getLaunchers() {
     if (_annLaunchers) return _annLaunchers;
     try {
-        const r = await fetch('/api/config');
+        const r = await fetch('api/config');
         const d = await r.json();
         _annLaunchers = {};
         for (const [k, v] of Object.entries(d.annotation_launchers || {}))
@@ -400,7 +400,7 @@ document.addEventListener('click', async e => {
         if (/^https?:\/\//.test(resolved)) {
             window.open(resolved, 'nb-web');
         } else {
-            fetch('/api/launch', {
+            fetch('api/launch', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ label, value }),

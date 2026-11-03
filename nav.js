@@ -39,10 +39,10 @@
     const COUNT_KEY    = 'tw-count-text';
 
     const PAGES = [
-        { id: 'tasks',    href: '/',                      label: 'List'       },
-        { id: 'kanban',   href: '/kanban.html',           label: 'Kanban'     },
-        { id: 'agenda',   href: '/agenda.html',            label: 'Agenda'     },
-        { id: 'calendar', href: '/calendar-planner.html', label: 'Calendar'   },
+        { id: 'tasks',    href: './',                     label: 'List'       },
+        { id: 'kanban',   href: 'kanban.html',           label: 'Kanban'     },
+        { id: 'agenda',   href: 'agenda.html',            label: 'Agenda'     },
+        { id: 'calendar', href: 'calendar-planner.html', label: 'Calendar'   },
     ];
 
     const STATUS_BTNS = [
@@ -134,8 +134,8 @@
         // Lazy-load xterm if not already loaded
         if (!window.Terminal) {
             await Promise.all([
-                new Promise(r => { const s = document.createElement('script'); s.src = '/xterm.js'; s.onload = r; document.head.appendChild(s); }),
-                new Promise(r => { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/xterm.css'; l.onload = r; document.head.appendChild(l); }),
+                new Promise(r => { const s = document.createElement('script'); s.src = 'xterm.js'; s.onload = r; document.head.appendChild(s); }),
+                new Promise(r => { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'xterm.css'; l.onload = r; document.head.appendChild(l); }),
             ]);
         }
 
@@ -151,7 +151,7 @@
 
         // Load terminal settings (height default, cwd, init script)
         let _ptyCfg = {};
-        try { const r = await fetch('/api/config'); _ptyCfg = await r.json(); } catch {}
+        try { const r = await fetch('api/config'); _ptyCfg = await r.json(); } catch {}
         const _cfgHeight = Math.max(60, parseInt(_ptyCfg.pty_height || 240));
 
         const term = new window.Terminal({ rows: 10, cols: 80, fontSize: 12, fontFamily: 'monospace', theme: { background: '#0a0a0a', foreground: '#d4d4d8' }, convertEol: true, scrollback: 200 });
@@ -198,7 +198,7 @@
         });
 
         const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-        const ws = new WebSocket(`${proto}://${location.host}/ws/pty`);
+        const ws = new WebSocket(`${proto}://${location.host}${location.pathname.replace(/[^/]*$/, '')}ws/pty`);
 
         let _sessionEnded = false;
         function _closePty() {
@@ -258,6 +258,8 @@
         if (p.endsWith('calendar-planner.html')) return 'calendar';
         return 'tasks';
     }
+    // The List is the folder's index: / alone, /tw/ behind a proxy, or …/index.html
+    function onList() { return /\/(index\.html)?$/.test(window.location.pathname); }
     function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
     function esc(s) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -706,7 +708,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         return (
             `<div class="tw-bar-left">` +
                 `<button id="tw-logo-btn" class="tw-logo-btn" title="Menu">` +
-                    `<img src="/tw-logo.png" alt="Menu" class="tw-logo">` +
+                    `<img src="tw-logo.png" alt="Menu" class="tw-logo">` +
                 `</button>` +
                 `<button id="tw-brand-refresh" title="Refresh">` +
                     `<span class="tw-name-full">Taskwarrior</span>` +
@@ -890,8 +892,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         if (TW.commands.isFilterOnly(cmd, await TW.commands.vocab())) {
             inp.value = '';
             setRawFilter(cmd);
-            if (window.location.pathname !== '/') {
-                window.location.href = '/';
+            if (!onList()) {
+                window.location.href = './';
             }
             return;
         }
@@ -988,7 +990,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             else if (action === 'stats')      { openStatsPanel();    }
             else if (action === 'settings')   { openSettingsPanel(); }
             else if (action === 'terminal')   { closeMenu(); openTerminal(); }
-            else if (action === 'help')       { closeMenu(); window.location.href = '/help.html'; }
+            else if (action === 'help')       { closeMenu(); window.location.href = 'help.html'; }
             else closeMenu();
         });
 
@@ -1066,7 +1068,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         sideMenu.id = 'tw-side-menu';
         sideMenu.innerHTML =
             `<div class="tw-menu-header">` +
-                `<img src="/logo-192.png" alt="tw-web">` +
+                `<img src="logo-192.png" alt="tw-web">` +
                 `<span>tw-web</span>` +
                 `<span id="tw-cache-ver"></span>` +
                 `<button type="button" id="tw-update-pill" style="display:none"></button>` +
@@ -1187,7 +1189,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         });
 
         // Background: fetch notification timeout
-        fetch('/api/config').then(r => r.json()).then(d => {
+        fetch('api/config').then(r => r.json()).then(d => {
             window.twNotifTimeout = (d.notification_timeout != null) ? d.notification_timeout : 3000;
         }).catch(() => { window.twNotifTimeout = 3000; });
     }
@@ -1211,7 +1213,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 
     async function pollSyncStatus() {
         try {
-            const r = await fetch('/api/sync/status');
+            const r = await fetch('api/sync/status');
             const d = await r.json();
             updateSyncIndicator(d.changes || 0);
         } catch {}
@@ -1219,7 +1221,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 
     async function fetchContexts() {
         try {
-            const r = await fetch('/api/contexts');
+            const r = await fetch('api/contexts');
             const d = await r.json();
             if (d.success) return { names: d.contexts || [], filters: d.filters || {} };
         } catch {}
@@ -1370,7 +1372,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         }
 
         try {
-            const r = await fetch('/api/projects' + (mode === 'all' ? '' : '?active=1'));
+            const r = await fetch('api/projects' + (mode === 'all' ? '' : '?active=1'));
             const d = await r.json();
             const projects = (d.projects || []).filter(p => p && p.name);
             render(projects);
@@ -1424,7 +1426,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         if (_vtLast && needed.every(n => fresh && n in fresh.sets)) return;
         _vtBusy = true;
         try {
-            const d = await TW.api.get('/api/vtags?match=' + encodeURIComponent(needed.join(',')));
+            const d = await TW.api.get('api/vtags?match=' + encodeURIComponent(needed.join(',')));
             if (!d.success) { console.warn('virtual tags:', d.error); return; }
             const first = !_vtLast;
             _vtLast = { names: d.names, tags: d.tags, sets: d.uuids || {} };
@@ -1448,7 +1450,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         if (_vtLast) return;
         if (typeof TW !== 'undefined' && TW.filter) return _syncVtags();
         try {
-            const d = await fetch('/api/vtags').then(r => r.json());
+            const d = await fetch('api/vtags').then(r => r.json());
             if (d.success && !_vtLast) _vtLast = { names: d.names, tags: d.tags, sets: {} };
         } catch {}
     }
@@ -1525,7 +1527,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             mode = m; localStorage.setItem('tw-tags-mode', mode);
             if (mode === 'all') {
                 try {
-                    const d = await fetch('/api/tags?all=1').then(r => r.json());
+                    const d = await fetch('api/tags?all=1').then(r => r.json());
                     panelTagCounts = d.counts || {};
                 } catch { body.innerHTML = '<div class="tw-panel-error">Failed to load tags</div>'; return; }
             } else if (mode === 'virtual') {
@@ -1586,7 +1588,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         async function load(m) {
             mode = m; localStorage.setItem('tw-proj-mode', mode);
             try {
-                const d = await fetch('/api/projects' + (mode==='all'?'':'?active=1')).then(r=>r.json());
+                const d = await fetch('api/projects' + (mode==='all'?'':'?active=1')).then(r=>r.json());
                 allProjects = (d.projects||[]).filter(p=>p&&p.name);
                 render();
             } catch { container.innerHTML = '<div class="tw-panel-error">Failed to load</div>'; }
@@ -1629,7 +1631,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             mode = m; localStorage.setItem('tw-tags-mode', mode);
             if (mode === 'all') {
                 try {
-                    const d = await fetch('/api/tags?all=1').then(r => r.json());
+                    const d = await fetch('api/tags?all=1').then(r => r.json());
                     tagCounts = d.counts || {};
                     render();
                 } catch { container.innerHTML = '<div class="tw-panel-error">Failed to load</div>'; }
@@ -1662,7 +1664,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         openPanel('Stats');
         const body = panelBody();
         try {
-            const r = await fetch('/api/stats');
+            const r = await fetch('api/stats');
             const d = await r.json();
             if (!d.success) throw new Error(d.error || 'failed');
             // Parse "Category    Value" lines, skip header + separator
@@ -1686,7 +1688,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         const body = panelBody();
         let cfg;
         try {
-            const r = await fetch('/api/config');
+            const r = await fetch('api/config');
             cfg = await r.json();
         } catch { body.innerHTML = '<div class="tw-panel-error">Failed to load settings</div>'; return; }
 
@@ -1912,7 +1914,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         // Server: restart or stop it (stop was only in the Firefox popup)
         form.appendChild(_section('server', 'Server', bd => {
             const since = _note('');
-            fetch('/api/ping', { cache: 'no-store' }).then(r => r.json()).then(d => {
+            fetch('api/ping', { cache: 'no-store' }).then(r => r.json()).then(d => {
                 const t = new Date(d.started * 1000);
                 since.textContent = 'Running since ' + t.toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
             }).catch(() => {});
@@ -2012,7 +2014,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             if (isNaN(notifVal) || notifVal < 0) { _status(sec, 'Invalid timeout', true); return; }
             _status(sec, 'Saving…');
             try {
-                const r = await fetch('/api/config', {
+                const r = await fetch('api/config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2133,12 +2135,12 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         btn.textContent       = 'Sync Now';
         changesEl.textContent = 'Loading…';
 
-        fetch('/api/sync/info').then(r => r.json())
+        fetch('api/sync/info').then(r => r.json())
             .then(d => { method.textContent = `Method: ${d.method}`; })
             .catch(() => { method.textContent = ''; });
 
         _renderSyncStatus(changesEl, null);
-        fetch('/api/sync/status?fetch=1').then(r => r.json())
+        fetch('api/sync/status?fetch=1').then(r => r.json())
             .then(d => _renderSyncStatus(changesEl, d))
             .catch(e => { changesEl.textContent = TW.api.networkError(e); });
 
@@ -2152,7 +2154,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             btn.disabled    = true;
             btn.textContent = 'Syncing…';
             output.style.display = 'none';
-            TW.api.write('POST', '/api/sync', { message: msg }).then(data => {
+            TW.api.write('POST', 'api/sync', { message: msg }).then(data => {
                 const came = _pulledText(data.pulled);
                 output.textContent   = (came ? `Pulled ${came}.\n\n` : '') +
                                        (data.output || (data.success ? 'Sync complete.' : 'Sync failed.'));
@@ -2162,7 +2164,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 if (data.success) {
                     comment.value = '';
                     pollSyncStatus();
-                    fetch('/api/sync/status').then(r => r.json()).then(d => _renderSyncStatus(changesEl, d)).catch(() => {});
+                    fetch('api/sync/status').then(r => r.json()).then(d => _renderSyncStatus(changesEl, d)).catch(() => {});
                     document.dispatchEvent(new CustomEvent('tw-sync-complete'));
                 }
             }).catch(err => {
@@ -2175,7 +2177,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 
         logBtn.onclick = () => {
             logBtn.disabled = true;
-            fetch('/api/sync/log').then(r => r.json()).then(d => {
+            fetch('api/sync/log').then(r => r.json()).then(d => {
                 output.textContent   = d.log || '(no log)';
                 output.style.display = 'block';
             }).catch(err => {
@@ -2188,7 +2190,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             if (!confirm('Undo the last task modification?')) return;
             undoBtn.disabled    = true;
             undoBtn.textContent = 'Undoing…';
-            TW.api.write('POST', '/api/sync/undo').then(d => {
+            TW.api.write('POST', 'api/sync/undo').then(d => {
                 output.textContent   = d.output || (d.success ? 'Undone.' : 'Undo failed.');
                 output.style.display = 'block';
                 if (d.success) document.dispatchEvent(new CustomEvent('tw-sync-complete'));
@@ -2264,7 +2266,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             answered = true;
             clearTimeout(timer);
             document.getElementById('tw-prompt-backdrop').classList.remove('open');
-            fetch('/api/hook-answer', {
+            fetch('api/hook-answer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: prompt.id, answer: val })
@@ -2278,7 +2280,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     }
 
     function _initSSE() {
-        const es = new EventSource('/api/events');
+        const es = new EventSource('api/events');
         es.onmessage = (e) => {
             try {
                 const msg = JSON.parse(e.data);
@@ -2322,7 +2324,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         _pinging = true;
         let ok = false;
         try {
-            const r = await fetch('/api/ping', { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+            const r = await fetch('api/ping', { cache: 'no-store', signal: AbortSignal.timeout(4000) });
             const d = await r.json();
             ok = !!d.ok;
             if (ok) {
@@ -2391,7 +2393,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     let _versionInfo = null;
     async function _checkVersion() {
         try {
-            _versionInfo = await (await fetch('/api/version', { cache: 'no-store' })).json();
+            _versionInfo = await (await fetch('api/version', { cache: 'no-store' })).json();
         } catch { return; }
         const v = _versionInfo, ver = document.getElementById('tw-cache-ver');
         const pill = document.getElementById('tw-update-pill');
@@ -2414,7 +2416,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         pill.textContent = 'Updating…';
         let d;
         try {
-            d = await (await fetch('/api/update', { method: 'POST' })).json();
+            d = await (await fetch('api/update', { method: 'POST' })).json();
         } catch (e) { showNotification(TW.api.networkError(e), 'error'); pill.disabled = false; return; }
         if (!d.success) { showNotification(d.error || 'Update failed', 'error'); _checkVersion(); return; }
         // The server restarts by itself when Python files changed; then the service worker fetches
@@ -2424,7 +2426,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         const sleep = ms => new Promise(r => setTimeout(r, ms));
         await sleep(2000);
         for (let i = 0; i < 40; i++) {
-            try { if ((await (await fetch('/api/ping', { cache: 'no-store' })).json()).ok) break; } catch {}
+            try { if ((await (await fetch('api/ping', { cache: 'no-store' })).json()).ok) break; } catch {}
             await sleep(500);
         }
         try {
@@ -2444,7 +2446,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                                               : 'started again (tw-web-launch.sh).'))) return;
         let d;
         try {
-            const r = await fetch(`/api/server/${action}`, { method: 'POST' });
+            const r = await fetch(`api/server/${action}`, { method: 'POST' });
             d = await r.json();
         } catch (e) { showNotification(TW.api.networkError(e), 'error'); return; }
         if (!d.success) { showNotification(d.error || `Could not ${action} the server`, 'error'); return; }
@@ -2457,10 +2459,10 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────────
     const _PAGE_KEYS = {
-        'L': '/',
-        'K': '/kanban.html',
-        'A': '/agenda.html',
-        'C': '/calendar-planner.html',
+        'L': './',
+        'K': 'kanban.html',
+        'A': 'agenda.html',
+        'C': 'calendar-planner.html',
     };
     const _CAL_KEYS = { 'D': 'day', 'W': 'week', 'M': 'month', 'T': 'today' };
 
@@ -2491,7 +2493,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 
             if (k === '?') {
                 e.preventDefault();
-                window.location.href = '/help.html';
+                window.location.href = 'help.html';
             } else if (_PAGE_KEYS[k]) {
                 e.preventDefault();
                 window.location.href = _PAGE_KEYS[k];

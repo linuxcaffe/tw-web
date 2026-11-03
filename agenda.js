@@ -78,8 +78,8 @@ function loadAgenda() {
     }
 
     Promise.all([
-        fetch('/api/tasks/planned?' + params).then(r => r.json()),
-        fetch('/api/tasks/due?'     + params).then(r => r.json()),
+        fetch('api/tasks/planned?' + params).then(r => r.json()),
+        fetch('api/tasks/due?'     + params).then(r => r.json()),
     ])
     .then(([plannedData, dueData]) => {
         document.getElementById('loading').style.display = 'none';
@@ -133,7 +133,7 @@ function renderAgenda(scheduled, due) {
 
     // If grand total isn't cached yet, fetch it in the background and update the counter
     if (grandTotal === null && window.twNav) {
-        fetch('/api/tasks?' + p).then(r => r.json()).then(data => {
+        fetch('api/tasks?' + p).then(r => r.json()).then(data => {
             if (data.success && Array.isArray(data.tasks)) {
                 grandTotal = data.tasks.length;
                 window.twNav.setGrandTotal(grandTotal, p);
@@ -166,7 +166,7 @@ function renderAgenda(scheduled, due) {
 async function agendaLayerDays(taskKeys, todayKey, isHistory) {
     const none = { byDay: new Map(), bars: new Set() };
     if (!TW.layers) return none;
-    _agendaCfg = _agendaCfg || fetch('/api/config').then(r => r.json()).catch(() => ({}));
+    _agendaCfg = _agendaCfg || fetch('api/config').then(r => r.json()).catch(() => ({}));
     const cfg = await _agendaCfg;
     if (!TW.layers.enabled(cfg).length) return none;
     const sorted = [...taskKeys].sort();
@@ -264,7 +264,7 @@ function dateHeader(key, isHistory, layerItems) {
         header.style.cursor = 'pointer';
         header.title = 'Open in Calendar Day view';
         header.addEventListener('click', () => {
-            window.location.href = `/calendar-planner.html?date=${key}&view=day`;
+            window.location.href = `calendar-planner.html?date=${key}&view=day`;
         });
     }
     return header;
