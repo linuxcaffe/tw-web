@@ -1,2 +1,1 @@
 # Checks that reproduce a known bug (tw:docs/tw-web-known-bugs.md). Remove a line when its bug is fixed.
-bug19-outside-change  # a change made outside the page never shows until a reload (bug 19)

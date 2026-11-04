@@ -10,6 +10,8 @@
  *   TW.api.handleWriteResult(data)    act on a write's hook signals; returns true if the PTY took over
  *   TW.api.networkError(e)            the message for a fetch that threw; when nothing answered, says
  *                                     so and asks nav.js to check the server (its banner)
+ *   TW.stamp.seen() / .set(s)         the task data's state this page has (X-Tasks-Stamp, bug 19):
+ *                                     nav.js reloads the view when the server's moves past it
  *   TW.commands.vocab()               task's commands and aliases (/api/commands), fetched once per page
  *   TW.commands.isFilterOnly(cmd, v)  command mode: true when cmd has no command word (a raw filter)
  *
@@ -48,6 +50,9 @@ const TW = (() => {
         return r.json();
     }
 
+    let _seen = null;
+    const stamp = { seen: () => _seen, set: s => { _seen = s; } };
+
     async function write(method, url, body) {
         const opts = { method };
         if (body !== undefined) {
@@ -62,6 +67,8 @@ const TW = (() => {
             return { success: false, error: networkError(e) };
         }
         invalidate();
+        const st = r.headers.get('X-Tasks-Stamp');   // our own write: not news to this page
+        if (st) _seen = st;
         try {
             return await r.json();
         } catch {
@@ -128,6 +135,6 @@ const TW = (() => {
         return !tokens.some(tok => isCommandWord(tok, v));
     }
 
-    return { store: { read, save, invalidate }, api: { get, write, handleWriteResult, networkError, NO_ANSWER },
+    return { stamp, store: { read, save, invalidate }, api: { get, write, handleWriteResult, networkError, NO_ANSWER },
              commands: { vocab, isCommandWord, isFilterOnly } };
 })();

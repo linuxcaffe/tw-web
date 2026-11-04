@@ -2317,6 +2317,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                     pollSyncStatus();
                     document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
                     showNotification(`Synced: ${_pulledText(msg.pulled)}`, 'info');
+                } else if (msg.type === 'tasks-changed') {
+                    _tasksChanged(msg.stamp);
                 } else if (msg.type === 'info') {
                     document.dispatchEvent(new CustomEvent('tw-show-notification',
                         { detail: { message: msg.question, type: 'info' } }));
@@ -2325,6 +2327,27 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         };
         // The stream drops when the server stops: check at once (the browser reconnects by itself)
         es.onerror = () => _serverCheck();
+    }
+
+    // ── Tasks changed elsewhere (bug 19) ──────────────────────────────────────
+    // The CLI, vit, another tab, the phone's sync or a later hook changed the data: reload the
+    // view as a sync does. The stamp comes from the event stream, or from the ping when the page
+    // comes back (the stream sleeps on a phone). This page's own writes set the stamp first
+    // (TW.api.write), so they're skipped; a burst reloads once; never under an open dialog.
+    let _tcTimer = null;
+    function _tasksChanged(stamp) {
+        if (!TW.stamp.seen()) { TW.stamp.set(stamp); return; }   // the page's first look
+        if (stamp === TW.stamp.seen()) return;
+        clearTimeout(_tcTimer);
+        _tcTimer = setTimeout(() => _applyTasksChanged(stamp), 400);
+    }
+    function _applyTasksChanged(stamp) {
+        if (stamp === TW.stamp.seen()) return;
+        const dialogOpen = [...document.querySelectorAll('.modal')].some(m => m.style.display === 'block');
+        if (dialogOpen) { _tcTimer = setTimeout(() => _applyTasksChanged(stamp), 1000); return; }
+        TW.stamp.set(stamp);
+        TW.store.invalidate();
+        document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
     }
 
     // ── Server watch ──────────────────────────────────────────────────────────
@@ -2350,6 +2373,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             const r = await fetch('api/ping', { cache: 'no-store', signal: AbortSignal.timeout(4000) });
             const d = await r.json();
             ok = !!d.ok;
+            if (ok && d.stamp) _tasksChanged(d.stamp);   // the stream may have slept (a phone)
             if (ok) {
                 _lsSet(_LAST_KEY, String(Date.now()));
                 _lsSet(_TERMUX_KEY, d.termux ? '1' : '0');

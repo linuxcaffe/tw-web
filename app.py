@@ -400,10 +400,59 @@ def _sse_broadcast(event: dict):
             except Exception:
                 pass
 
+# ── Tasks changed (bug 19) ────────────────────────────────────────────────
+# A change made outside the page (the CLI, vit, another tab, the phone's sync, a hook acting
+# later) never reached an open page. The stamp names the data files' state; the watcher below
+# pushes `tasks-changed` when it moves, /api/ping carries it (the fallback when the stream
+# sleeps, as on a phone), and every /api/ answer has it in X-Tasks-Stamp, so a page knows which
+# state it already has and skips its own writes. Stats only: never runs task per check.
+_data_dir_cache: Path | None = None
+
+def _data_dir() -> Path:
+    global _data_dir_cache
+    if _data_dir_cache is None:
+        d = os.environ.get('TASKDATA')
+        if not d:
+            try:
+                r = subprocess.run(['task', 'rc.hooks=off', '_get', 'rc.data.location'],
+                                   capture_output=True, text=True, timeout=5, stdin=subprocess.DEVNULL)
+                d = r.stdout.strip() if r.returncode == 0 else ''
+            except (OSError, subprocess.SubprocessError):
+                d = ''
+        _data_dir_cache = Path(os.path.expanduser(d)) if d else Path.home() / '.task'
+    return _data_dir_cache
+
+def _tasks_stamp() -> str:
+    parts = []
+    for name in ('pending.data', 'completed.data'):
+        try:
+            st = (_data_dir() / name).stat()
+            parts.append(f'{st.st_mtime_ns:x}.{st.st_size:x}')
+        except OSError:
+            parts.append('-')
+    return '-'.join(parts)
+
+@app.after_request
+def _stamp_header(resp):
+    if request.path.startswith('/api/') and request.path != '/api/events':
+        resp.headers['X-Tasks-Stamp'] = _tasks_stamp()
+    return resp
+
 def _prompt_watcher():
-    """Background thread: watch for .prompt files written by hooks."""
+    """Background thread: watch for .prompt files written by hooks, and for the task data
+    changing (bug 19)."""
     seen: set[str] = set()
+    stamp, tick = None, 0
     while True:
+        tick += 1
+        if tick % 3 == 0:                     # ~1 s: the data files, by stat
+            try:
+                now = _tasks_stamp()
+                if stamp is not None and now != stamp:
+                    _sse_broadcast({'type': 'tasks-changed', 'stamp': now})
+                stamp = now
+            except Exception:
+                pass
         try:
             for pf in sorted(_PROMPT_DIR.glob('*.prompt')):
                 stem = pf.stem
@@ -1258,7 +1307,8 @@ def server_health():
 @app.route('/api/ping')
 def server_ping():
     """The page's "is the server there?": cheap, runs no task command."""
-    return jsonify({'ok': True, 'termux': _is_termux(os.environ), 'started': _START_TIME})
+    return jsonify({'ok': True, 'termux': _is_termux(os.environ), 'started': _START_TIME,
+                    'stamp': _tasks_stamp()})
 
 def _restart_soon():
     """Exit the serving process with code 3 after the response has gone out: Werkzeug's reloader
