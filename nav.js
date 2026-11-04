@@ -700,26 +700,16 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 }
 `;
 
-    // ── The nb-web link (tw-nb-interop M7) ─────────────────────────────────────
-    // A nav link and the N key to nb-web, taken from tw-web's own `nb` annotation launcher and
-    // only when that's a web address (http://host/#{value} → http://host/). Same tab, so Back
-    // returns; in the bundle (nb-web at /, tw-web at /tw/) both stay in one window. Nothing
+    // ── The way to nb-web (tw-nb-interop M7) ───────────────────────────────────
+    // The N key goes to nb-web, at the address in tw-web's own `nb` annotation launcher, and only
+    // when that's a web address (http://host/#{value} → http://host/). Same tab, so Back returns;
+    // in the bundle (nb-web at /, tw-web at /tw/) both stay in one window. The nav link it also
+    // had opened a second nb-web instead of switching, so it's gone (djp 2026-11-04). Nothing
     // else here knows about nb-web.
     let _siblingHref = '';
     function _siblingUrl(tmpl) {
         const base = String(tmpl || '').split('{value}')[0].replace(/[#?]+$/, '');
         return /^https?:\/\/[^\s"'<>`]+$/.test(base) ? base : '';
-    }
-    function _addSiblingLink(tmpl) {
-        _siblingHref = _siblingUrl(tmpl);
-        const left = document.querySelector('#tw-nav-bar .tw-bar-left');
-        if (!_siblingHref || !left || left.querySelector('.tw-nav-sibling')) return;
-        const a = document.createElement('a');
-        a.className = 'tw-nav-link tw-nav-sibling';
-        a.href = _siblingHref;
-        a.title = 'nb-web (N)';
-        a.textContent = 'nb-web';
-        left.appendChild(a);
     }
 
     // ── HTML builders ─────────────────────────────────────────────────────────
@@ -1210,10 +1200,10 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             _updateFilterBar(getState());   // refresh with real context expressions
         });
 
-        // Background: fetch notification timeout, and the nb-web link
+        // Background: fetch notification timeout, and nb-web's address for the N key
         fetch('api/config').then(r => r.json()).then(d => {
             window.twNotifTimeout = (d.notification_timeout != null) ? d.notification_timeout : 3000;
-            _addSiblingLink((d.annotation_launchers || {}).nb);
+            _siblingHref = _siblingUrl((d.annotation_launchers || {}).nb);
         }).catch(() => { window.twNotifTimeout = 3000; });
     }
 
