@@ -1346,6 +1346,64 @@ def nb_health():
     })
 
 
+# A task's note when nb-web doesn't answer (M7 step 3, djp 2026-11-04): termux-open hands it to
+# Documents (Android), else tw-web shows it read-only. Only notes in tasknotes: tw-web has no
+# login and may listen on Tailscale, so never another notebook, a dotfile, an encrypted note, a
+# folder or a path out of it; a numeric id (tasks:5) needs nb itself.
+_NOTE_MAX = 1_000_000
+
+
+def _tasknote_file(value):
+    """(path, selector, None) for an `nb:` annotation value naming a note in tasknotes, else
+    (None, None, (message, status))."""
+    v = str(value or '').strip()
+    notebook, sep, rel = v.partition(':')
+    if not sep:
+        notebook, rel = 'tasknotes', v                      # bare: tasknotes (M1)
+    if not rel:
+        return None, None, ('no note named', 400)
+    if notebook != 'tasknotes':
+        return None, None, (f'only notes in tasknotes: open here, not {notebook}:', 403)
+    parts = rel.split('/')
+    if rel.startswith('/') or any(x in ('', '.', '..') or x.startswith('.') for x in parts):
+        return None, None, ('not a note in tasknotes', 403)
+    if rel.isdigit():
+        return None, None, ('a numeric id needs nb itself', 404)
+    root = Path(os.environ.get('NB_DIR') or Path.home() / '.nb') / 'tasknotes'
+    for cand in (root / rel, root / (rel + '.md')):
+        try:
+            real = cand.resolve()
+            real.relative_to(root.resolve())
+        except (OSError, ValueError):
+            return None, None, ('not a note in tasknotes', 403)
+        if real.is_file():
+            if real.name.endswith('.enc') or real.stat().st_size > _NOTE_MAX:
+                return None, None, ('not readable here (encrypted, or too big)', 403)
+            return real, 'tasknotes:' + str(real.relative_to(root.resolve())), None
+    return None, None, ('no such note on this device', 404)
+
+
+@app.route('/api/nb/note')
+def nb_note_read():
+    path, selector, err = _tasknote_file(request.args.get('value', ''))
+    if err:
+        return jsonify({'success': False, 'error': err[0]}), err[1]
+    return jsonify({'success': True, 'selector': selector, 'name': path.name,
+                    'text': path.read_text(errors='replace')})
+
+
+@app.route('/api/nb/open', methods=['POST'])
+def nb_note_open():
+    path, _, err = _tasknote_file((request.get_json(silent=True) or {}).get('value', ''))
+    if err:
+        return jsonify({'success': False, 'error': err[0]}), err[1]
+    if not shutil.which('termux-open'):
+        return jsonify({'success': False, 'error': 'no termux-open here (Android only)'}), 409
+    subprocess.Popen(['termux-open', str(path)], stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return jsonify({'success': True})
+
+
 def _restart_soon():
     """Exit the serving process with code 3 after the response has gone out: Werkzeug's reloader
     (the parent process) then starts a fresh one, as it does when a file changes."""

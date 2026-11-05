@@ -31,6 +31,12 @@ check(async pg => {
         expect(typeof h.nb.ok === 'boolean' && typeof h.plugin.ok === 'boolean', 'server parts');
     });
 
+    await withLauncher('http://nb.test/#{value}', async () => {        // another origin that answers
+        await pg.context().route('http://nb.test/**', r => r.fulfill({ contentType: 'text/html', body: 'nb-web' }));
+        const h = await ask(pg);
+        expect(h.nbWeb.state === 'up', `another origin, answering: ${h.nbWeb.state}`);
+    });
+
     await withLauncher('http://127.0.0.1:9/#{value}', async () => {    // nothing listens
         const t0 = Date.now();
         const h = await ask(pg);

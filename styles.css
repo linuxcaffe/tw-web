@@ -1401,3 +1401,9 @@ body.kanban-page .app-container { flex: 1; min-height: 0; display: flex; flex-di
 /* drag-and-drop states */
 .sortable-ghost  { opacity: 0.25; }
 .sortable-chosen { box-shadow: 0 8px 28px rgba(0,0,0,0.6) !important; }
+
+/* A task's note read-only, when nb-web doesn't answer (M7 step 3) */
+.tw-note-ro .modal-content { max-width: 720px; }
+.tw-note-ro-why  { margin: 12px 20px 0; color: var(--text-dim); font-size: 0.9em; }
+.tw-note-ro-text { margin: 12px 20px 20px; white-space: pre-wrap; word-break: break-word;
+                   font-family: inherit; color: var(--text); }

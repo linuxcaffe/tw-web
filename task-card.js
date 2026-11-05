@@ -330,6 +330,52 @@ async function _getLaunchers() {
 // Pre-warm so launchers are ready before first annotation render
 _getLaunchers();
 
+// What of nb is here (M7 a): warmed now, so a click can choose its path without waiting (a new
+// tab only opens inside the click's own gesture), and refreshed after each nb: click.
+let _nbHealthNow = null;
+const _warmNbHealth = fresh => TW.nbHealth({ fresh }).then(h => { _nbHealthNow = h; }).catch(() => {});
+_warmNbHealth(false);
+
+// An nb: link when nb-web doesn't answer (M7 step 3, djp 2026-11-04): the note from this device,
+// in Documents (termux-open, Android) or read-only here; each says it's a fallback, and why.
+async function _openNoteHere(value, why) {
+    const h = _nbHealthNow || {};
+    const say = (m, type = 'info') => window.twNav?.showNotification?.(m, type);
+    if (h.termuxOpen?.ok && h.notes?.ok) {
+        const r = await fetch('api/nb/open', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ value }) }).catch(() => null);
+        if (r?.ok) { say(`${why}: opened the note in Documents`); return; }
+    }
+    const r = await fetch('api/nb/note?value=' + encodeURIComponent(value)).catch(() => null);
+    const d = r ? await r.json().catch(() => ({})) : {};
+    if (!r?.ok) {
+        say(`${why}, and ${d.error || TW.NB_MISSING.notes}`, 'error');
+        return;
+    }
+    _showNoteReadOnly(d, why);
+}
+
+function _showNoteReadOnly(d, why) {
+    document.getElementById('tw-note-ro')?.remove();
+    const esc = s => { const e = document.createElement('div'); e.textContent = s; return e.innerHTML; };
+    const m = document.createElement('div');
+    m.id = 'tw-note-ro';
+    m.className = 'modal tw-note-ro';
+    m.style.display = 'block';
+    m.innerHTML = `<div class="modal-content" role="dialog" aria-modal="true" aria-label="${esc(d.name)}">
+        <div class="modal-header"><h3>${esc(d.name)}</h3>
+          <span class="close" role="button" tabindex="0" aria-label="Close">&times;</span></div>
+        <p class="tw-note-ro-why">${esc(why)}: a read-only copy from this device (${esc(d.selector)}).</p>
+        <pre class="tw-note-ro-text">${esc(d.text)}</pre></div>`;
+    document.body.appendChild(m);
+    const close = () => m.remove();
+    m.querySelector('.close').addEventListener('click', close);
+    m.addEventListener('click', e => { if (e.target === m) close(); });
+    m.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
+    m.tabIndex = -1;
+    m.querySelector('.close').focus();
+}
+
 // Linkify annotation text: handles https?/ftp/file:// URIs, mailto:,
 // and "label: value" annotation conventions dispatched via /api/launch.
 function linkifyAnnotation(raw) {
@@ -397,7 +443,11 @@ document.addEventListener('click', async e => {
         if (!launchers[label]) return;
         const tmpl = launchers[label];
         const resolved = tmpl.replace('{value}', encodeURIComponent(value));
-        if (/^https?:\/\//.test(resolved)) {
+        const nbDown = label === 'nb' && _nbHealthNow && _nbHealthNow.nbWeb.state === 'down';
+        if (label === 'nb') _warmNbHealth(true);
+        if (/^https?:\/\//.test(resolved) && nbDown) {
+            _openNoteHere(value, TW.NB_MISSING.down);
+        } else if (/^https?:\/\//.test(resolved)) {
             // Same origin (the bundle: nb-web at /, tw-web at /tw/): in place, so Back returns.
             // Elsewhere: a plain new tab. Never a named window: in an Epiphany web app,
             // window.open(url, 'nb-web') made an empty popup and handed the URL to Firefox

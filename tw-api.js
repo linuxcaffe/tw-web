@@ -125,8 +125,11 @@ const TW = (() => {
         const timer = setTimeout(() => ctl.abort(), 800);
         try {
             const u = new URL(url, location.href);
-            await fetch(u, { mode: u.origin === location.origin ? 'same-origin' : 'no-cors',
-                             cache: 'no-store', credentials: 'omit', redirect: 'manual', signal: ctl.signal });
+            const same = u.origin === location.origin;
+            // no-cors allows only redirect: 'follow' (anything else throws at once, which read as
+            // "down" for every nb-web on another origin, over Tailscale say)
+            await fetch(u, { mode: same ? 'same-origin' : 'no-cors', redirect: same ? 'manual' : 'follow',
+                             cache: 'no-store', credentials: 'omit', signal: ctl.signal });
             return 'up';
         } catch { return 'down'; }
         finally { clearTimeout(timer); }

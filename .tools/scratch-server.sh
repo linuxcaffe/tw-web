@@ -24,10 +24,10 @@ case "$cmd" in
 up)
     [ -f "$STATE" ] && die "already up ($STATE); run down first"
     TMP=$(mktemp -d -t tw-web-scratch.XXXXXX)
-    mkdir -m 700 "$TMP/data" "$TMP/run"
+    mkdir -m 700 "$TMP/data" "$TMP/run" "$TMP/nb"   # nb: its own NB_DIR, never ~/.nb
     printf 'data.location=%s/data\nhooks=off\nconfirmation=no\n' "$TMP" > "$TMP/taskrc"
     PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
-    (cd "$DIR" && exec env TASKRC="$TMP/taskrc" TASKDATA="$TMP/data" TW_TASK_DIR="$TMP/data" XDG_RUNTIME_DIR="$TMP/run" \
+    (cd "$DIR" && exec env TASKRC="$TMP/taskrc" TASKDATA="$TMP/data" TW_TASK_DIR="$TMP/data" NB_DIR="$TMP/nb" XDG_RUNTIME_DIR="$TMP/run" \
         TW_WEB_SETTINGS="$TMP/settings.json" TW_WEB_PORT="$PORT" python3 app.py > "$TMP/server.log" 2>&1) &
     PID=$!
     printf 'TMP=%q\nPORT=%q\nPID=%q\n' "$TMP" "$PORT" "$PID" > "$STATE"
@@ -40,8 +40,8 @@ up)
     ;;
 env)
     load
-    printf 'export TASKRC=%q TASKDATA=%q TW_WEB_PORT=%q TW_WEB_SETTINGS=%q\n' \
-        "$TMP/taskrc" "$TMP/data" "$PORT" "$TMP/settings.json"
+    printf 'export TASKRC=%q TASKDATA=%q TW_WEB_PORT=%q TW_WEB_SETTINGS=%q NB_DIR=%q\n' \
+        "$TMP/taskrc" "$TMP/data" "$PORT" "$TMP/settings.json" "$TMP/nb"
     ;;
 probe)
     load
