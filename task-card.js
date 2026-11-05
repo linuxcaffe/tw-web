@@ -441,7 +441,9 @@ document.addEventListener('click', async e => {
         // and cause browsers to open a new tab on every click.
         const launchers = _annLaunchers || await _getLaunchers();
         if (!launchers[label]) return;
-        const tmpl = launchers[label];
+        // nb: on a device with its own nb-web address (nav.js nbWebHere) goes there
+        const here = label === 'nb' ? (window.twNav?.nbWebHere?.() || '') : '';
+        const tmpl = here ? here.replace(/\/?$/, '/') + '#{value}' : launchers[label];
         const resolved = tmpl.replace('{value}', encodeURIComponent(value));
         const nbDown = label === 'nb' && _nbHealthNow && _nbHealthNow.nbWeb.state === 'down';
         if (label === 'nb') _warmNbHealth(true);

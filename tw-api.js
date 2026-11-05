@@ -141,11 +141,13 @@ const TW = (() => {
             let d = {};
             try { d = await get('api/nb/health'); } catch { /* the server is down: nothing local */ }
             const no = { ok: false };
-            const url = d.nb_web_url || '';
+            const serverUrl = d.nb_web_url || '';
+            const here = window.twNav?.nbWebHere?.() || '';   // this device's own (nav.js)
+            const url = here || serverUrl;
             return {
                 nb: d.nb || no, plugin: d.plugin || no, tasknotes: d.tasknotes || no,
                 notes: d.notes || { ok: false, path: '' }, termuxOpen: d.termux_open || no,
-                nbWeb: { state: await _probeNbWeb(url), url },
+                nbWeb: { state: await _probeNbWeb(url), url, serverUrl, here: !!here },
             };
         })();
         return _nbHealth;

@@ -281,7 +281,7 @@
 
     window.twNav = { getState, setState, stateToParams, setCount, setGrandTotal, getGrandTotal,
                      openSyncDialog, initProjectsSidebar, initTagsSidebar, showNotification, showOutput,
-                     setRawFilter, clearRawFilter, openPty,
+                     setRawFilter, clearRawFilter, openPty, nbWebHere, goNbWeb,
                      // BP.bars, where the bars stack and the brand reads "Task"; BP.phone, the phone layout
                      narrow: window.matchMedia(`(max-width: ${BP.bars}px)`),
                      phone:  window.matchMedia(`(max-width: ${BP.phone}px)`), bp: BP };
@@ -575,6 +575,28 @@
 #tw-update-pill:hover { background: #f7c948; }
 #tw-update-pill:disabled { opacity: 0.6; cursor: default; }
 .tw-menu-items { flex: 1; padding: 8px 0; overflow-y: auto; }
+.tw-sibling-ask-back {
+    position: fixed; inset: 0; z-index: 10050; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.45); padding: 16px;
+}
+.tw-sibling-ask {
+    background: var(--bg2, #22272e); color: var(--text, #cdd9e5); border: 1px solid var(--border, #444);
+    border-radius: 8px; padding: 16px; width: 100%; max-width: 380px; box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+}
+.tw-sibling-ask h4 { margin: 0 0 8px; font-size: 1.05em; }
+.tw-sibling-ask p { margin: 0 0 8px; font-size: 14px; }
+.tw-sibling-ask-more { color: var(--text-muted, #888); }
+.tw-sibling-ask input {
+    width: 100%; box-sizing: border-box; padding: 6px 8px; font: inherit; font-size: 14px;
+    background: var(--bg, #1a1e24); color: var(--text, #cdd9e5); border: 1px solid var(--border, #444); border-radius: 4px;
+}
+.tw-sibling-ask input:focus { outline: none; border-color: var(--accent, #3498db); }
+.tw-sibling-ask-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; justify-content: flex-end; }
+.tw-sibling-ask-row button {
+    padding: 6px 12px; font-size: 14px; cursor: pointer; border-radius: 4px;
+    background: var(--bg3, #2b3038); color: var(--text, #cdd9e5); border: 1px solid var(--border, #444);
+}
+.tw-sibling-ask-row .tw-sibling-ask-primary { border-color: var(--accent, #3498db); }
 .tw-menu-item {
     display: block; width: 100%; text-align: left; padding: 11px 20px;
     background: none; border: none; border-left: 3px solid transparent;
@@ -746,6 +768,108 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     function _siblingUrl(tmpl) {
         const base = String(tmpl || '').split('{value}')[0].replace(/[#?]+$/, '');
         return /^https?:\/\/[^\s"'<>`]+$/.test(base) ? base : '';
+    }
+
+    // This device's own address for nb-web, when the server's doesn't work from here (djp
+    // 2026-11-05: a phone). Kept in this browser only; it wins over the `nb` launcher for N, the
+    // menu entry and nb: annotation links (task-card.js) and the health probe (tw-api.js).
+    // N and the menu entry check nb-web answers before going, and ask when it doesn't.
+    const NB_WEB_HERE_KEY = 'tw-nb-web-here';
+    const _WEB_ADDR_RE = /^https?:\/\/[^\s"'<>`]+$/;
+    function nbWebHere() {
+        try { const v = localStorage.getItem(NB_WEB_HERE_KEY) || ''; return _WEB_ADDR_RE.test(v) ? v : ''; }
+        catch { return ''; }
+    }
+    function _setNbWebHere(url) {
+        try { url ? localStorage.setItem(NB_WEB_HERE_KEY, url) : localStorage.removeItem(NB_WEB_HERE_KEY); } catch {}
+        _addSiblingItem();
+    }
+    const _nbWebBase = () => nbWebHere() || _siblingHref;
+    async function _probeNbWeb(url) {   // as TW.nbHealth's: any answer means up, a login page too
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 800);
+        try {
+            const u = new URL(url, location.href);
+            const same = u.origin === location.origin;
+            await fetch(u, { mode: same ? 'same-origin' : 'no-cors', redirect: same ? 'manual' : 'follow',
+                             cache: 'no-store', credentials: 'omit', signal: ctl.signal });
+            return true;
+        } catch { return false; }
+        finally { clearTimeout(timer); }
+    }
+    function _addSiblingItem() {
+        const list = document.getElementById('tw-menu-list');
+        if (!list || !_nbWebBase() || list.querySelector('[data-menu="nb-web"]')) return;
+        const b = document.createElement('button');
+        b.className = 'tw-menu-item';
+        b.dataset.menu = 'nb-web';
+        b.title = 'nb-web (N)';
+        b.textContent = 'nb-web';
+        list.appendChild(b);
+    }
+    // The question: this device's address. Resolves {action: 'save', url} | {action: 'server'} | null.
+    function _askNbAddress(why, value) {
+        return new Promise(resolve => {
+            const back = document.createElement('div');
+            back.className = 'tw-sibling-ask-back';
+            const box = document.createElement('div');
+            box.className = 'tw-sibling-ask';
+            box.setAttribute('role', 'dialog');
+            box.setAttribute('aria-modal', 'true');
+            const h = document.createElement('h4');
+            h.textContent = 'nb-web';
+            const msg = document.createElement('p');
+            msg.textContent = why;
+            const more = document.createElement('p');
+            more.className = 'tw-sibling-ask-more';
+            more.textContent = "If it's at another address from here, give that address. It is kept in this browser only.";
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = value;
+            input.placeholder = 'http://100.x.y.z:5001/';
+            input.spellcheck = false;
+            input.autocapitalize = 'off';
+            input.setAttribute('aria-label', "nb-web's address on this device");
+            const row = document.createElement('div');
+            row.className = 'tw-sibling-ask-row';
+            const btn = (label, cls, fn) => {
+                const b = document.createElement('button');
+                b.type = 'button'; b.className = cls; b.textContent = label;
+                b.addEventListener('click', fn);
+                row.appendChild(b);
+                return b;
+            };
+            const done = v => { back.remove(); resolve(v); };
+            const save = () => {
+                const url = input.value.trim();
+                if (!_WEB_ADDR_RE.test(url)) { msg.textContent = 'An address starts with http:// or https://.'; input.focus(); return; }
+                done({ action: 'save', url });
+            };
+            btn('Save and go', 'tw-sibling-ask-primary', save);
+            if (nbWebHere()) btn("Use the server's address", '', () => done({ action: 'server' }));
+            btn('Cancel', '', () => done(null));
+            box.append(h, msg, more, input, row);
+            back.appendChild(box);
+            back.addEventListener('click', e => { if (e.target === back) done(null); });
+            back.addEventListener('keydown', e => {
+                e.stopPropagation();          // no page shortcut under the question
+                if (e.key === 'Escape') { e.preventDefault(); done(null); }
+                else if (e.key === 'Enter' && e.target === input) { e.preventDefault(); save(); }
+            });
+            document.body.appendChild(back);
+            input.focus();
+            input.select();
+        });
+    }
+    async function goNbWeb() {
+        const url = _nbWebBase();
+        if (url && await _probeNbWeb(url)) { location.href = url; return; }
+        const ans = await _askNbAddress(url ? `nb-web doesn't answer at ${url} from this device.`
+                                            : "nb-web's address isn't set.", url);
+        if (!ans) return;
+        if (ans.action === 'server') { _setNbWebHere(''); return; }
+        _setNbWebHere(ans.url);
+        location.href = ans.url;
     }
 
     // ── HTML builders ─────────────────────────────────────────────────────────
@@ -1039,6 +1163,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             else if (action === 'settings')   { openSettingsPanel(); }
             else if (action === 'terminal')   { closeMenu(); openTerminal(); }
             else if (action === 'help')       { closeMenu(); window.location.href = 'help.html'; }
+            else if (action === 'nb-web')     { closeMenu(); goNbWeb(); }
             else closeMenu();
         });
 
@@ -1240,6 +1365,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         fetch('api/config').then(r => r.json()).then(d => {
             window.twNotifTimeout = (d.notification_timeout != null) ? d.notification_timeout : 3000;
             _siblingHref = _siblingUrl((d.annotation_launchers || {}).nb);
+            _addSiblingItem();
         }).catch(() => { window.twNotifTimeout = 3000; });
     }
 
@@ -2567,9 +2693,9 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             if (k === '?') {
                 e.preventDefault();
                 window.location.href = 'help.html';
-            } else if (k === 'N' && _siblingHref) {
+            } else if (k === 'N' && _nbWebBase()) {
                 e.preventDefault();
-                window.location.href = _siblingHref;
+                goNbWeb();
             } else if (_PAGE_KEYS[k]) {
                 e.preventDefault();
                 window.location.href = _PAGE_KEYS[k];
