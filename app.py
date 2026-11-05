@@ -1310,6 +1310,42 @@ def server_ping():
     return jsonify({'ok': True, 'termux': _is_termux(os.environ), 'started': _START_TIME,
                     'stamp': _tasks_stamp()})
 
+# ── tw-nb-interop M7 (a): what of nb is here, asked before acting (djp 2026-11-04) ─────────
+# The phone's scenarios: tw-web local with nb-web over Tailscale, with nb + Documents, with nb
+# alone. Each feature asks this (and TW.nbHealth, which probes nb-web from the browser: the
+# launcher is the browser's address) instead of finding out by failing.
+
+def _nb_web_url():
+    """nb-web's base address from the `nb` annotation launcher, or '' when that's not a web one."""
+    from urllib.parse import urlsplit, urlunsplit
+    template = (_load_settings().get('annotation_launchers') or {}).get('nb') or ''
+    try:
+        parts = urlsplit(template.replace('{value}', ''))
+    except ValueError:
+        return ''
+    if parts.scheme not in ('http', 'https') or not _ORIGIN_HOST.fullmatch(parts.netloc or ''):
+        return ''
+    return urlunsplit((parts.scheme, parts.netloc.lower(), parts.path or '/', '', ''))
+
+
+@app.route('/api/nb/health')
+def nb_health():
+    """nb, the nb-plugin tw, a tasknotes notebook, the ~/.task/notes link (the read-only
+    view's way in), termux-open (Android: Documents opens a note), and nb-web's address."""
+    home = Path.home()
+    nb_root = Path(os.environ.get('NB_DIR') or home / '.nb')
+    notes = Path(os.environ.get('TW_TASK_DIR') or home / '.task') / 'notes'
+    notes_ok = notes.is_dir()                                # a link must resolve
+    return jsonify({
+        'nb':          {'ok': bool(shutil.which('nb'))},
+        'plugin':      {'ok': (nb_root / '.plugins' / 'tw.nb-plugin').exists()},
+        'tasknotes':   {'ok': (nb_root / 'tasknotes').is_dir()},
+        'notes':       {'ok': notes_ok, 'path': str(notes.resolve()) if notes_ok else ''},
+        'termux_open': {'ok': bool(shutil.which('termux-open'))},
+        'nb_web_url':  _nb_web_url(),
+    })
+
+
 def _restart_soon():
     """Exit the serving process with code 3 after the response has gone out: Werkzeug's reloader
     (the parent process) then starts a fresh one, as it does when a file changes."""

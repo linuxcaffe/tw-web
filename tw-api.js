@@ -106,6 +106,48 @@ const TW = (() => {
         return false;
     }
 
+    // ── What of nb is here (tw-nb-interop M7 a, djp 2026-11-04) ───────────────
+    // One answer, one wording, asked before acting: the server says what's on its host (nb, the
+    // nb-plugin tw, tasknotes, the ~/.task/notes link, termux-open); nb-web's reachability is
+    // probed from here, since the `nb` launcher is the browser's address (over Tailscale, say).
+    // Any answer means up, a login page too. Cached 30 s.
+    const NB_MISSING = {
+        down:   "nb-web isn't reachable",
+        unset:  "nb-web isn't set up here (the nb annotation launcher)",
+        nb:     "nb isn't installed here",
+        plugin: "nb's tw plugin isn't installed here",
+        notes:  "the task notes aren't on this device",
+    };
+    let _nbHealth = null, _nbHealthAt = 0;
+    async function _probeNbWeb(url) {
+        if (!url) return 'unset';
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 800);
+        try {
+            const u = new URL(url, location.href);
+            await fetch(u, { mode: u.origin === location.origin ? 'same-origin' : 'no-cors',
+                             cache: 'no-store', credentials: 'omit', redirect: 'manual', signal: ctl.signal });
+            return 'up';
+        } catch { return 'down'; }
+        finally { clearTimeout(timer); }
+    }
+    function nbHealth({ fresh = false } = {}) {
+        if (!fresh && _nbHealth && Date.now() - _nbHealthAt < 30_000) return _nbHealth;
+        _nbHealthAt = Date.now();
+        _nbHealth = (async () => {
+            let d = {};
+            try { d = await get('api/nb/health'); } catch { /* the server is down: nothing local */ }
+            const no = { ok: false };
+            const url = d.nb_web_url || '';
+            return {
+                nb: d.nb || no, plugin: d.plugin || no, tasknotes: d.tasknotes || no,
+                notes: d.notes || { ok: false, path: '' }, termuxOpen: d.termux_open || no,
+                nbWeb: { state: await _probeNbWeb(url), url },
+            };
+        })();
+        return _nbHealth;
+    }
+
     // ── Command mode's vocabulary (bug 9) ─────────────────────────────────────
     let _vocab = null;
     async function vocab() {
@@ -136,5 +178,5 @@ const TW = (() => {
     }
 
     return { stamp, store: { read, save, invalidate }, api: { get, write, handleWriteResult, networkError, NO_ANSWER },
-             commands: { vocab, isCommandWord, isFilterOnly } };
+             commands: { vocab, isCommandWord, isFilterOnly }, nbHealth, NB_MISSING };
 })();
