@@ -15,8 +15,13 @@ check(async pg => {
     await pg.goto(B + '/kanban.html');
     await sleep(1500);                                              // api/config has answered
     await pg.click('#tw-logo-btn');
-    const item = pg.locator('#tw-menu-list .tw-menu-item[data-menu="nb-web"]');
-    expect(await item.count() === 1, 'an nb-web entry in the side menu');
+    // the menu footer, as nb-web's has (djp 2026-11-05): this station, nb-web, Stop
+    const item = pg.locator('#tw-menu-footer #tw-menu-nb');
+    await item.waitFor({ timeout: 3000 }).catch(() => {});
+    expect(await item.isVisible(), 'an nb-web link in the menu footer');
+    const station = (await pg.locator('#tw-menu-station').textContent()) || '';
+    expect(station.trim().length > 0, 'the footer names this station');
+    expect(await pg.locator('#tw-menu-footer #tw-menu-stop').isVisible(), 'a Stop in the footer');
     await item.click();
     const box = pg.locator('.tw-sibling-ask');
     await box.waitFor({ timeout: 3000 }).catch(() => {});

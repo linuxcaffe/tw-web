@@ -35,6 +35,7 @@ context.either.read=description.has:'(alpha|beta)' or project:nowhere
 report.mine.columns=id,description
 report.mine.filter=status:pending
 alias.zz=information
+gittw.device=scratch
 """
 
 # IDs 1..7 in this order. 'today' is midnight, so these times all fall on today.

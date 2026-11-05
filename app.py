@@ -1875,6 +1875,13 @@ def modify_task(task_id):
     else:
         return jsonify({'success': True, 'message': 'No changes to apply', 'task': None, 'warnings': []})
 
+@app.route('/api/station')
+def station():
+    """This station's name (gittw.device), for the menu footer; '' when it isn't named."""
+    r = run_task_command(['task', '_get', 'rc.gittw.device'], readonly=True)
+    name = r['stdout'].strip() if r['success'] else ''
+    return jsonify({'station': name if re.fullmatch(r'[\w.-]{1,64}', name) else ''})
+
 @app.route('/api/config', methods=['GET'])
 def get_config():
     """Return current UI settings (settings.json > config.py > defaults)."""

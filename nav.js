@@ -575,6 +575,21 @@
 #tw-update-pill:hover { background: #f7c948; }
 #tw-update-pill:disabled { opacity: 0.6; cursor: default; }
 .tw-menu-items { flex: 1; padding: 8px 0; overflow-y: auto; }
+#tw-menu-footer {
+    display: flex; align-items: center; gap: 12px; padding: 10px 20px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+}
+#tw-menu-station {
+    font-size: 13px; color: rgba(255,255,255,0.45); margin-right: auto;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#tw-menu-nb { font-size: 12px; color: #3498db; text-decoration: none; white-space: nowrap; }
+#tw-menu-nb:hover { text-decoration: underline; }
+#tw-menu-stop {
+    font-size: 12px; color: rgba(255,255,255,0.35); background: none; border: none; padding: 0;
+    cursor: pointer; white-space: nowrap;
+}
+#tw-menu-stop:hover { color: #ff8080; }
 .tw-sibling-ask-back {
     position: fixed; inset: 0; z-index: 10050; display: flex; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.45); padding: 16px;
@@ -797,15 +812,11 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         } catch { return false; }
         finally { clearTimeout(timer); }
     }
-    function _addSiblingItem() {
-        const list = document.getElementById('tw-menu-list');
-        if (!list || !_nbWebBase() || list.querySelector('[data-menu="nb-web"]')) return;
-        const b = document.createElement('button');
-        b.className = 'tw-menu-item';
-        b.dataset.menu = 'nb-web';
-        b.title = 'nb-web (N)';
-        b.textContent = 'nb-web';
-        list.appendChild(b);
+    function _addSiblingItem() {       // the footer's nb-web link, once there's an address
+        const a = document.getElementById('tw-menu-nb');
+        if (!a) return;
+        a.hidden = !_nbWebBase();
+        if (!a.hidden) a.href = _nbWebBase();
     }
     // The question: this device's address. Resolves {action: 'save', url} | {action: 'server'} | null.
     function _askNbAddress(why, value) {
@@ -1173,9 +1184,19 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             else if (action === 'settings')   { openSettingsPanel(); }
             else if (action === 'terminal')   { closeMenu(); openTerminal(); }
             else if (action === 'help')       { closeMenu(); window.location.href = 'help.html'; }
-            else if (action === 'nb-web')     { closeMenu(); goNbWeb(); }
             else closeMenu();
         });
+        document.getElementById('tw-menu-nb').addEventListener('click', e => {
+            e.preventDefault(); e.stopPropagation(); closeMenu(); goNbWeb();
+        });
+        document.getElementById('tw-menu-stop').addEventListener('click', e => {
+            e.stopPropagation(); _serverControl('stop');
+        });
+        _addSiblingItem();
+        fetch('api/station').then(r => r.json()).then(d => {
+            const el = document.getElementById('tw-menu-station');
+            if (el) el.textContent = d.station || '';
+        }).catch(() => {});
 
         // Arrow-key navigation inside the side menu
         document.getElementById('tw-side-menu').addEventListener('keydown', e => {
@@ -1261,6 +1282,12 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                     `<button class="tw-menu-item" data-menu="${item.toLowerCase()}">${item}</button>`
                 ).join('') +
             `</nav>` +
+            // as nb-web's footer (djp 2026-11-05): this station, the way to nb-web, Stop
+            `<footer id="tw-menu-footer">` +
+                `<span id="tw-menu-station" title="This station (gittw.device)"></span>` +
+                `<a id="tw-menu-nb" href="#" title="nb-web (N)" hidden>nb-web</a>` +
+                `<button type="button" id="tw-menu-stop" title="Stop this tw-web server">Stop</button>` +
+            `</footer>` +
             `<div id="tw-menu-panel" class="tw-menu-panel">` +
                 `<div class="tw-panel-header">` +
                     `<button id="tw-panel-back" class="tw-panel-back">← Back</button>` +

@@ -19,7 +19,10 @@ check(async pg => {
                   if (x && x.ts) { x.ts -= 60_000; sessionStorage.setItem(k, JSON.stringify(x)); } } catch {}
         }
     });
-    await pg.goto(B + '/');
+    // back by tw-web's own List link: a bare load from outside goes back to the last page
+    // (resume-last-page), which here is the Calendar
+    await pg.locator('.tw-nav-link', { hasText: 'List' }).first().click();
+    await pg.waitForLoadState('load');
     await sleep(2000);
     const after = await cardTexts(pg);
     const count = await pg.textContent('#tw-count');
