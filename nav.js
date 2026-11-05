@@ -861,11 +861,20 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             input.select();
         });
     }
+    // Before asking, in order (djp 2026-11-05): this device's address, the server's (the nb
+    // launcher's), and nb-web's usual port where this page is (yoga without the bundle, or over
+    // Tailscale). All probed at once, the first that answers wins; a fallback isn't saved.
+    function _nbWebCandidates() {
+        const own = `${location.protocol}//${location.hostname}:5001/`;
+        const all = [nbWebHere(), _siblingHref, own].filter(u => u && _WEB_ADDR_RE.test(u));
+        return [...new Set(all.map(u => u.replace(/\/?$/, '/')))];
+    }
     async function goNbWeb() {
         const url = _nbWebBase();
-        if (url && await _probeNbWeb(url)) { location.href = url; return; }
-        const ans = await _askNbAddress(url ? `nb-web doesn't answer at ${url} from this device.`
-                                            : "nb-web's address isn't set.", url);
+        const tries = _nbWebCandidates().map(u => ({ u, up: _probeNbWeb(u) }));
+        for (const t of tries) if (await t.up) { location.href = t.u; return; }
+        const ans = await _askNbAddress(url ? `nb-web doesn't answer at ${url} from this device, nor at its usual port.`
+                                            : "nb-web's address isn't set, and it doesn't answer at its usual port.", url);
         if (!ans) return;
         if (ans.action === 'server') { _setNbWebHere(''); return; }
         _setNbWebHere(ans.url);
