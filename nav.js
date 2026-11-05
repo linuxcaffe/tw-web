@@ -1091,6 +1091,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 
     function openMenu() {
         document.getElementById('tw-side-menu').classList.add('open');
+        _checkVersion();      // the server may have fetched since (a sync, the phone's m-sync)
         document.getElementById('tw-menu-backdrop').classList.add('open');
         _checkVersion();
         if (_kbNav) {

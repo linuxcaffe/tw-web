@@ -99,3 +99,38 @@ def test_version_without_git_says_so(client, app_module, monkeypatch, tmp_path):
     monkeypatch.setattr(app_module, '_WEB_DIR', tmp_path)
     d = client.get('/api/version', headers=LOCAL).get_json()
     assert d['version'] is None and d['can_update'] is False
+
+
+# ── Checking now (djp 2026-11-05: "every sync") ──────────────────────────────
+# The server fetched only hourly, so the pill came up to an hour late. POST /api/version/check
+# fetches now: the phone's m-sync calls it on every run (scheduled every 15 min, or by hand),
+# and tw-web's own Sync starts one. At most one fetch a minute, whoever asks.
+
+def test_check_fetches_now_and_says_what_is_new(client, repos):
+    web, publish = repos
+    publish('Menu: an nb-web entry')
+    d = client.post('/api/version/check', headers=TRUSTED).get_json()
+    assert d['behind'] == 1 and d['subjects'] == ['Menu: an nb-web entry'] and d['checked']
+
+
+def test_check_is_a_post_and_origin_checked(client, repos):
+    assert client.get('/api/version/check', headers=LOCAL).status_code in (404, 405)
+    assert client.post('/api/version/check', headers={**LOCAL, 'Origin': 'http://evil.example'}).status_code == 403
+
+
+def test_check_fetches_at_most_once_a_minute(client, app_module, repos, monkeypatch):
+    calls = []
+    real = app_module._fetch_web
+    monkeypatch.setattr(app_module, '_fetch_web', lambda: calls.append(1) or real())
+    client.post('/api/version/check', headers=TRUSTED)
+    client.post('/api/version/check', headers=TRUSTED)
+    assert len(calls) == 1
+
+
+def test_a_sync_also_checks(client, app_module, repos, monkeypatch):
+    calls = []
+    monkeypatch.setattr(app_module, '_sync_now', lambda message: {'success': True, 'stdout': '', 'stderr': '',
+                                                                   'pulled': False})
+    monkeypatch.setattr(app_module, '_check_soon', lambda: calls.append(1))
+    assert client.post('/api/sync', headers=TRUSTED, json={}).status_code == 200
+    assert calls == [1]

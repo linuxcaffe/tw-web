@@ -1470,6 +1470,25 @@ def _update_check_loop():
 def web_version():
     return jsonify(_version_info())
 
+CHECK_AT_MOST_EVERY = 60
+
+def _check_now():
+    """Fetch now, unless a fetch ran in the last minute (whoever asked). The version info after."""
+    checked = _update_state['checked']
+    if checked is None or time.time() - checked >= CHECK_AT_MOST_EVERY:
+        _fetch_web()
+    return _version_info()
+
+def _check_soon():
+    """_check_now in the background, so a sync answers without waiting on the fetch."""
+    threading.Thread(target=_check_now, daemon=True).start()
+
+@app.route('/api/version/check', methods=['POST'])
+def web_version_check():
+    """Check for an update now (djp 2026-11-05): the hourly fetch made the pill up to an hour
+    late. The phone's m-sync calls this on every run; tw-web's own Sync starts one."""
+    return jsonify(_check_now())
+
 @app.route('/api/update', methods=['POST'])
 def web_update():
     """git pull --ff-only. The reloader restarts the server when Python files change; the page
@@ -2375,6 +2394,7 @@ def sync_tasks():
     data    = request.get_json(silent=True) or {}
     message = (data.get('message') or '').strip()
     result  = _sync_now(message)
+    _check_soon()                                   # and tw-web's own update, while we're online
     # all of it: gittw's progress, then git's errors (showing only stdout hid why a pull failed)
     output  = ('\n'.join(x for x in (result['stdout'].strip(), result['stderr'].strip()) if x)
                or ('Sync complete.' if result['success'] else 'Sync failed.'))
