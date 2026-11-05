@@ -553,6 +553,7 @@
 /* side menu */
 #tw-side-menu {
     position: fixed; top: 0; left: -270px; width: 260px; height: 100vh;
+    height: 100dvh;   /* a phone's visible height: 100vh runs under its browser bars, footer and all */
     background: #111; z-index: 20000; transition: left 0.22s ease;
     display: flex; flex-direction: column;
     box-shadow: 4px 0 24px rgba(0,0,0,0.6); box-sizing: border-box;
