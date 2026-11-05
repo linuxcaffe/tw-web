@@ -281,7 +281,7 @@
 
     window.twNav = { getState, setState, stateToParams, setCount, setGrandTotal, getGrandTotal,
                      openSyncDialog, initProjectsSidebar, initTagsSidebar, showNotification, showOutput,
-                     setRawFilter, clearRawFilter, openPty, nbWebHere, goNbWeb,
+                     setRawFilter, clearRawFilter, openPty, nbWebHere, goNbWeb, nbWebCandidates,
                      // BP.bars, where the bars stack and the brand reads "Task"; BP.phone, the phone layout
                      narrow: window.matchMedia(`(max-width: ${BP.bars}px)`),
                      phone:  window.matchMedia(`(max-width: ${BP.phone}px)`), bp: BP };
@@ -801,9 +801,11 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         _addSiblingItem();
     }
     const _nbWebBase = () => nbWebHere() || _siblingHref;
-    async function _probeNbWeb(url) {   // as TW.nbHealth's: any answer means up, a login page too
+    // As TW.nbHealth's: any answer means up, a login page too. 2.5 s: over Tailscale nb-web's
+    // redirect to its login page and the page took 0.6-0.7 s from s5, past the 0.8 s this was.
+    async function _probeNbWeb(url) {
         const ctl = new AbortController();
-        const timer = setTimeout(() => ctl.abort(), 800);
+        const timer = setTimeout(() => ctl.abort(), 2500);
         try {
             const u = new URL(url, location.href);
             const same = u.origin === location.origin;
@@ -876,14 +878,16 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     // Before asking, in order (djp 2026-11-05): this device's address, the server's (the nb
     // launcher's), and nb-web's usual port where this page is (yoga without the bundle, or over
     // Tailscale). All probed at once, the first that answers wins; a fallback isn't saved.
-    function _nbWebCandidates() {
+    // Shared with nb: annotation links (TW.nbHealth, task-card.js), so they find nb-web the same way.
+    function nbWebCandidates(serverUrl = _siblingHref) {
         const own = `${location.protocol}//${location.hostname}:5001/`;
-        const all = [nbWebHere(), _siblingHref, own].filter(u => u && _WEB_ADDR_RE.test(u));
-        return [...new Set(all.map(u => u.replace(/\/?$/, '/')))];
+        const all = [nbWebHere(), serverUrl, own].filter(u => u && _WEB_ADDR_RE.test(u));
+        // a bare origin gets its slash, so two spellings are one; a path stays as written
+        return [...new Set(all.map(u => /^https?:\/\/[^/]+$/.test(u) ? u + '/' : u))];
     }
     async function goNbWeb() {
         const url = _nbWebBase();
-        const tries = _nbWebCandidates().map(u => ({ u, up: _probeNbWeb(u) }));
+        const tries = nbWebCandidates().map(u => ({ u, up: _probeNbWeb(u) }));
         for (const t of tries) if (await t.up) { location.href = t.u; return; }
         const ans = await _askNbAddress(url ? `nb-web doesn't answer at ${url} from this device, nor at its usual port.`
                                             : "nb-web's address isn't set, and it doesn't answer at its usual port.", url);

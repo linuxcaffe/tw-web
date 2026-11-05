@@ -122,7 +122,7 @@ const TW = (() => {
     async function _probeNbWeb(url) {
         if (!url) return 'unset';
         const ctl = new AbortController();
-        const timer = setTimeout(() => ctl.abort(), 800);
+        const timer = setTimeout(() => ctl.abort(), 2500);   // Tailscale: 0.6-0.7 s from s5
         try {
             const u = new URL(url, location.href);
             const same = u.origin === location.origin;
@@ -143,11 +143,17 @@ const TW = (() => {
             const no = { ok: false };
             const serverUrl = d.nb_web_url || '';
             const here = window.twNav?.nbWebHere?.() || '';   // this device's own (nav.js)
-            const url = here || serverUrl;
+            // as the menu's nb-web link (nav.js): this device's, the launcher's, nb-web's usual
+            // port where this page is; the first that answers is nb-web's address for nb: links
+            const tries = (window.twNav?.nbWebCandidates?.(serverUrl) || [here || serverUrl].filter(Boolean))
+                .map(u => ({ u, up: _probeNbWeb(u) }));
+            let url = '', state = here || serverUrl ? 'down' : 'unset';   // none set: unset, unless one answers
+            for (const t of tries) if (await t.up === 'up') { url = t.u; state = 'up'; break; }
+            if (!url) url = here || serverUrl;
             return {
                 nb: d.nb || no, plugin: d.plugin || no, tasknotes: d.tasknotes || no,
                 notes: d.notes || { ok: false, path: '' }, termuxOpen: d.termux_open || no,
-                nbWeb: { state: await _probeNbWeb(url), url, serverUrl, here: !!here },
+                nbWeb: { state, url, serverUrl, here: !!here },
             };
         })();
         return _nbHealth;

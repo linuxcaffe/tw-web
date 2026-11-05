@@ -118,7 +118,12 @@ function check(fn) {
         const { chromium } = loadPlaywright();
         const browser = await chromium.launch();
         try {
-            const pg = await browser.newPage();
+            const ctx = await browser.newContext();
+            // never the real nb-web: tw-web looks for it at its usual port where the page is
+            // (localhost:5001), where yoga's container listens. A check that wants it there
+            // routes it itself (a page's route wins over this one).
+            await ctx.route(/^http:\/\/(localhost|127\.0\.0\.1):5001\//, r => r.abort());
+            const pg = await ctx.newPage();
             pg.on('dialog', d => d.accept());
             await fn(pg);
         } finally {
