@@ -73,6 +73,18 @@
     // Raw filter: complete TW expression override — survives page navigation via sessionStorage
     let _rawFilter = '';
     try { _rawFilter = sessionStorage.getItem(RAW_FILTER_KEY) || ''; } catch {}
+    // A link can open on given tasks (djp 2026-11-04: nb-web's task header, ?rawfilter=uuid:…):
+    // as if typed in the raw filter; the session keeps it, the address bar drops it.
+    try {
+        const params = new URLSearchParams(location.search);
+        const fromUrl = (params.get('rawfilter') || '').trim();
+        if (fromUrl) {
+            _rawFilter = fromUrl;
+            try { sessionStorage.setItem(RAW_FILTER_KEY, _rawFilter); } catch {}
+            params.delete('rawfilter');
+            history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params : '') + location.hash);
+        }
+    } catch {}
 
     function setRawFilter(expr) {
         _rawFilter = expr.trim();
