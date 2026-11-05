@@ -6,7 +6,11 @@ read only notes in the tasknotes notebook, never a dotfile, an encrypted note, o
 it: tw-web has no login and may listen on Tailscale.
 
 GET  /api/nb/note?value=<annotation value>   the note's text, read-only
-POST /api/nb/open  {value}                   termux-open on the note file (Android)
+POST /api/nb/open  {value}                   Documents, else termux-open, on the note (Android)
+
+Documents through the tasknotes folder it was given (djp 2026-11-05): termux-open hands a
+Termux file to another app only with allow-external-apps=true, so Documents got nothing and
+closed. Asked by its document address in that folder, Documents reads it with its own access.
 """
 import pytest
 
@@ -65,6 +69,7 @@ def test_refuses_anything_else(client, notes, value):
 
 def test_open_runs_termux_open_on_the_file(client, notes, app_module, monkeypatch):
     calls = []
+    monkeypatch.setattr(app_module, '_documents_app', lambda: '')
     monkeypatch.setattr(app_module.shutil, 'which', lambda name: '/bin/termux-open' if name == 'termux-open' else None)
     monkeypatch.setattr(app_module.subprocess, 'Popen', lambda argv, **k: calls.append(argv))
     r = client.post('/api/nb/open', json={'value': 'tasknotes:retile-0badc0de.note.md'})
@@ -74,6 +79,7 @@ def test_open_runs_termux_open_on_the_file(client, notes, app_module, monkeypatc
 
 def test_open_without_termux_open_says_so(client, notes, app_module, monkeypatch):
     monkeypatch.setattr(app_module.shutil, 'which', lambda name: None)
+    monkeypatch.setattr(app_module, '_documents_app', lambda: '')
     r = client.post('/api/nb/open', json={'value': 'tasknotes:retile-0badc0de.note.md'})
     assert r.status_code == 409 and 'termux-open' in r.get_json()['error']
 
@@ -84,3 +90,23 @@ def test_open_refuses_what_read_refuses(client, notes, app_module, monkeypatch):
     monkeypatch.setattr(app_module.subprocess, 'Popen', lambda argv, **k: calls.append(argv))
     assert client.post('/api/nb/open', json={'value': 'djp:private.md'}).status_code in (403, 404)
     assert calls == []
+
+
+def test_open_asks_documents_through_its_tasknotes_folder(client, notes, app_module, monkeypatch):
+    calls = []
+    monkeypatch.setattr(app_module, '_documents_app', lambda: 'org.fossify.documents.debug')
+    monkeypatch.setattr(app_module.shutil, 'which', lambda name: '/bin/' + name)
+    monkeypatch.setattr(app_module.subprocess, 'Popen', lambda argv, **k: calls.append(argv))
+    r = client.post('/api/nb/open', json={'value': 'tasknotes:legal/call-00f04687.note.md'})
+    assert r.status_code == 200 and r.get_json()['success']
+    from urllib.parse import quote
+    tree, doc = quote(str(notes.resolve()), safe=''), quote(str((notes / 'legal' / 'call-00f04687.note.md').resolve()), safe='')
+    assert calls == [['am', 'start', '-a', 'android.intent.action.VIEW', '-t', 'text/markdown',
+                      '-d', f'content://com.termux.documents/tree/{tree}/document/{doc}',
+                      '-n', 'org.fossify.documents.debug/org.fossify.documents.activities.DocumentOpenActivity']]
+
+
+def test_health_says_a_note_can_open_with_documents_alone(client, notes, app_module, monkeypatch):
+    monkeypatch.setattr(app_module, '_documents_app', lambda: 'org.fossify.documents')
+    monkeypatch.setattr(app_module.shutil, 'which', lambda name: '/bin/am' if name == 'am' else None)
+    assert client.get('/api/nb/health').get_json()['termux_open']['ok'] is True

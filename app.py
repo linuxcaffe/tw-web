@@ -1341,7 +1341,7 @@ def nb_health():
         'plugin':      {'ok': (nb_root / '.plugins' / 'tw.nb-plugin').exists()},
         'tasknotes':   {'ok': (nb_root / 'tasknotes').is_dir()},
         'notes':       {'ok': notes_ok, 'path': str(notes.resolve()) if notes_ok else ''},
-        'termux_open': {'ok': bool(shutil.which('termux-open'))},
+        'termux_open': {'ok': bool(shutil.which('termux-open') or (_documents_app() and shutil.which('am')))},
         'nb_web_url':  _nb_web_url(),
     })
 
@@ -1392,15 +1392,50 @@ def nb_note_read():
                     'text': path.read_text(errors='replace')})
 
 
+# Documents (Fossify's, or djp's fork): a note opens through the tasknotes folder Documents was
+# given (+ → Open folder → Termux → .nb/tasknotes), by its address in Termux's documents
+# provider, so Documents reads it with its own access (djp 2026-11-05). termux-open hands a
+# Termux file to another app only with allow-external-apps=true: without it Documents got
+# nothing and closed. termux-open stays the way for anything else.
+_DOCUMENTS_APPS = ('org.fossify.documents.debug', 'org.fossify.documents')
+_DOCUMENTS_OPEN = 'org.fossify.documents.activities.DocumentOpenActivity'
+_documents_found = None
+
+def _documents_app():
+    """The installed Documents package, or ''. Asked once (pm, Android only)."""
+    global _documents_found
+    if _documents_found is None:
+        _documents_found = ''
+        if shutil.which('pm'):
+            try:
+                out = subprocess.run(['pm', 'list', 'packages', 'org.fossify.documents'], capture_output=True,
+                                     text=True, timeout=10, stdin=subprocess.DEVNULL).stdout
+            except (OSError, subprocess.SubprocessError):
+                out = ''
+            have = {line.split(':', 1)[-1].strip() for line in out.splitlines()}
+            _documents_found = next((a for a in _DOCUMENTS_APPS if a in have), '')
+    return _documents_found
+
+def _documents_argv(path):
+    from urllib.parse import quote
+    root = (Path(os.environ.get('NB_DIR') or Path.home() / '.nb') / 'tasknotes').resolve()
+    uri = (f'content://com.termux.documents/tree/{quote(str(root), safe="")}'
+           f'/document/{quote(str(path), safe="")}')
+    return ['am', 'start', '-a', 'android.intent.action.VIEW', '-t', 'text/markdown', '-d', uri,
+            '-n', f'{_documents_app()}/{_DOCUMENTS_OPEN}']
+
 @app.route('/api/nb/open', methods=['POST'])
 def nb_note_open():
     path, _, err = _tasknote_file((request.get_json(silent=True) or {}).get('value', ''))
     if err:
         return jsonify({'success': False, 'error': err[0]}), err[1]
-    if not shutil.which('termux-open'):
+    if _documents_app() and shutil.which('am'):
+        argv = _documents_argv(path)
+    elif shutil.which('termux-open'):
+        argv = ['termux-open', str(path)]
+    else:
         return jsonify({'success': False, 'error': 'no termux-open here (Android only)'}), 409
-    subprocess.Popen(['termux-open', str(path)], stdin=subprocess.DEVNULL,
-                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return jsonify({'success': True})
 
 
