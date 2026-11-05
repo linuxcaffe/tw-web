@@ -30,11 +30,36 @@ stop_tw_web_procs() {
     return $found
 }
 FLASK_URL="http://localhost:5000/"
-EPIPHANY_PROFILE="$HOME/.local/share/org.gnome.Epiphany.WebApp-tw-web-3f978691d368f37d5f7c65c7aefa29341f2c5068"
-SW_DIR="$EPIPHANY_PROFILE/serviceworkers"
-CACHE_BASE="$HOME/.cache/org.gnome.Epiphany.WebApp-tw-web-3f978691d368f37d5f7c65c7aefa29341f2c5068"
-WEBKIT_CACHE="$CACHE_BASE/WebKitCache"
-SW_CACHE_STORAGE="$CACHE_BASE/CacheStorage"
+OPEN_URL="$FLASK_URL"
+# The tw-nb bundle (~/dev/tw-nb-bundle): when it's there, opening tw-web runs `bundle.sh up` and
+# opens tw-web through it, at localhost:5080/tw/, in the web app installed at the bundle's
+# address (djp 2026-11-05: one app for both). Without it, or if it doesn't answer, :5000 as before.
+#   TW_WEB_BUNDLE=<path to bundle.sh>   somewhere else;  TW_WEB_BUNDLE=off   never
+BUNDLE_SH="${TW_WEB_BUNDLE:-$HOME/dev/tw-nb-bundle/bundle.sh}"
+BUNDLE_ROOT="${BUNDLE_URL:-http://localhost:5080}/"
+# An Epiphany web app is found by the address it opens (its .desktop file's Exec), not its name;
+# its cache folder has the profile's name.
+_profile_for() {   # <url> -> the profile of a web app that opens it, if one does
+    local f
+    for f in ~/.local/share/applications/org.gnome.Epiphany.WebApp-*.desktop; do
+        [ -f "$f" ] || continue
+        grep -q "^Exec=.* ${1%/}/\?\$" "$f" || continue
+        sed -n 's/^Exec=.*--profile=\([^" ]*\).*/\1/p' "$f" | head -1
+        return 0
+    done
+}
+_set_profile() {   # <url>
+    EPIPHANY_PROFILE=$(_profile_for "$1")
+    SW_DIR="$EPIPHANY_PROFILE/serviceworkers"
+    CACHE_BASE=""
+    [ -n "$EPIPHANY_PROFILE" ] && CACHE_BASE="$HOME/.cache/$(basename "$EPIPHANY_PROFILE")"
+    WEBKIT_CACHE="$CACHE_BASE/WebKitCache"
+    SW_CACHE_STORAGE="$CACHE_BASE/CacheStorage"
+    # no web app: no folders, so --clean's rm -rf never gets a root-anchored path
+    [ -n "$EPIPHANY_PROFILE" ] || { SW_DIR=""; WEBKIT_CACHE=""; SW_CACHE_STORAGE=""; }
+}
+_bundled() { [ "$BUNDLE_SH" != "off" ] && [ -x "$BUNDLE_SH" ]; }
+if _bundled; then _set_profile "$BUNDLE_ROOT"; else _set_profile "$FLASK_URL"; fi
 
 # ── --stop: kill server ───────────────────────────────────────────────────────
 if [ "$1" = "--stop" ]; then
@@ -117,12 +142,24 @@ fi
 
 [ "$1" = "--no-open" ] && exit 0   # the server is up; whoever asked opens it
 
+# ── The bundle: start what's missing, then open tw-web through it ────────────
+# (after --no-open, which is how bundle.sh itself starts tw-web: no loop)
+if _bundled; then
+    "$BUNDLE_SH" up | sed 's/^/  /'
+    if curl -s -o /dev/null -m 2 "${BUNDLE_ROOT}tw/"; then
+        OPEN_URL="${BUNDLE_ROOT}tw/"
+    else
+        echo "tw-web-launch: the bundle isn't answering at $BUNDLE_ROOT -- opening $FLASK_URL"
+        _set_profile "$FLASK_URL"
+    fi
+fi
+
 # ── Launch Epiphany PWA (detaches; server keeps running) ─────────────────────
 # Without that web app (a new machine), the default browser
-if command -v epiphany-browser >/dev/null && [ -d "$EPIPHANY_PROFILE" ]; then
+if command -v epiphany-browser >/dev/null && [ -n "$EPIPHANY_PROFILE" ] && [ -d "$EPIPHANY_PROFILE" ]; then
     epiphany-browser --application-mode \
         "--profile=$EPIPHANY_PROFILE" \
-        "$FLASK_URL" &
+        "$OPEN_URL" &
 else
-    xdg-open "$FLASK_URL" >/dev/null 2>&1 &
+    xdg-open "$OPEN_URL" >/dev/null 2>&1 &
 fi
