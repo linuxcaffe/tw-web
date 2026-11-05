@@ -38,6 +38,30 @@
     const CTX_FILT_KEY = 'tw-ctx-filters';
     const COUNT_KEY    = 'tw-count-text';
 
+    // ── Back where you were (djp 2026-11-05) ──────────────────────────────────
+    // Opened at the bare address from outside (a launcher, nb-web's W key, any referrer that
+    // isn't tw-web itself), the List goes on to the page open last time. tw-web's own List link
+    // still lands on the List, and an address with a query or hash (?rawfilter=…) is left alone.
+    const LAST_PAGE_KEY = 'tw-last-page';
+    const RESUMABLE = ['', 'index.html', 'kanban.html', 'agenda.html', 'calendar-planner.html'];
+    {
+        const cut = location.pathname.lastIndexOf('/');
+        const base = location.origin + location.pathname.slice(0, cut + 1);
+        const page = location.pathname.slice(cut + 1);
+        if (RESUMABLE.includes(page)) {
+            let last = '';
+            try { last = localStorage.getItem(LAST_PAGE_KEY) || ''; } catch {}
+            const list = page === '' || page === 'index.html';
+            const fromHere = document.referrer.startsWith(base);
+            if (list && !location.search && !location.hash && !fromHere
+                    && RESUMABLE.includes(last) && last !== '' && last !== 'index.html') {
+                location.replace(last);
+                return;     // this page is going; nothing else of it should run
+            }
+            try { localStorage.setItem(LAST_PAGE_KEY, page); } catch {}
+        }
+    }
+
     const PAGES = [
         { id: 'tasks',    href: './',                     label: 'List'       },
         { id: 'kanban',   href: 'kanban.html',           label: 'Kanban'     },
