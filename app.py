@@ -1392,12 +1392,15 @@ def nb_note_read():
                     'text': path.read_text(errors='replace')})
 
 
-# Documents (Fossify's, or djp's fork): a note opens through the tasknotes folder Documents was
+# Documents (nb Docs, or Fossify's): a note opens through the tasknotes folder Documents was
 # given (+ → Open folder → Termux → .nb/tasknotes), by its address in Termux's documents
 # provider, so Documents reads it with its own access (djp 2026-11-05). termux-open hands a
 # Termux file to another app only with allow-external-apps=true: without it Documents got
 # nothing and closed. termux-open stays the way for anything else.
-_DOCUMENTS_APPS = ('org.fossify.documents.debug', 'org.fossify.documents')
+# nb Docs first (the fork, rebranded: io.github.linuxcaffe.nbdocs, 2026-11-05), then Fossify's own.
+# The activity keeps Fossify's class name in all of them (nb Docs kept Fossify's code package).
+_DOCUMENTS_APPS = ('io.github.linuxcaffe.nbdocs', 'io.github.linuxcaffe.nbdocs.debug',
+                   'org.fossify.documents.debug', 'org.fossify.documents')
 _DOCUMENTS_OPEN = 'org.fossify.documents.activities.DocumentOpenActivity'
 _documents_found = None
 
@@ -1408,7 +1411,8 @@ def _documents_app():
         _documents_found = ''
         if shutil.which('pm'):
             try:
-                out = subprocess.run(['pm', 'list', 'packages', 'org.fossify.documents'], capture_output=True,
+                # every package: a filter is a substring, and nb Docs' id doesn't contain Fossify's
+                out = subprocess.run(['pm', 'list', 'packages'], capture_output=True,
                                      text=True, timeout=10, stdin=subprocess.DEVNULL).stdout
             except (OSError, subprocess.SubprocessError):
                 out = ''

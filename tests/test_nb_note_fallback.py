@@ -110,3 +110,36 @@ def test_health_says_a_note_can_open_with_documents_alone(client, notes, app_mod
     monkeypatch.setattr(app_module, '_documents_app', lambda: 'org.fossify.documents')
     monkeypatch.setattr(app_module.shutil, 'which', lambda name: '/bin/am' if name == 'am' else None)
     assert client.get('/api/nb/health').get_json()['termux_open']['ok'] is True
+
+
+# nb Docs (djp 2026-11-05): the fork, rebranded, installs as io.github.linuxcaffe.nbdocs (a debug
+# build adds .debug). It comes first; Fossify's own apps still work. The activity keeps Fossify's
+# class name: nb Docs keeps Fossify's code package, only the app id changed.
+
+def _found(app_module, monkeypatch, installed):
+    import types
+    monkeypatch.setattr(app_module, '_documents_found', None)
+    monkeypatch.setattr(app_module.shutil, 'which', lambda c: '/bin/pm' if c == 'pm' else None)
+    def pm(argv, **k):           # as pm does: a last word not an option filters by substring
+        f = argv[-1] if argv[-1] != 'packages' and not argv[-1].startswith('-') else ''
+        out = ''.join(f'package:{p}\n' for p in installed if f in p)
+        return types.SimpleNamespace(stdout=out, returncode=0)
+    monkeypatch.setattr(app_module.subprocess, 'run', pm)
+    return app_module._documents_app()
+
+
+def test_nb_docs_is_found(app_module, monkeypatch):
+    assert _found(app_module, monkeypatch, ['io.github.linuxcaffe.nbdocs']) == 'io.github.linuxcaffe.nbdocs'
+
+
+def test_nb_docs_comes_before_fossifys(app_module, monkeypatch):
+    assert _found(app_module, monkeypatch, ['org.fossify.documents.debug', 'io.github.linuxcaffe.nbdocs',
+                                            'org.fossify.documents']) == 'io.github.linuxcaffe.nbdocs'
+
+
+def test_a_nb_docs_debug_build_is_found_too(app_module, monkeypatch):
+    assert _found(app_module, monkeypatch, ['io.github.linuxcaffe.nbdocs.debug']) == 'io.github.linuxcaffe.nbdocs.debug'
+
+
+def test_fossifys_still_works(app_module, monkeypatch):
+    assert _found(app_module, monkeypatch, ['org.fossify.documents']) == 'org.fossify.documents'
