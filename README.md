@@ -310,6 +310,7 @@ Your own events come from tw-events too (0.3.0+): the lines of `~/.task/config/m
 | `f` | Toggle filter / command mode |
 | `a` | Add task |
 | `t` | Open terminal (shell) |
+| `N` | nb-web (where an `nb:` link opens) |
 | `?` | Help |
 
 ### Filter bar
@@ -370,6 +371,19 @@ tw-web works with [recurrence-overhaul](https://github.com/linuxcaffe/tw-recurre
 ### Completed and deleted tasks
 
 Switch status via the status button in the nav bar. Completed and deleted tasks are shown newest-first (by end date) by default. Each card shows `uuid:8chars` and `end:date` at the start of its attributes row.
+
+### Task notes (nb)
+
+A task can have its own note in [nb](https://github.com/xwmx/nb). Annotate it with a bare `nb:`
+and the [nbnotes](https://github.com/linuxcaffe/tw-nbnotes-hook) hook makes the note, then turns
+the annotation into its link (`nb: tasknotes:kitchen/…note.md`). On a card that link opens the
+note in [nb-web](https://github.com/linuxcaffe/nb-web), at the first address that answers: this
+device's own (asked for, and kept in this browser, when none answers), the `nb` launcher in
+Settings → Annotation launchers, then nb-web's usual port (5001) on this host. When none answers,
+on a phone the note opens in [nb Docs](https://github.com/linuxcaffe/nb-Docs). `N` goes to
+nb-web, and the menu's last line names this station and links there too.
+
+How the pieces fit together across stations (a phone and a desktop, synced): [Task notes](https://github.com/linuxcaffe/tw-mobilize/blob/main/docs/task-notes.md).
 
 ---
 
