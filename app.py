@@ -1433,14 +1433,16 @@ def nb_note_open():
     path, _, err = _tasknote_file((request.get_json(silent=True) or {}).get('value', ''))
     if err:
         return jsonify({'success': False, 'error': err[0]}), err[1]
+    app = ''
     if _documents_app() and shutil.which('am'):
         argv = _documents_argv(path)
+        app = 'nb Docs' if _documents_app().startswith('io.github.linuxcaffe.nbdocs') else 'Documents'
     elif shutil.which('termux-open'):
         argv = ['termux-open', str(path)]
     else:
         return jsonify({'success': False, 'error': 'no termux-open here (Android only)'}), 409
     subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return jsonify({'success': True})
+    return jsonify({'success': True, 'app': app})     # the app it opened in, for the card to name
 
 
 def _restart_soon():

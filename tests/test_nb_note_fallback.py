@@ -143,3 +143,26 @@ def test_a_nb_docs_debug_build_is_found_too(app_module, monkeypatch):
 
 def test_fossifys_still_works(app_module, monkeypatch):
     assert _found(app_module, monkeypatch, ['org.fossify.documents']) == 'org.fossify.documents'
+
+
+# The card said "opened the note in Documents" whichever app it was (djp 2026-11-05, nb Docs on
+# s5): /api/nb/open now says which (`app`), and the card names it.
+
+@pytest.mark.parametrize('pkg, name', [('io.github.linuxcaffe.nbdocs', 'nb Docs'),
+                                       ('io.github.linuxcaffe.nbdocs.debug', 'nb Docs'),
+                                       ('org.fossify.documents', 'Documents'),
+                                       ('org.fossify.documents.debug', 'Documents')])
+def test_open_says_which_app(client, notes, app_module, monkeypatch, pkg, name):
+    monkeypatch.setattr(app_module, '_documents_app', lambda: pkg)
+    monkeypatch.setattr(app_module.shutil, 'which', lambda n: '/bin/' + n)
+    monkeypatch.setattr(app_module.subprocess, 'Popen', lambda argv, **k: None)
+    r = client.post('/api/nb/open', json={'value': 'tasknotes:legal/call-00f04687.note.md'})
+    assert r.get_json()['app'] == name
+
+
+def test_open_with_termux_open_names_no_app(client, notes, app_module, monkeypatch):
+    monkeypatch.setattr(app_module, '_documents_app', lambda: '')
+    monkeypatch.setattr(app_module.shutil, 'which', lambda n: '/bin/' + n)
+    monkeypatch.setattr(app_module.subprocess, 'Popen', lambda argv, **k: None)
+    r = client.post('/api/nb/open', json={'value': 'tasknotes:legal/call-00f04687.note.md'})
+    assert r.get_json()['app'] == ''

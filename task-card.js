@@ -344,7 +344,8 @@ async function _openNoteHere(value, why) {
     if (h.termuxOpen?.ok && h.notes?.ok) {
         const r = await fetch('api/nb/open', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify({ value }) }).catch(() => null);
-        if (r?.ok) { say(`${why}: opened the note in Documents`); return; }
+        const d = r?.ok ? await r.json().catch(() => ({})) : null;
+        if (d) { say(`${why}: opened the note in ${d.app || 'another app'}`); return; }
     }
     const r = await fetch('api/nb/note?value=' + encodeURIComponent(value)).catch(() => null);
     const d = r ? await r.json().catch(() => ({})) : {};
