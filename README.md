@@ -61,7 +61,7 @@ You can manage your entire task system from a phone, a tablet, or a browser tab 
 ### Linux
 
 **With [awesome-taskwarrior](https://github.com/linuxcaffe/awesome-taskwarrior)'s `tw`:** `tw -I tw-web` clones
-it from Codeberg (GitHub if Codeberg doesn't answer) into `~/.local/share/tw-web`, installs its Python packages
+it from GitHub (Codeberg if GitHub doesn't answer) into `~/.local/share/tw-web`, installs its Python packages
 (in a `.venv` where the system's Python is managed by its package manager) and adds tw-web to your app menu;
 then start it with `~/.local/share/tw-web/tw-web-launch.sh`. `tw -u tw-web` updates it (fast-forward, only on a
 clean `main`). A checkout of your own, named in `~/.task/local.rc` (`tw-web.dir = ~/dev/tw-web`), is used as it
