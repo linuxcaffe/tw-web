@@ -207,6 +207,6 @@ laptop window, and `d225a36` (a pointer-type split) was reverted for it (`b08801
 After each milestone (a merged fix, a finished doc or skill), append a line to the day's timedot block in
 `~/.nb/claude/accounting/dev_timelog.md`: `tw-web:<topic>  <hours>  ; <what, concretely>`, in quarter
 hours, under a `## YYYY-MM-DD` heading. If another session already wrote that day's block, start a new
-fenced block under the same heading. Commit it in that notebook as
-`timedot: YYYY-MM-DD tw-web session (…)`. Do it as you go, no end-of-session ritual. Other tw repos use
+fenced block under the same heading. nb commits it: run no git in a notebook (it can damage nb's
+index). Do it as you go, no end-of-session ritual. Other tw repos use
 their own account (`tw-taskutil:<topic>`, …).
