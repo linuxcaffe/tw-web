@@ -21,4 +21,6 @@ The import changed only front matter, Hugo shortcodes, site links and images
 (see the script's docstring). The pages are ours from here: upstream's 2.x docs are frozen.
 
 Changed since the import (page: what and why):
-  (none yet)
+  context.md (2026-11-12): read and write contexts (2.6.0): define, show, list output,
+    the commands affected, .read/.write/.rc.<key> settings. Source: the 2.6.2 taskrc(5) and
+    task(1) man pages, with output checked against task 2.6.2.
