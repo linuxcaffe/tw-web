@@ -1690,6 +1690,121 @@ def get_commands():
     _commands_cache_ts = time.time()
     return jsonify(_commands_cache)
 
+# ── Help (tw:docs/tw-web-help-plan.md) ────────────────────────────────────────
+# Pages are markdown files under docs/help/, served only by name from the index
+# built from their front matter: no request text is ever joined into a path.
+_HELP_DIR = Path(__file__).resolve().parent / 'docs' / 'help'
+_HELP_TABS = {  # tab -> folder under docs/help/ ('' = docs/help itself)
+    'keys': '', 'tw-web': 'tw-web', 'commands': 'taskwarrior/commands', 'taskwarrior': 'taskwarrior',
+}
+_HELP_NAME = re.compile(r'[a-z0-9_-]{1,64}')
+
+
+def _help_front(text):
+    """(front-matter dict, body) of a help page. Values may be JSON-quoted."""
+    m = re.match(r'---\n(.*?)\n---\n', text, re.S)
+    if not m:
+        return {}, text
+    front = {}
+    for line in m.group(1).splitlines():
+        k, sep, v = line.partition(':')
+        if not sep:
+            continue
+        v = v.strip()
+        if v.startswith('"'):
+            try:
+                v = json.loads(v)
+            except ValueError:
+                v = v.strip('"')
+        front[k.strip()] = v
+    return front, text[m.end():]
+
+
+def _help_index():
+    """{tab: {name: {title, category, summary, path}}} from the files on disk."""
+    index = {}
+    for tab, folder in _HELP_TABS.items():
+        pages = {}
+        base = _HELP_DIR / folder if folder else _HELP_DIR
+        files = [base / 'keys.md'] if tab == 'keys' else sorted(base.glob('*.md'))
+        for f in files:
+            if not f.is_file() or not _HELP_NAME.fullmatch(f.stem):
+                continue
+            front, _ = _help_front(f.read_text(encoding='utf-8'))
+            pages[f.stem] = {'title': front.get('title') or f.stem,
+                             'category': front.get('category', ''),
+                             'summary': front.get('summary', ''), 'path': f}
+        index[tab] = pages
+    return index
+
+
+def _help_categories():
+    try:
+        return json.loads((_HELP_DIR / 'categories.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {}
+
+
+@app.route('/api/help')
+def get_help_index():
+    """The help index: each tab's pages (name, title, category, summary) and category order."""
+    index = _help_index()
+    tabs = {tab: [{'name': n, **{k: v for k, v in p.items() if k != 'path'}} for n, p in pages.items()]
+            for tab, pages in index.items()}
+    return jsonify({'success': True, 'tabs': tabs, 'categories': _help_categories()})
+
+
+@app.route('/api/help/page/<tab>/<name>')
+def get_help_page(tab, name):
+    """One help page's markdown (front matter removed), by tab and name from the index."""
+    page = _help_index().get(tab, {}).get(name) if _HELP_NAME.fullmatch(name or '') else None
+    if not page:
+        return jsonify({'success': False, 'error': 'No such help page'}), 404
+    _, body = _help_front(page['path'].read_text(encoding='utf-8'))
+    return jsonify({'success': True, 'tab': tab, 'name': name, 'title': page['title'],
+                    'category': page['category'], 'markdown': body})
+
+
+_help_commands_cache: dict = {}
+_help_commands_ts: float = 0.0
+
+
+def _parse_task_commands(text):
+    """Rows of `task commands` (2.6.2): [{command, category, description}].
+    Column spans come from the dashed rule under the header."""
+    lines = text.splitlines()
+    rule = next((i for i, l in enumerate(lines) if l.startswith('---')), None)
+    if rule is None:
+        return []
+    spans = [(m.start(), m.end()) for m in re.finditer(r'-+', lines[rule])]
+    if len(spans) < 3:
+        return []
+    rows = []
+    for line in lines[rule + 1:]:
+        if not line.strip():
+            continue
+        cells = [line[a:b].strip() for a, b in spans[:-1]] + [line[spans[-1][0]:].strip()]
+        if cells[0]:
+            rows.append({'command': cells[0], 'category': cells[1], 'description': cells[-1]})
+        elif rows and cells[-1]:                     # a wrapped description
+            rows[-1]['description'] += ' ' + cells[-1]
+    return rows
+
+
+@app.route('/api/help/commands')
+def get_help_commands():
+    """Every command `task commands` lists (custom reports too), with its category and description."""
+    global _help_commands_cache, _help_commands_ts
+    if time.time() - _help_commands_ts < 60:
+        return jsonify(_help_commands_cache)
+    r = run_task_command(['task', 'rc.context=none', 'rc.defaultwidth=0', 'rc.verbose=nothing',
+                          'commands'], readonly=True)
+    if not r['success']:
+        return jsonify({'success': False, 'error': 'task commands failed'}), 500
+    _help_commands_cache = {'success': True, 'commands': _parse_task_commands(r['stdout'])}
+    _help_commands_ts = time.time()
+    return jsonify(_help_commands_cache)
+
 @app.route('/api/contexts')
 def get_contexts():
     """Get all defined contexts, their filter definitions, and the active context."""

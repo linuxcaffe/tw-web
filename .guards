@@ -10,6 +10,8 @@ app.py:def _origin_allowed
 app.py:def _allowed_hosts
 app.py:def _server_options
 app.py:_EXTENSION_ROUTES
+app.py:def _help_index
+app.py:_HELP_NAME
 app.py:static_folder=None
 app.py:def _is_asset
 app.py:def _open_allowed

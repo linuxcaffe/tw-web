@@ -10,93 +10,72 @@
     <link rel="stylesheet" href="styles.css">
     <script src="nav.js"></script>
     <script src="tw-api.js"></script>
+    <script src="marked.min.js"></script>
+    <script src="help.js"></script>
     <style>
-        body { background: #1a1a1a; color: #ecf0f1; }
-        .help-page { max-width: 720px; margin: 0 auto; padding: 24px 20px 60px; }
-        .help-page h1 { color: #ecf0f1; font-size: 1.4rem; margin-bottom: 4px; }
-        .help-page .help-subtitle { color: rgba(255,255,255,0.4); font-size: 13px; margin-bottom: 32px; }
-        .help-section { margin-bottom: 32px; }
-        .help-section h2 {
-            font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
-            text-transform: uppercase; color: rgba(255,255,255,0.35);
-            margin-bottom: 10px; padding-bottom: 6px;
-            border-bottom: 1px solid rgba(255,255,255,0.07);
+        body { background: var(--bg); color: var(--text); }
+        .help-wrap { max-width: 760px; margin: 0 auto; padding: 16px 16px 60px; }
+        .help-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 10px; flex-wrap: wrap; }
+        .help-tab {
+            background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-muted);
+            padding: 8px 12px; font-size: 14px; cursor: pointer; margin-bottom: -1px;
         }
-        .help-table { width: 100%; border-collapse: collapse; }
-        .help-table tr { border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .help-table tr:last-child { border-bottom: none; }
-        .help-table td { padding: 7px 4px; font-size: 13px; color: rgba(255,255,255,0.75); vertical-align: top; }
-        .help-table td:first-child { width: 120px; }
-        kbd {
-            display: inline-block; padding: 2px 7px; font-size: 11px; font-family: monospace;
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 3px; color: #ecf0f1; white-space: nowrap;
+        .help-tab:hover { color: var(--text); }
+        .help-tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+        .help-head { font-size: 13px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.5; }
+        .help-head a { color: var(--accent); }
+
+        .help-list-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+        .help-filter {
+            flex: 1; min-width: 0; padding: 6px 10px; font-size: 14px; border-radius: 6px;
+            border: 1px solid var(--border); background: var(--bg2); color: var(--text);
         }
-        .help-note {
-            font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 20px;
-            padding: 10px 14px; background: rgba(255,255,255,0.04);
-            border-radius: 6px; border-left: 3px solid rgba(255,255,255,0.1);
+        .help-mode { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+        .help-mode-btn { background: var(--bg2); color: var(--text-muted); border: none; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+        .help-mode-btn.active { background: var(--bg3); color: var(--text); font-weight: 600; }
+
+        details.help-cat { border-bottom: 1px solid var(--border); }
+        details.help-cat > summary { cursor: pointer; padding: 9px 2px; font-weight: 600; font-size: 14px; }
+        .help-cat-count { color: var(--text-muted); font-weight: normal; margin-left: 6px; font-size: 12px; }
+        .help-items, .help-az { list-style: none; margin: 0; padding: 0 0 8px; }
+        .help-item { display: flex; gap: 10px; padding: 5px 2px 5px 18px; font-size: 14px; line-height: 1.4; }
+        .help-az .help-item { padding-left: 2px; }
+        .help-item-cat { flex: 0 0 150px; color: var(--text-muted); font-size: 12px; padding-top: 2px; }
+        .help-item-main { display: flex; flex-wrap: wrap; column-gap: 8px; min-width: 0; }
+        .help-item-link { color: var(--accent); text-decoration: none; }
+        .help-item-link:hover { text-decoration: underline; }
+        .help-item-nolink { font-family: monospace; }
+        .help-item-summary { color: var(--text-muted); font-size: 13px; }
+        .help-none, .help-loading, .help-error { color: var(--text-muted); font-size: 14px; }
+        .help-error { color: var(--red); }
+
+        .help-back { display: inline-block; margin-bottom: 8px; color: var(--accent); text-decoration: none; font-size: 13px; }
+        .help-md { font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+        .help-md h1 { font-size: 1.4rem; margin: 6px 0 12px; }
+        .help-md h2 { font-size: 1.1rem; margin: 22px 0 8px; }
+        .help-md h3 { font-size: 1rem; margin: 18px 0 6px; }
+        .help-md a { color: var(--accent); }
+        .help-md a.help-image { color: var(--text-muted); font-style: italic; }
+        .help-md code { font-size: 0.92em; background: var(--bg3); padding: 1px 4px; border-radius: 3px; }
+        .help-md pre { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; overflow-x: auto; }
+        .help-md pre code { background: none; padding: 0; }
+        .help-md table { border-collapse: collapse; margin: 8px 0; display: block; overflow-x: auto; }
+        .help-md th, .help-md td { border-bottom: 1px solid var(--border); padding: 5px 10px 5px 2px; text-align: left; vertical-align: top; }
+        .help-md blockquote { margin: 8px 0; padding: 4px 12px; border-left: 3px solid var(--border); color: var(--text-muted); }
+
+        @media (max-width: 768px) {   /* bp: phone */
+            .help-az .help-item { flex-direction: column; gap: 0; }
+            .help-item-cat { flex: none; padding-top: 0; }
         }
     </style>
 </head>
 <body>
 
-<div class="help-page">
-    <h1>tw-web Help</h1>
-    <p class="help-subtitle">Keyboard shortcuts &amp; quick reference</p>
-
-    <div class="help-section">
-        <h2>Navigation</h2>
-        <table class="help-table">
-            <tr><td><kbd>L</kbd></td><td>Task list</td></tr>
-            <tr><td><kbd>K</kbd></td><td>Kanban board</td></tr>
-            <tr><td><kbd>A</kbd></td><td>Agenda</td></tr>
-            <tr><td><kbd>C</kbd></td><td>Calendar</td></tr>
-            <tr><td><kbd>N</kbd></td><td>nb-web (when the <code>nb</code> annotation launcher is a web address)</td></tr>
-            <tr><td><kbd>?</kbd></td><td>This help page</td></tr>
-            <tr><td><kbd>Esc</kbd></td><td>Focus menu button (always — essential for escaping filters)</td></tr>
-            <tr><td><kbd>Enter</kbd> on menu</td><td>Open side menu</td></tr>
-            <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Navigate menu items</td></tr>
-            <tr><td><kbd>Esc</kbd> in menu</td><td>Close menu, return focus to menu button</td></tr>
-        </table>
-    </div>
-
-    <div class="help-section">
-        <h2>Task list</h2>
-        <table class="help-table">
-            <tr><td><kbd>a</kbd></td><td>Add new task</td></tr>
-            <tr><td><kbd>f</kbd></td><td>Focus filter input</td></tr>
-            <tr><td><kbd>c</kbd></td><td>Focus context buttons</td></tr>
-            <tr><td><kbd>s</kbd></td><td>Focus status buttons</td></tr>
-        </table>
-    </div>
-
-    <div class="help-section">
-        <h2>Calendar</h2>
-        <table class="help-table">
-            <tr><td><kbd>D</kbd></td><td>Day view; again: next zoom step</td></tr>
-            <tr><td><kbd>W</kbd></td><td>Week view; again: next zoom step</td></tr>
-            <tr><td><kbd>M</kbd></td><td>Month view</td></tr>
-            <tr><td><kbd>T</kbd></td><td>Jump to today</td></tr>
-            <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Previous / next day, week or month</td></tr>
-            <tr><td><kbd>Space</kbd></td><td>Repeat the view button last clicked (after Week or Day: next zoom step), until you click elsewhere</td></tr>
-        </table>
-        <p class="help-note">Holidays: amber all-day bars from your taskrc's <code>holiday.*</code> entries (tw-events writes them: <code>events init</code>). They don't move, open or count; the Agenda shows them on its date lines. Settings → Calendar → Holidays.</p>
-        <p class="help-note">Moon &amp; seasons: the moon's phases, solstices and equinoxes (<code>events init --moon yes --seasons yes</code>) are a dashed mark at their time in Week and Day (hover the icon; Day view shows the name beside it), just the icon by the day number in Month (hover for the name, click for that day), and follow the date on the Agenda's lines; so are the clock changes, with 🕐 (<code>--clock yes</code>). Settings → Calendar → Moon &amp; seasons.</p>
-        <p class="help-note">My events: your own events from tw-events (<code>~/.task/config/my-events.txt</code>) and the ghosts of tasks (<code>events add &lt;id&gt;</code>, which stay after the task is done): green bars, or a solid mark with 📌 at their time; on the Agenda they get a line of their own. Settings → Calendar → My events.</p>
-        <p class="help-note">Zoom: Week and Day each have three steps of row size and start hour (Settings → Week/Day zoom steps). Clicking the active view's button, or pressing its key, moves to the next step; changing view or reloading goes back to the default.</p>
-        <p class="help-note">On a phone: press and hold a task (about a third of a second) to pick it up, then move it; the page stays put. A quick sideways swipe goes to the next or previous week, day or month. In Week and Day, pinch to step through the zoom steps: spread your fingers for smaller rows, pinch them together for bigger ones; the time between your fingers stays put.</p>
-    </div>
-
-    <div class="help-section">
-        <h2>Configuration</h2>
-        <table class="help-table">
-            <tr><td><kbd>Menu → Settings</kbd></td><td>Notification timeout, kanban columns, calendar day range &amp; default view</td></tr>
-            <tr><td><kbd>~/.task/config/tw-web.rc</kbd></td><td>Taskwarrior settings — UDAs, urgency coefficients, recurrence engine</td></tr>
-        </table>
-    </div>
-
-    <p class="help-note">More to come. If something is missing or broken, check the browser console and the tw-web server log.</p>
+<div class="help-wrap">
+    <div id="help-tabs" class="help-tabs" role="tablist"></div>
+    <p id="help-head" class="help-head"></p>
+    <div id="help-lists"></div>
+    <div id="help-page"></div>
 </div>
 
 </body>

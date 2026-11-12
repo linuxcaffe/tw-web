@@ -1,0 +1,6 @@
+{
+  "tw-web": ["Getting started", "Views", "Working with tasks", "Sync & devices", "Integrating"],
+  "taskwarrior": ["Getting Started", "Basic Usage", "Configuring Taskwarrior", "Advanced Topics",
+                  "Tasksh", "Integrating with Taskwarrior", "Feedback", "About"],
+  "commands": ["report", "operation", "context", "graphs", "metadata", "config", "misc", "migration", "internal"]
+}
