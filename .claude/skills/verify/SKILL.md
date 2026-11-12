@@ -139,6 +139,16 @@ for Epiphany-only bugs the user tries a scratch server's URL in Epiphany itself.
   the PID is the server.
 - **The pre-commit hook bumps `sw.js`** and blocks on a failing guard, reference check or test. Don't
   bump `CACHE` by hand (CLAUDE.md invariant 11), and don't `--no-verify` past a check you haven't read.
+- **Two known flaky tests** (seen 2026-11-12, each failing once then passing on rerun, on `main` too):
+  e2e `editor-recur` (the recurrence hook's template sometimes isn't there yet) and pytest
+  `test_update.py::test_check_fetches_now_and_says_what_is_new`. Rerun before suspecting your change; if one
+  fails twice in a row, it's real.
+- **A test that passes in a worktree can still miss files git won't commit.** `.gitignore` has `_*`, and the
+  help import's `_get.md` passed every test in the worktree but never reached `main`
+  (`test_help_docs.py::test_no_page_is_gitignored` now guards `docs/help/`). After merging new files, check
+  `git ls-files` has them all.
+- **e2e on `help.html`:** each tab's list stays in the DOM, hidden, after you switch tabs. Scope selectors to
+  `.help-list:not([hidden])` (`help.check.cjs` keeps it in `V`).
 
 ## The installer (`tw-web.install`, `tw -I tw-web`)
 
