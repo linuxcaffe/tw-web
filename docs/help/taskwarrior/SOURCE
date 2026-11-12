@@ -1,0 +1,24 @@
+Imported from tw.org (https://github.com/GothenburgBitFactory/tw.org),
+commit d69bc6107c424dc9f27918b583bc07b03cbfa46f (2024-03-17), the last before Taskwarrior 3.0, by .tools/import-tw-docs.py.
+Taskwarrior and its documentation are MIT licensed (see license.md); credit to the
+Taskwarrior authors and the tw.org contributors.
+
+Kept: 43 topic pages and 15 command pages.
+Dropped:
+  upgrade-3: 3.x only
+  sync: 3.x only (TaskChampion)
+  taskserver/*: stale: Taskserver is unmaintained; the fleet syncs with gittw
+  commands/synchronize: stale: Taskserver
+  history_td: stale: Taskserver
+  build: stale: upstream develop builds 3.x
+  jobs: stale: old call for volunteers
+  _index: replaced by the help index
+  commands/_index: replaced by the Commands tab
+  commands/missing: the site's broken-link page
+  man/*: not in this snapshot; task ships its man pages
+
+The import changed only front matter, Hugo shortcodes, site links and images
+(see the script's docstring). The pages are ours from here: upstream's 2.x docs are frozen.
+
+Changed since the import (page: what and why):
+  (none yet)
