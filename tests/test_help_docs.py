@@ -2,6 +2,7 @@
 resolves, and no page carries active HTML. Plan: tw:docs/tw-web-help-plan.md."""
 import importlib.util
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,15 @@ def _front(text):
 def test_pages_exist():
     assert len(PAGES) >= 58
     assert (HELP / 'taskwarrior' / 'SOURCE').is_file()
+
+
+def test_no_page_is_gitignored():
+    """.gitignore's `_*` once kept commands/_get.md and _unique.md out of the import commit."""
+    r = subprocess.run(['git', '-C', str(ROOT), 'check-ignore', '--no-index', *map(str, PAGES)],
+                       capture_output=True, text=True)
+    if r.returncode == 128:
+        pytest.skip('not a git checkout')
+    assert r.stdout == '', f'ignored by .gitignore: {r.stdout}'
 
 
 @pytest.mark.parametrize('page', PAGES, ids=lambda p: str(p.relative_to(HELP)))

@@ -58,6 +58,7 @@ test-results/
 # Fichiers de débogage
 command.debug
 _*
+!docs/help/**/_*.md
 
 # User settings — machine-local preferences written by the Settings UI
 settings.json
