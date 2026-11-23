@@ -22,7 +22,7 @@ Hover it for what's new, one line per change.
 Click it, say yes, and tw-web updates itself: the server pulls the new version, restarts if it has to, and the page reloads onto it.
 It takes a few seconds, and your tasks aren't touched.
 
-The server looks for updates every hour, and also when you sync (see *Syncing*), so the pill is never far behind.
+The server looks for updates every hour, and also when you sync (see [Syncing](sync.md)), so the pill is never far behind.
 
 ## When it can't
 
@@ -51,4 +51,4 @@ which clears those saved files and starts fresh.
 ## See also
 
 - [Installing](install.md)
-- *Troubleshooting*
+- [Troubleshooting](troubleshooting.md)

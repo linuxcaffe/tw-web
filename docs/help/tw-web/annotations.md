@@ -55,7 +55,7 @@ A label tw-web doesn't know stays plain text, so `Note: call back Monday` is jus
 
 The `nb` launcher is the link to your notes.
 When nb-web isn't answering, tw-web doesn't leave you with a dead link: on a phone it opens the note in another app, and elsewhere it shows a read-only copy from this device, saying why.
-More: *Working with nb*.
+More: [Working with nb](nb.md).
 
 ## Adding, editing and deleting
 

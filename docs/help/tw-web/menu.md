@@ -29,7 +29,7 @@ On a phone, where the sidebars don't fit, this is how you get to them.
 
 **Settings** is where tw-web's own settings live: see [Settings](settings.md).
 
-**Sync** opens the Sync dialog, for [gittw](https://github.com/linuxcaffe/gittw): what's waiting to go, a **Sync Now** button, and **Undo** for the last change to a task. See *Syncing*.
+**Sync** opens the Sync dialog, for [gittw](https://github.com/linuxcaffe/gittw): what's waiting to go, a **Sync Now** button, and **Undo** for the last change to a task. See [Syncing](sync.md).
 
 **Terminal** opens the console with your own shell (or press `t`): see [The terminal console](console.md).
 
@@ -39,6 +39,6 @@ On a phone, where the sidebars don't fit, this is how you get to them.
 
 The footer names this **station** (its `gittw.device`, when gittw is set up), so on a phone and a laptop you know which you're looking at.
 
-**nb-web** appears when you have an `nb` annotation launcher with a web address: it opens your notes (`N` does the same). See *Working with nb*.
+**nb-web** appears when you have an `nb` annotation launcher with a web address: it opens your notes (`N` does the same). See [Working with nb](nb.md).
 
 **Stop** stops this tw-web server, after you confirm. It stays stopped until you start it again; see [Installing](install.md#starting-it).

@@ -49,7 +49,7 @@ Rename them, reorder them, add a column or drop one; the board follows.
 
 **Sync automatically** works with [gittw](https://github.com/linuxcaffe/gittw), which keeps your task data in git and shares it between stations.
 With it on, tw-web syncs soon after the server starts, a minute after your last change, and every 15 minutes (every 5 after a failed try, as when you're offline).
-Changes made on another station show up by themselves. See *Syncing*.
+Changes made on another station show up by themselves. See [Syncing](sync.md).
 
 ## Calendar
 
@@ -124,7 +124,7 @@ Add your own with **+ Add launcher**, say `man` with `xterm -e man {value}`, and
 
 [image: a task card with an nb: annotation shown as a link]
 
-More: [Annotations and links](annotations.md), and *Working with nb*.
+More: [Annotations and links](annotations.md), and [Working with nb](nb.md).
 
 ## tw-web.rc
 

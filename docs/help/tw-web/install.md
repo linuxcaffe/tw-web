@@ -53,7 +53,7 @@ $ tw-web-launch.sh --clean     # clear the page's saved files first, then start
 $ tw-web-launch.sh --stop      # stop the server
 ```
 
-`--clean` is the cure for a page that looks half old, half new after an update (see *Troubleshooting*).
+`--clean` is the cure for a page that looks half old, half new after an update (see [Troubleshooting](troubleshooting.md)).
 
 Or start the server alone, and open `http://localhost:5000` in any browser:
 
@@ -80,7 +80,7 @@ Other settings (a different port, a reverse proxy) are in the README: [Network a
 ## On a phone
 
 tw-web runs on an Android phone too, inside Termux, with your tasks synced from your computer.
-See *On a phone (Termux)*.
+See [On a phone (Termux)](phone.md).
 
 ## Next
 

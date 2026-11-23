@@ -46,7 +46,7 @@ and the task is back on the List, with its ID, ready to edit.
 
 Made a mistake just now? **Menu → Sync** has an **Undo** button, which runs `task undo`: it reverses the last change to any task, whatever made it.
 It asks before it does.
-See *Syncing* for the rest of that dialog.
+See [Syncing](sync.md) for the rest of that dialog.
 
 ## See also
 
