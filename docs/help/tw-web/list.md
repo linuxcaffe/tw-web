@@ -45,10 +45,10 @@ Click again to fold it.
 
 A card shows:
 
-- a **priority dot**, red for H (and 1, 2), amber for M (3, 4), green for L (5, 6); a ring around it means a recurring task, see *Recurrence*
+- a **priority dot**, red for H (and 1, 2), amber for M (3, 4), green for L (5, 6); a ring around it means a recurring task, see [Recurrence](recurrence.md)
 - the **description**, then the project, due and scheduled dates, duration and tags; the due date turns amber when it's less than three days off, red once it's past
 - an **extras** line for anything else, such as `dep:12` when it depends on task 12, or a UDA's value
-- its **annotations**, with links you can click (see *Annotations and links*)
+- its **annotations**, with links you can click (see [Annotations and links](annotations.md))
 
 A task that depends on others shows them right under it, indented, so you can see what's in the way.
 A started task is highlighted, so what you're working on stands out.
@@ -66,7 +66,7 @@ Each card has its buttons on the right:
 | ✕ | delete it, after you confirm | `task 12 delete` |
 
 Your hooks run for every one of these, just as they do in a terminal.
-If a hook needs to ask you something, the console opens so it can (see *The terminal console*).
+If a hook needs to ask you something, the console opens so it can (see [The terminal console](console.md)).
 
 A completed or deleted card has only the edit button, and shows its short UUID and end date first, since it has no ID any more.
 To undo the last change, open **Sync** from the menu and use **Undo** (`task undo`).
@@ -101,10 +101,10 @@ The Tags sidebar has three modes:
 As the window narrows, Tags goes first, then Projects.
 Both are still in the menu (**Projects**, **Tags**), which is how you reach them on a phone.
 
-More on what the filter inputs accept: *Filtering*.
+More on what the filter inputs accept: [Filtering](filter-bar.md).
 
 ## See also
 
-- *Adding and editing*
+- [Adding and editing](add-edit.md)
 - [Keyboard shortcuts](../keys.md)
 - [Urgency](../taskwarrior/urgency.md), for why the List is in the order it is

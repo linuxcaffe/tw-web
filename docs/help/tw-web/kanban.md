@@ -80,4 +80,4 @@ Hold a card for a moment to pick it up, then drag; a pill in the nav bar is the 
 
 - [Settings](settings.md), for the columns and the `state` UDA
 - [List](list.md), for what's on a card and its buttons
-- *Filtering*
+- [Filtering](filter-bar.md)

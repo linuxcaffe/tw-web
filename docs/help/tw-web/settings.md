@@ -80,7 +80,7 @@ Holidays also has a number: how many days ahead the Agenda gives a holiday its o
 
 ## Terminal
 
-tw-web has a real terminal, the console, for the commands that need one (see *The command bar*).
+tw-web has a real terminal, the console, for the commands that need one (see [The command bar](command-bar.md)).
 
 **Default height** is how tall it opens, in pixels.
 
@@ -124,7 +124,7 @@ Add your own with **+ Add launcher**, say `man` with `xterm -e man {value}`, and
 
 [image: a task card with an nb: annotation shown as a link]
 
-More: *Annotations and links*, and *Working with nb*.
+More: [Annotations and links](annotations.md), and *Working with nb*.
 
 ## tw-web.rc
 
@@ -162,7 +162,7 @@ recurrence.field=r
 ```
 
 tw-web leaves recurrence to the [recurrence-overhaul hook](https://github.com/linuxcaffe/tw-recurrence_overhaul-hook), so Taskwarrior's own [recurrence](../taskwarrior/recurrence.md) is switched off, and tw-web looks for the hook's `r` attribute (`r:1mo`) instead of `recur`.
-See *Recurrence*.
+See [Recurrence](recurrence.md).
 
 Priority is the one setting tw-web needs that isn't in this file, because it changes a built-in attribute.
 Numeric priorities as well as H, M and L:

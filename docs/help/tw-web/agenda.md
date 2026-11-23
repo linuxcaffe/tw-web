@@ -61,4 +61,4 @@ Pick **Completed** or **Deleted** and it turns into a history: the days run back
 
 - [Calendar](calendar.md), for the same tasks on a grid you can drag them around
 - [Using dates](../taskwarrior/using_dates.md), for what due, scheduled and wait mean
-- *Filtering*
+- [Filtering](filter-bar.md)

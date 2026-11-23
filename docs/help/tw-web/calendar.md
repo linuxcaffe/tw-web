@@ -105,4 +105,4 @@ In Week and Day, pinch to step through the zoom steps: spread your fingers for s
 
 - [Agenda](agenda.md), for the same tasks as a list
 - [Using dates](../taskwarrior/using_dates.md) and [Durations](../taskwarrior/durations.md)
-- *Adding and editing*
+- [Adding and editing](add-edit.md)
