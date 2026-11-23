@@ -22,6 +22,10 @@
         }
         .help-tab:hover { color: var(--text); }
         .help-tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+        .help-sub { display: inline-flex; margin-bottom: 10px; }
+        .help-sub[hidden] { display: none; }
+        .help-sub-btn { background: var(--bg2); color: var(--text-muted); border: none; padding: 5px 12px; font-size: 13px; cursor: pointer; }
+        .help-sub-btn.active { background: var(--bg3); color: var(--text); font-weight: 600; }
         .help-head { font-size: 13px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.5; }
         .help-head a { color: var(--accent); }
 
@@ -73,6 +77,7 @@
 
 <div class="help-wrap">
     <div id="help-tabs" class="help-tabs" role="tablist"></div>
+    <div id="help-sub" class="help-mode help-sub" hidden></div>
     <p id="help-head" class="help-head"></p>
     <div id="help-lists"></div>
     <div id="help-page"></div>

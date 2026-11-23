@@ -40,8 +40,9 @@ Day ordinals are the days in the month, numbered starting from 1, to either the 
 
 * `1st`, `2nd`, `3rd`, ...  - The date of the nearest future Nth day at 0:00:00 local.
 
-Note that if today is February 20th, specifying `31st` is an error, and does not mean March 31.
-For this, use a precise date format.
+Today's own number gives next month's: on the 23rd, `23rd` is the 23rd of next month.
+A day the month doesn't have rolls over rather than failing: in November, `31st` is December 1st.
+For an exact day, use a precise date format.
 
 ## Months of the Year
 
@@ -52,48 +53,38 @@ To specify a month in the past, use a different date format.
 
 The months are recognized in three-letter abbreviated form and the full month name only.
 
-## Year Dates
+## Period Dates
 
-Year dates are abbreviated names for dates within the year, that occur at various boundaries.
-The abbreviations use 's' to mean the start, and 'e' to mean the end of the period.
-The periods are indicated using 'm' (month), 'q' (quarter) and 'y' (year).
-So the date 'socy' means 'start of current year'.
+Period dates name the start or the end of the current day, week, work week, month, quarter or year.
+The abbreviations use 's' for the start and 'e' for the end, then the period: 'd' (day), 'w' (week),
+'ww' (work week), 'm' (month), 'q' (quarter), 'y' (year).
 
-* `socy`, `eocy`   - Start of the current year. End of the current year. Time is 0:00:00 local.
-* `socq`, `eocq`   - Start of the current quarter. End of the current quarter. Time is 0:00:00 local.
-* `socm`, `eocm`   - Start of the current month. End of the current month. Time is 0:00:00 local.
-* `soy`, `eoy`     - Start of the next year. End of the year. Time is 0:00:00 local.
-* `soq`, `eoq`     - Start of the next quarter. End of the quarter. Time is 0:00:00 local.
-* `som`, `eom`     - Start of the next month. End of the month. Time is 0:00:00 local.
+* `sod`, `eod`   - Start of today, 0:00:00. End of today, 23:59:59.
+* `sow`, `eow`   - Start of this week, Monday 0:00:00. End of this week, Sunday 23:59:59.
+* `soww`, `eoww` - Start of this work week, Monday 0:00:00. End of it, Friday 23:59:59.
+* `som`, `eom`   - Start of this month, the 1st at 0:00:00. End of this month, its last day at 23:59:59.
+* `soq`, `eoq`   - Start of this quarter. End of this quarter, 23:59:59.
+* `soy`, `eoy`   - Start of this year, January 1st 0:00:00. End of this year, December 31st 23:59:59.
 
-There is redundancy in this table, and it exists for the sake of symmetry.
-For example, 'eom' and 'eocm' are always the same, but exist so that every date has a matching pair.
+So a start date is already past (`som` on the 23rd is the 1st of this month), and an end date is the
+last second of the period. Weeks run Monday to Sunday here whatever `weekstart` says.
+Taskwarrior 2.6.2 has no `socw`, `eocm` or other "current" (`c`) forms; an unknown name is taken as text.
 
-[image: year](https://taskwarrior.org/images/year.png)
-
-## Week Dates
-
-Week dates are abbreviated names for dates within the week, that occur at various boundaries.
-The abbreviations use 's' to mean the start, and 'e' to mean the end of the period.
-The periods are indicated using 'd' (day), 'w' (week).
-
-* `socw`, `eocw` - Start of the current week. End of the current week. Time is 0:00:00 local.
-* `sow`, `eow`   - Start of the next week. End of the week. Time is 0:00:00 local.
-* `soww`, `eoww` - Start of the next work week. End of the work week. Time is 0:00:00 local.
-* `sod`, `eod`   - Start of today. End of today. Time is 0:00:00 local.
 * `yesterday`    - Start of yesterday. Time is 0:00:00 local.
 * `today`        - Start of today. Time is 0:00:00 local.
 * `now`          - Right now.
 * `tomorrow`     - Start of tomorrow. Time is 0:00:00 local.
 
-Again, there is redundancy in the table, for the sake of symmetry.
-
-[image: week](https://taskwarrior.org/images/week.png)
+`task calc` shows what any of these means right now, without touching your tasks:
+```
+$ task calc eom
+2026-11-30T23:59:59
+```
 
 ## Calculated Dates
 
 These dates are from algorithms, and easily calculated.
 
-* `later`, `someday`                                               - January 18th, 2038 - the end of time. Time is 0:00:00 local.
+* `later`, `someday`                                               - December 30th, 9999 - the end of time. Time is 0:00:00 local.
 * `easter`, `eastermonday`, `pentecost`, `ascension`, `goodfriday` - Time is 0:00:00 local.
 * `midsommarafton`, `midsommar`                                    - First Friday and Saturday after 19th June. Time is 0:00:00 local.

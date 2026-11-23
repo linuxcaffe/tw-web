@@ -24,3 +24,13 @@ Changed since the import (page: what and why):
   context.md (2026-11-12): read and write contexts (2.6.0): define, show, list output,
     the commands affected, .read/.write/.rc.<key> settings. Source: the 2.6.2 taskrc(5) and
     task(1) man pages, with output checked against task 2.6.2.
+  named_dates.md, dates.md (2026-11-23): period dates as 2.6.2 resolves them (`task calc`):
+    s… is the start of the current period (sod = today, sow = this Monday, som/soq/soy this
+    month/quarter/year), e… its end at 23:59:59; weeks Monday–Sunday whatever weekstart says;
+    no soc…/eoc… names; later/someday = 9999-12-30, not 2038; Nth ordinals roll over (31st in
+    November = December 1st) instead of failing.
+  dom.md (2026-11-23): per-tag access is tags.<tag> (tag.<tag> isn't a reference); annotation
+    ordinals count from 1; tw.program/args/width/height/syncneeded added; a section on
+    references in filters, modifications and calc (due.month:11 fails, (due.year == 2026) works).
+  examples.md (2026-11-23): context.width/height → tw.width/height (deprecated in 2.6.0).
+  tags.md (2026-11-23): due:today matches the whole day in 2.6.2 (due.is:today for the moment).

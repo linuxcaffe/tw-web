@@ -34,14 +34,8 @@ For example, to determine whether a task has a due date that falls on the curren
     $ task due.after:yesterday and due.before:tomorrow list
 
 This filters tasks with a due date during the narrow time window of 'today'.
-Note that it is not sufficient to just specify the date, because due dates all have associated times (defaulting to 0:00:00), and if you want to match the date, you need to consider the time.
-So for example, this command *does not*
-list tasks due today:
-
-    $ task due:today list
-
-Instead, this filter matches tasks with a due date of today, and a time of 0:00.
-In order to see all tasks due today, you need to provide proper range bracketing.
+In 2.6.2 the shorter `due:today` does the same: `attribute:date` with a date at midnight matches the
+whole day, so it finds a task due today at 15:00. For the exact moment, use `due.is:today` or `'(due == today)'`.
 
 ## Simplification
 

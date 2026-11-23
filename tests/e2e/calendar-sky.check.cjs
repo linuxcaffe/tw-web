@@ -37,7 +37,9 @@ check(async pg => withHolidays([
     await pg.click('.view-btn[data-view="day"]');
     await sleep(800);
     m = await marks(pg);
-    expect(m.length === 1 && m[0].title === 'Full Moon 15:30', `day view: ${JSON.stringify(m)}`);
+    // on a Monday the equinox (this week's Monday) is today too
+    const want = mon === 0 ? ['Full Moon 15:30', 'March Equinox 03:00'] : ['Full Moon 15:30'];
+    expect(JSON.stringify(m.map(x => x.title).sort()) === JSON.stringify(want.sort()), `day view: ${JSON.stringify(m)}`);
 
     await pg.click('.view-btn[data-view="month"]');
     await sleep(800);

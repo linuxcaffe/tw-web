@@ -387,11 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // The List's card manager, with the List's action handler
     taskCardManager = new TaskCardManager(new ScriptTaskActionHandler());
     
-    // ?add=1 — open the Add dialog on load (e.g. from Firefox extension shortcut)
-    if (new URLSearchParams(window.location.search).get('add') === '1') {
-        history.replaceState({}, '', location.pathname);
-        setTimeout(() => document.dispatchEvent(new CustomEvent('tw-open-add')), 300);
-    }
+    // ?add=1 (open the Add dialog on load) is nav.js's, for every view
 
     // The List's editor (a global, as on the other pages)
     taskEditor = new TaskEditor({

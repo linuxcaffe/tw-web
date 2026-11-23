@@ -13,7 +13,8 @@ category: "Keys"
 | `A` | Agenda |
 | `C` | Calendar |
 | `N` | nb-web (when the `nb` annotation launcher is a web address) |
-| `?` | Help |
+| `?` | Help; on Help, back to the view you came from |
+| `Esc` on Help | Back to the view you came from (a first `Esc` leaves a focused input) |
 | `Esc` | Focus the menu button (always: the way out of a filter input) |
 | `Enter` on the menu button | Open the side menu |
 | `↑` `↓` | Move through the menu items |

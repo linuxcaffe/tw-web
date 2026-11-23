@@ -86,6 +86,15 @@ $ task _get system.os
 FreeBSD
 ```
 
+### `tw.program`, `tw.args`, `tw.width`, `tw.height`, `tw.syncneeded`
+
+(2.6.0) The running program, its whole command line, the terminal's width and height, and `1` when
+there are local changes not yet synced. They replace the deprecated `context.*` forms:
+```
+$ task _get tw.width tw.height
+80 24
+```
+
 ### `rc.<name>`
 
 Any configuration value default, with any overrides from the `.taskrc` applied, then with any command line overrides applied last.
@@ -187,33 +196,45 @@ Tags can be accessed as a single item as an `<attribute>`, of the individual tag
 
 * `tags.<literal>` - (2.4.0) Direct access, per-tag, for example:
   ```
-  $ task _get 1.tag.home
+  $ task _get 1.tags.home
   home
   ```
-  If the tag is present, it is shown, otherwise the result is blank, and Taskwarrior exits with a non-zero status.
+  If the tag is present, it is shown, otherwise the result is blank (`1.tag.home`, singular, is not a DOM reference).
   ```
-  $ task _get 1.tag.DUE
+  $ task _get 1.tags.DUE
   DUE
-  $ task _get 1.tag.OVERDUE
+  $ task _get 1.tags.OVERDUE
   ```
 
   Workѕ for virtual tags too, in the same manner.
 
 Annotations are compound data structures, with two elements, which are `description` and `entry`.
-Annotations are accessed by an ordinal.
+Annotations are accessed by an ordinal, counting from 1 (`annotations.0` is blank).
 
 * `annotations.<N>.description` - (2.4.0) The description of the Nth annotation, for example:
-
-  $ task _get 1.annotations.0.description
+  ```
+  $ task _get 1.annotations.1.description
+  ```
 
 * `annotations.<N>.entry` - (2.4.0) The creation timestamp of the Nth annotation, for example:
   ```
-  $ task _get 1.annotations.0.entry
+  $ task _get 1.annotations.1.entry
   ```
   Note that because `entry` is of type `date`, the individual elements can be addressed, as above, for example:
   ```
-  $ task _get 1.annotations.0.entry.year
+  $ task _get 1.annotations.1.entry.year
   2014
   ```
 
 UDA values can be accessed in the same manner.
+
+## DOM references in filters and modifications
+
+A reference works wherever a value does, and dates take arithmetic:
+```
+$ task '(due < 2.due)' list             # due before task 2
+$ task '(due.year == 2026)' list        # a date's element, in an expression
+$ task add Pay rent due:eom wait:due-4d # 'due' is this task's own, read once at entry
+$ task calc '2.due - now'               # P7DT5H26M43S
+```
+A date's element works only in an expression: `due.month:11` is read as an attribute modifier and fails.

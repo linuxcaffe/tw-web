@@ -1,4 +1,4 @@
-// Help (tw:docs/tw-web-help-plan.md, step 2): four tabs, foldable categories, the filter,
+// Help (tw:docs/tw-web-help-plan.md, step 2): three tabs (Commands under Taskwarrior), foldable categories, the filter,
 // A–Z, a page and its links, Back, deep links, the Commands list from `task commands`,
 // and raw HTML in a page shown as text, never run.
 const { check, expect, B, sleep } = require('./lib.cjs');
@@ -12,7 +12,7 @@ check(async pg => {
     await pg.goto(B + '/help.html');
     await pg.waitForSelector('#help-page .help-md h1');
     const tabs = await pg.$$eval('.help-tab', b => b.map(x => x.textContent));
-    expect(JSON.stringify(tabs) === JSON.stringify(['Keys', 'tw-web', 'Commands', 'Taskwarrior']), 'tabs: ' + tabs);
+    expect(JSON.stringify(tabs) === JSON.stringify(['Keys', 'tw-web', 'Taskwarrior']), 'tabs: ' + tabs);
     expect((await pg.textContent('.help-md h1')) === 'Keyboard shortcuts', 'Keys page title');
     expect((await pg.$$('.help-md table')).length === 3, 'Keys has its three tables');
 

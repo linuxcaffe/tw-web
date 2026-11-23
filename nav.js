@@ -62,6 +62,20 @@
         }
     }
 
+    // ── Help is a layer over the view you came from (djp 2026-11-23) ──────────
+    // Help never becomes the last page. Escape or ? goes back to that view, and anything done in
+    // the nav bar (a view link, a filter, context, status, the add button) goes there and does it.
+    const ON_HELP = /\/help\.html$/.test(location.pathname);
+    function _helpReturn() {
+        let last = '';
+        try { last = localStorage.getItem(LAST_PAGE_KEY) || ''; } catch {}
+        return RESUMABLE.includes(last) && last !== '' && last !== 'index.html' ? last : './';
+    }
+    function leaveHelp(query = '') { location.href = _helpReturn() + query; }
+    function openHelp() { if (ON_HELP) return; location.href = 'help.html'; }
+    // A nav-bar text input with the focus: typing there doesn't leave Help until Enter or blur
+    const _typingInNav = () => !!document.activeElement?.closest?.('#tw-nav-bar input, #tw-btn-bar input');
+
     const PAGES = [
         { id: 'tasks',    href: './',                     label: 'List'       },
         { id: 'kanban',   href: 'kanban.html',           label: 'Kanban'     },
@@ -93,6 +107,7 @@
         _applyState(next);
         _updateFilterBar(next);
         document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: { ...next, clientOnly } }));
+        if (ON_HELP && !_typingInNav()) leaveHelp();
     }
     // Raw filter: complete TW expression override — survives page navigation via sessionStorage
     let _rawFilter = '';
@@ -115,6 +130,7 @@
         try { sessionStorage.setItem(RAW_FILTER_KEY, _rawFilter); } catch {}
         _updateFilterBar(getState());
         document.dispatchEvent(new CustomEvent('tw-filter-change', { detail: getState() }));
+        if (ON_HELP) leaveHelp();
     }
     function clearRawFilter() {
         if (!_rawFilter) return;
@@ -288,7 +304,7 @@
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     function activePage() {
-        const p = window.location.pathname;
+        const p = ON_HELP ? _helpReturn() : window.location.pathname;
         if (p.endsWith('kanban.html'))           return 'kanban';
         if (p.endsWith('agenda.html'))           return 'agenda';
         if (p.endsWith('calendar-planner.html')) return 'calendar';
@@ -1135,6 +1151,12 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 clearTimeout(timer);
                 timer = setTimeout(() => setState({ [stateKey]: inp.value }, { clientOnly: true }), DEBOUNCE);
             });
+            // On Help, a typed filter takes you to the view on Enter or blur (change), not mid-word
+            if (ON_HELP) inp.addEventListener('change', () => {
+                clearTimeout(timer);
+                setState({ [stateKey]: inp.value }, { clientOnly: true });
+                leaveHelp();
+            });
             clr.addEventListener('click', () => {
                 inp.value = '';
                 clr.classList.remove('vis');
@@ -1188,7 +1210,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             else if (action === 'stats')      { openStatsPanel();    }
             else if (action === 'settings')   { openSettingsPanel(); }
             else if (action === 'terminal')   { closeMenu(); openTerminal(); }
-            else if (action === 'help')       { closeMenu(); window.location.href = 'help.html'; }
+            else if (action === 'help')       { closeMenu(); openHelp(); }
             else closeMenu();
         });
         document.getElementById('tw-menu-nb').addEventListener('click', e => {
@@ -1221,6 +1243,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 
         // Brand text → force refresh (bypass cache) with blink
         document.getElementById('tw-brand-refresh').addEventListener('click', () => {
+            if (ON_HELP) { leaveHelp(); return; }
             const btn = document.getElementById('tw-brand-refresh');
             btn.classList.add('blinking');
             btn.addEventListener('animationend', () => btn.classList.remove('blinking'), { once: true });
@@ -1230,6 +1253,18 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
             document.dispatchEvent(new CustomEvent('tw-show-notification',
                 { detail: { message: 'Refreshed', type: 'success' } }));
         });
+
+        // On Help, Add (the button or a) opens the dialog on the view you came from
+        if (ON_HELP) document.addEventListener('tw-open-add', () => leaveHelp('?add=1'));
+        // ?add=1 (Help's Add, the Firefox extension's shortcut): open the Add dialog once the
+        // page's editor is built (every view builds it on DOMContentLoaded)
+        else if (new URLSearchParams(location.search).get('add') === '1') {
+            const q = new URLSearchParams(location.search);
+            q.delete('add');
+            history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+            window.addEventListener('load', () =>
+                setTimeout(() => document.dispatchEvent(new CustomEvent('tw-open-add')), 300));
+        }
 
         // Count + add area → open add dialog
         document.getElementById('tw-add-area').addEventListener('click', () =>
@@ -2707,6 +2742,13 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     };
     const _CAL_KEYS = { 'D': 'day', 'W': 'week', 'M': 'month', 'T': 'today' };
 
+    // A dialog, prompt or the console is up: Escape belongs to it, not to Help
+    function _overlayOpen() {
+        const shown = id => { const n = document.getElementById(id); return !!n && getComputedStyle(n).display !== 'none'; };
+        return shown('tw-sync-dialog') || shown('tw-cmd-output')
+            || !!document.querySelector('#tw-prompt-backdrop.open, #tw-menu-panel.open, .modal[style*="block"]');
+    }
+
     function _initKeys() {
         document.addEventListener('keydown', (e) => {
             if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -2721,8 +2763,10 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                     e.preventDefault();
                     return;
                 }
+                // On Help (nothing focused, no dialog or console open): back to the view
+                if (ON_HELP && !inInput && !_overlayOpen()) { e.preventDefault(); leaveHelp(); return; }
                 if (inInput) e.target.blur();
-                if (_rawFilter) clearRawFilter();
+                if (_rawFilter && !ON_HELP) clearRawFilter();
                 document.getElementById('tw-logo-btn')?.focus();
                 e.preventDefault();
                 return;
@@ -2734,7 +2778,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
 
             if (k === '?') {
                 e.preventDefault();
-                window.location.href = 'help.html';
+                if (ON_HELP) leaveHelp(); else openHelp();
             } else if (k === 'N' && _nbWebBase()) {
                 e.preventDefault();
                 goNbWeb();

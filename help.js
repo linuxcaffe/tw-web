@@ -10,13 +10,16 @@
         { id: 'keys', label: 'Keys', head: 'Keyboard shortcuts in the current version of tw-web.' },
         { id: 'tw-web', label: 'tw-web', head: 'This applies to the current version of tw-web.',
           more: ['README and source on GitHub', 'https://github.com/linuxcaffe/tw-web#readme'] },
-        { id: 'commands', label: 'Commands',
+        { id: 'commands', label: 'Commands', parent: 'taskwarrior',
           head: "Taskwarrior 2.6.2 commands, as `task commands` lists them here (your own reports included). " +
                 "Most can be run in tw-web's command bar; those that need a terminal open in the console." },
-        { id: 'taskwarrior', label: 'Taskwarrior',
+        { id: 'taskwarrior', label: 'Taskwarrior', sub: 'Topics',
           head: "This is Taskwarrior CLI help (2.6.2). Filters, dates and tags work the same in tw-web's filter and command bars." },
     ];
     const FOLDER = { keys: '', 'tw-web': 'tw-web/', commands: 'taskwarrior/commands/', taskwarrior: 'taskwarrior/' };
+    // The tab bar: Commands sits under Taskwarrior (Topics | Commands), so three tabs fit a phone
+    const TOP = TABS.filter(t => !t.parent);
+    const SUBS = { taskwarrior: ['taskwarrior', 'commands'] };
     const OPEN_KEY = 'tw-help-open', MODE_KEY = 'tw-help-mode';
 
     let index = null, categories = {}, commandRows = null;
@@ -217,7 +220,7 @@
         if (seq !== showPage.seq) return;
         el.page.replaceChildren();
         if (tab !== 'keys') {
-            const back = make('a', 'help-back', '← ' + TABS.find(t => t.id === tab).label);
+            const back = make('a', 'help-back', '← ' + (tab === 'taskwarrior' ? 'Topics' : TABS.find(t => t.id === tab).label));
             back.href = '#' + tab;
             el.page.appendChild(back);
         }
@@ -236,9 +239,14 @@
     function route() {
         const { tab, name, anchor } = parseHash();
         if (shown.list && shown.tab) scrolls[shown.tab] = window.scrollY;
-        el.tabs.querySelectorAll('.help-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-        el.tabs.querySelectorAll('.help-tab').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
         const t = TABS.find(x => x.id === tab);
+        const top = t.parent || t.id;
+        el.tabs.querySelectorAll('.help-tab').forEach(b => {
+            b.classList.toggle('active', b.dataset.tab === top);
+            b.setAttribute('aria-selected', b.dataset.tab === top);
+        });
+        el.sub.hidden = !SUBS[top];
+        el.sub.querySelectorAll('.help-sub-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         el.head.innerHTML = headHtml(t.head);
         if (t.more) {
             const a = make('a', null, t.more[0]);
@@ -268,15 +276,24 @@
         el = {
             tabs: document.getElementById('help-tabs'), head: document.getElementById('help-head'),
             lists: document.getElementById('help-lists'), page: document.getElementById('help-page'),
+            sub: document.getElementById('help-sub'),
         };
         marked.use({ renderer: { html: tok => esc(tok.text || tok.raw || '') } });
-        TABS.forEach(t => {
+        TOP.forEach(t => {
             const b = make('button', 'help-tab', t.label);
             b.type = 'button';
             b.dataset.tab = t.id;
             b.setAttribute('role', 'tab');
             b.addEventListener('click', () => { location.hash = '#' + t.id; });
             el.tabs.appendChild(b);
+        });
+        SUBS.taskwarrior.forEach(id => {
+            const t = TABS.find(x => x.id === id);
+            const b = make('button', 'help-sub-btn', t.sub || t.label);
+            b.type = 'button';
+            b.dataset.tab = id;
+            b.addEventListener('click', () => { location.hash = '#' + id; });
+            el.sub.appendChild(b);
         });
         try {
             const r = await fetch('api/help');

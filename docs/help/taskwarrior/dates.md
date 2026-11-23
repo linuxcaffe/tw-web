@@ -138,27 +138,24 @@ Synonyms are a useful shortcut to entering lengthy dates.
 Here is the full set:
 
 * `now`                        - Current local date and time.
-* `today`                      - Current local date, with time 00:00:00.
-* `sod`                        - Local date of the start of the next day, with time 00:00:00. Same as `tomorrow`.
+* `today`, `sod`               - Current local date, with time 00:00:00.
 * `eod`                        - Current local date, with time 23:59:59.
 * `yesterday`                  - Local date for yesterday, with time 00:00:00.
-* `tomorrow`                   - Local date for tomorrow, with time 00:00:00. Same as `sod`.
+* `tomorrow`                   - Local date for tomorrow, with time 00:00:00.
 * `monday`, `tuesday`, ...     - Local date for the specified day, after today, with time 00:00:00. Can be shortened, e.g. `mon`, `tue` (2.6.0) Can be capitalized, e.g. `Monday`, `Tue`
 * `january`, `february`, ...   - Local date for the specified month, 1st day, with time 00:00:00. Can be shortened, e.g. `jan`, `feb`. (2.6.0) Can be capitalized, e.g. `January`, `Feb`.
-* `later`, `someday`           - Local 2038-01-18, with time 00:00:00. A date far away, with semantically meaningful to GTD users.
-* `soy`                        - Local date for the next year, January 1st, with time 00:00:00.
-* `eoy`                        - Local date for this year, December 31st, with time 00:00:00.
-* `soq`                        - Local date for the start of the next quarter (January, April, July, October), 1st, with time 00:00:00.
+* `later`, `someday`           - Local 9999-12-30, with time 00:00:00. A date far away, semantically meaningful to GTD users.
+* `soy`                        - Local date for this year, January 1st, with time 00:00:00.
+* `eoy`                        - Local date for this year, December 31st, with time 23:59:59.
+* `soq`                        - Local date for the start of the current quarter (January, April, July, October), 1st, with time 00:00:00.
 * `eoq`                        - Local date for the end of the current quarter (March, June, September, December), last day of the month, with time 23:59:59.
-* `som`                        - Local date for the 1st day of the next month, with time 00:00:00.
-* `socm`                       - Local date for the 1st day of the current month, with time 00:00:00.
-* `eom`, `eocm`                - Local date for the last day of the current month, with time 23:59:59.
-* `sow`                        - Local date for the next Sunday, with time 00:00:00.
-* `socw`                       - Local date for the last Sunday, with time 00:00:00.
-* `eow`, `eocw`                - Local date for the end of the week, Saturday night, with time 00:00:00.
-* `soww`                       - Local date for the start of the work week, next Monday, with time 00:00:00.
-* `eoww`                       - Local date for the end of the work week, Friday night, with time 23:59:59.
-* `1st`, `2nd`, ...           - Local date for the next Nth day, with time 00:00:00.
+* `som`                        - Local date for the 1st day of the current month, with time 00:00:00.
+* `eom`                        - Local date for the last day of the current month, with time 23:59:59.
+* `sow`                        - Local date for this week's Monday, with time 00:00:00.
+* `eow`                        - Local date for this week's Sunday, with time 23:59:59.
+* `soww`                       - Local date for the start of the work week, this Monday, with time 00:00:00.
+* `eoww`                       - Local date for the end of the work week, Friday, with time 23:59:59.
+* `1st`, `2nd`, ...           - Local date for the next Nth day (today's number gives next month's; a day the month lacks rolls over), with time 00:00:00.
 * `goodfriday`                 - Local date for the next Good Friday, with time 00:00:00.
 * `easter`                     - Local date for the next Easter Sunday, with time 00:00:00.
 * `eastermonday`               - Local date for the next Easter Monday, with time 00:00:00.
@@ -166,6 +163,8 @@ Here is the full set:
 * `pentecost`                  - Local date for the next Pentecost (40 days after Easter Sunday), with time 00:00:00.
 * `midsommar`                  - Local date for the Saturday after June 20th, with time 00:00:00. Swedish.
 * `midsommarafton`             - Local date for the Friday after June 19th, with time 00:00:00. Swedish.
+
+Weeks run Monday to Sunday for these, whatever `weekstart` says. There are no `socw`, `eocm` or other "current" (`c`) forms in 2.6.2: an unknown name is taken as text. `task calc eom` shows what a synonym means right now.
 
 The synonyms are supported in addition to `rc.dateformat`
 
