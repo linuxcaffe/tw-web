@@ -65,6 +65,14 @@ As you fill the line in, tw-web gives hints: a rule needs a due or scheduled dat
 They're only hints.
 The hook is the one that decides, and if it refuses, its own words come back to you after the save.
 
+## One station makes recurring tasks
+
+With gittw keeping two stations in step, a phone may run only a few hooks of its own (its `hooks.location`), and recurrence-overhaul needn't be one of them.
+There, a rule is saved as a plain `r` attribute: no template, no instances, and a later edit doesn't fix it, because the hook only acts when a rule is new.
+So when you type a rule on a station without the hook, the Recur line says so, and the save says it again.
+It's a reminder, not a block: make the recurring task on the station that runs the hook.
+To mend one made on the wrong station, run `task <id> modify r:` and then `task <id> modify r:<rule>` on the station that has the hook.
+
 ## Editing a template
 
 A template's Wait, Scheduled and Until show as dates, as you'd expect, but they're saved as offsets from its anchor date, the due date or else the scheduled one (`rwait:due-604800s`), so every later instance gets them at the same distance.

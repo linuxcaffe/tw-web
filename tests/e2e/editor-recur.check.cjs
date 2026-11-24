@@ -8,7 +8,13 @@ const { check, expect, task, B, sleep, withRecurrence } = require('./lib.cjs');
 
 const all = () => JSON.parse(task('rc.hooks=off', 'export'));
 const toast = pg => pg.locator('#tw-notif-text').textContent();
-const open = (pg, t) => pg.evaluate(t => taskEditor.show(t), t || null);
+
+// show() focuses the description 80 ms after the dialog opens (later on the first open, which loads
+// the template): typing before that lands in the description ('recur e2e rent1mo')
+const open = async (pg, t) => {
+    await pg.evaluate(t => taskEditor.show(t), t || null);
+    await pg.waitForFunction(() => document.activeElement?.id === 'task-editor-description');
+};
 
 check(async pg => withRecurrence(async () => {
     await pg.goto(B + '/');

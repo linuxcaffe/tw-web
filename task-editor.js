@@ -263,6 +263,8 @@ class TaskEditor {
         });
         this.modal.querySelectorAll('input[name="te-rtype"]').forEach(r =>
             r.addEventListener('change', () => this._recurHints()));
+        // Whether this station runs the recurrence hook (s5 doesn't): the Recur line warns if not
+        TW.api.get('api/station').then(d => { this._station = d; this._recurHints(); }).catch(() => {});
         // Date order: hints as the four dates change
         ['#task-editor-due', '#task-editor-scheduled', '#task-editor-wait', '#task-editor-until'].forEach(sel => {
             const el = this.modal.querySelector(sel);
@@ -805,8 +807,15 @@ class TaskEditor {
             until.classList.toggle('te-recur-unused', !!chain);
             until.title = chain ? 'A chain takes no until: End stops it' : '';
         }
-        const hint = r && !val('due') && !val('scheduled') ? 'A recurring task needs a due or scheduled date.'
+        const rule = r && !val('due') && !val('scheduled') ? 'A recurring task needs a due or scheduled date.'
                    : chain && val('until') ? 'A chain takes no until: End stops it.' : '';
+        // A new rule on a station without the hook: stored, but no template (djp 2026-11-24: recurring
+        // tasks are made on one station). Not on a template already made elsewhere.
+        const st = this._station;
+        const noHook = r && st && st.recurrence === false && TW.recur.kind(this.currentTask) !== 'template'
+            ? `${st.station || 'This station'} doesn't run the recurrence hook: no template will be made here. ` +
+              'Make recurring tasks on the station that runs it.' : '';
+        const hint = [noHook, rule].filter(Boolean).join(' ');
         note.className = 'te-recur-note te-recur-hint';
         note.textContent = hint;
         note.style.display = hint ? '' : 'none';

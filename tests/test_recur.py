@@ -81,3 +81,71 @@ def test_native_recurrence_keeps_the_virtual_tag(app_module, monkeypatch):
         stdout = 'recurrence.field=recur\n'
     monkeypatch.setattr(app_module.subprocess, 'run', lambda *a, **k: Shown)
     assert app_module._get_recurrence_filter() == '+RECURRING'
+
+
+# A station without recurrence-overhaul (s5 runs a few hooks of its own, hooks.location) stores r
+# as a plain field and makes no template (task 123, 2026-11-24). Recurring tasks are made on a
+# station that runs the hook (djp: "keep recurrence on yoga only"); tw-web says so, never blocks.
+
+def _station(app_module, monkeypatch, tmp_path, hooks=(), name='s5'):
+    d = tmp_path / 'hooks.d'
+    d.mkdir()
+    for h in hooks:
+        (d / h).write_text('#!/bin/sh\n')
+        (d / h).chmod(0o755)
+    calls = []
+    def run(args, readonly=False, **k):
+        calls.append(args)
+        if args[1:] == ['_get', 'rc.hooks.location']:
+            out = str(d)
+        elif args[1:] == ['_get', 'rc.gittw.device']:
+            out = name
+        elif 'export' in args:
+            out = '[{"uuid": "u1", "id": 1}]'
+        else:
+            out = ''
+        return {'success': True, 'stdout': out + '\n', 'stderr': '', 'returncode': 0}
+    monkeypatch.setattr(app_module, 'run_task_command', run)
+    return calls
+
+
+RECUR_HOOKS = ('on-add_recurrence.py', 'on-modify_recurrence.py')
+LOCAL = {'Host': 'localhost:5000'}
+
+
+def test_station_says_whether_it_runs_the_recurrence_hook(client, app_module, monkeypatch, tmp_path):
+    _station(app_module, monkeypatch, tmp_path, hooks=('on-add_need-priority.py',))
+    assert client.get('/api/station', headers=LOCAL).get_json() == {'station': 's5', 'recurrence': False}
+
+
+def test_a_station_with_the_hook_runs_recurrence(client, app_module, monkeypatch, tmp_path):
+    _station(app_module, monkeypatch, tmp_path, hooks=RECUR_HOOKS, name='yoga')
+    assert client.get('/api/station', headers=LOCAL).get_json() == {'station': 'yoga', 'recurrence': True}
+
+
+def test_a_hook_that_cannot_run_does_not_count(client, app_module, monkeypatch, tmp_path):
+    _station(app_module, monkeypatch, tmp_path, hooks=RECUR_HOOKS)
+    (tmp_path / 'hooks.d' / 'on-modify_recurrence.py').chmod(0o644)
+    assert client.get('/api/station', headers=LOCAL).get_json()['recurrence'] is False
+
+
+def test_add_with_r_without_the_hook_warns(client, app_module, monkeypatch, tmp_path):
+    _station(app_module, monkeypatch, tmp_path)
+    body = client.post('/api/task/add', json={'description': 'pay', 'due': '2030-01-31T00:00:00',
+                                              'r': '1mo'}).get_json()
+    assert body['success']
+    assert any('s5' in w and 'recurrence' in w for w in body['warnings']), body['warnings']
+
+
+def test_add_with_r_and_the_hook_does_not_warn(client, app_module, monkeypatch, tmp_path):
+    _station(app_module, monkeypatch, tmp_path, hooks=RECUR_HOOKS)
+    body = client.post('/api/task/add', json={'description': 'pay', 'r': '1mo'}).get_json()
+    assert not any('recurrence' in w for w in body['warnings'] or [])
+
+
+def test_modify_setting_r_without_the_hook_warns_clearing_does_not(client, app_module, monkeypatch, tmp_path):
+    _station(app_module, monkeypatch, tmp_path)
+    body = client.put('/api/task/1/modify', json={'r': '1mo'}).get_json()
+    assert any('recurrence' in w for w in body['warnings']), body['warnings']
+    body = client.put('/api/task/1/modify', json={'r': ''}).get_json()
+    assert not any('recurrence' in w for w in body['warnings'] or [])

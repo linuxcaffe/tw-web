@@ -2005,8 +2005,9 @@ def modify_task(task_id):
                 try:
                     task = json.loads(export_result['stdout'])
                     if task:
-                        return jsonify({'success': True, 'message': result['stdout'],
-                                        'task': task[0], 'warnings': _warnings(result), **signals})
+                        return jsonify({'success': True, 'message': result['stdout'], 'task': task[0],
+                                        'warnings': (_warnings(result) or []) + _recurrence_warning(data.get('r')),
+                                        **signals})
                 except (json.JSONDecodeError, IndexError) as e:
                     print(f"Error parsing task data: {e}")
                     return jsonify({'success': True, 'message': result['stdout'], 'task': None,
@@ -2022,12 +2023,36 @@ def modify_task(task_id):
     else:
         return jsonify({'success': True, 'message': 'No changes to apply', 'task': None, 'warnings': []})
 
-@app.route('/api/station')
-def station():
-    """This station's name (gittw.device), for the menu footer; '' when it isn't named."""
+def _station_name():
+    """This station's name (gittw.device); '' when it isn't named."""
     r = run_task_command(['task', '_get', 'rc.gittw.device'], readonly=True)
     name = r['stdout'].strip() if r['success'] else ''
-    return jsonify({'station': name if re.fullmatch(r'[\w.-]{1,64}', name) else ''})
+    return name if re.fullmatch(r'[\w.-]{1,64}', name) else ''
+
+def _runs_recurrence():
+    """Whether this station's hooks include recurrence-overhaul's add and modify hooks. A station
+    can run a few hooks of its own (mobilize's hooks.location: s5 has no recurrence), and there r is
+    stored as a plain field and no template is made. Doesn't see hooks=off (reads override it)."""
+    r = run_task_command(['task', '_get', 'rc.hooks.location'], readonly=True)
+    loc = r['stdout'].strip() if r['success'] else ''
+    hooks = Path(loc).expanduser() if loc else _task_dir() / 'hooks'
+    return all(any(p.is_file() and os.access(p, os.X_OK) for p in hooks.glob(f'on-{event}_recurrence*'))
+               for event in ('add', 'modify'))
+
+def _recurrence_warning(r_value):
+    """A note for a write that sets r on a station without the recurrence hook (djp 2026-11-24:
+    recurring tasks are made on one station); [] otherwise. Never a refusal."""
+    if not r_value or _runs_recurrence():
+        return []
+    here = _station_name() or 'This station'
+    return [f"{here} doesn't run the recurrence hook: r is saved as a plain field and no template "
+            "is made. Make recurring tasks on the station that runs it."]
+
+@app.route('/api/station')
+def station():
+    """This station's name (gittw.device), for the menu footer, and whether it runs the recurrence
+    hook (the editor's Recur line warns when it doesn't)."""
+    return jsonify({'station': _station_name(), 'recurrence': _runs_recurrence()})
 
 @app.route('/api/config', methods=['GET'])
 def get_config():
@@ -2243,7 +2268,7 @@ def add_task():
                 task = json.loads(export_result['stdout'])
                 if task:
                     new_uuid = task[0]['uuid']
-                    warnings = _warnings(create_result)
+                    warnings = (_warnings(create_result) or []) + _recurrence_warning(data.get('r'))
 
                     # Wire parent dep: make the new task a prerequisite of parent_id
                     if parent_id:
