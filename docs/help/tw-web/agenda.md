@@ -38,6 +38,7 @@ A **waiting** task, hidden on the List until its wait date, shows here: the Agen
 A card placed by its wait or until date says so, `wait Dec 4` or `⌛ until Dec 10`, since neither date shows on a card otherwise.
 
 The heading counts them by kind, "4 Due, 7 Sched", adding Wait and Until when there are some.
+The counter in the nav bar says how many dated tasks are shown out of all your tasks of those statuses, as on the [List](list.md): `11/40`.
 
 Within a day they're in time order, so a task with only a date comes first.
 Cards are the same as on the [List](list.md), with the same buttons and the same card/row switch.

@@ -126,7 +126,9 @@ function renderAgenda(tasks) {
     }
 
     const total = items.length;
-    const p     = window.twNav?.stateToParams() ?? '';
+    // The denominator is every task of these statuses, no context, no filter: the List's, the
+    // Calendar's and Kanban's. Keyed and fetched by status alone (it was by context too, and shrank)
+    const p     = 'status=' + encodeURIComponent(statuses.join(','));
     let grandTotal = window.twNav?.getGrandTotal(p) ?? null;
 
     // Client-side filtering: the List's rules (TW.filter)

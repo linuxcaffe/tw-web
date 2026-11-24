@@ -75,6 +75,8 @@ tw-web's context is its own: choosing one here doesn't change `task context` in 
 The filter means the same thing on the [List](list.md), the [Agenda](agenda.md) and the [Kanban](kanban.md) board.
 The [Calendar](calendar.md) is the exception: its grid follows only the status buttons, so a planned task never vanishes from it, while its Unscheduled column follows the filter and context.
 
+The counter by the **+** button is the same on every view: what the view shows, out of all your tasks of the chosen statuses, with no context and no filter. `12/40` means 12 shown of 40; a single `40` means nothing is left out.
+
 ## A filter starts your next task
 
 Adding a task starts from what the filter names.
