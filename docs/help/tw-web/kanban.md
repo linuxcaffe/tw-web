@@ -42,6 +42,7 @@ $ task 12 modify state:started start:now
 
 A task that was already started keeps its own start time. Dragging it out to another column stops it (`start:`).
 A task you start from its card's **▶** button stays in its column; every started task shows the started colour, in any column.
+A task in **started** is always started: stop it with its card's **■** button, or undo its completion, and it goes back to the column before **started** (**todo**), whatever page you did it on.
 
 **done** holds your *completed* tasks in the context, the most recently completed first.
 Dragging a card in completes it (`task 12 done`), and dragging a completed card out reopens it into that column (`status:pending`), started again if it goes to **started**.
@@ -88,6 +89,7 @@ Every column has three small buttons in its header:
 Drag a card up or down within a column and that column switches to **Manual**, keeping the order you made.
 Cards you haven't placed yet come after the ones you have, by urgency. **done** stays in completion order.
 The order is kept by the tw-web server, not in your tasks, so it's the same in every browser.
+Under a filter, a drag reorders the cards you see and leaves the hidden ones where they were. Completed and deleted tasks drop out of the order the next time it's saved.
 
 ## On a phone
 

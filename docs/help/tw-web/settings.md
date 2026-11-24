@@ -147,6 +147,7 @@ urgency.uda.state.todo.coefficient=5
 ```
 
 The `state` [UDA](../taskwarrior/udas.md) is what the Kanban columns are made of.
+There's no `uda.state.values` line on purpose: with one, Taskwarrior refuses any state not in it, so a column you add or rename in Settings would fail on every drag ("The 'state' attribute does not allow a value of 'started'").
 The two [urgency](../taskwarrior/urgency.md) coefficients push backlog tasks down and to-do tasks up in reports that sort by urgency, the CLI's `next` among them.
 
 ```

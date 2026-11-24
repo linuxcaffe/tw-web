@@ -1868,7 +1868,7 @@ def stop_task(task_id):
     """Stop a task"""
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
-    args = ['task', task_id, 'stop']
+    args = ['task', task_id, 'stop'] + _kb_leaving_started(_export_one(task_id))
     result = run_task_command(args)
     resp = {'success': result['success'],
             'message': result['stdout'] if result['success'] else result['stderr'],
@@ -1896,7 +1896,8 @@ def revert_task(task_id):
     """Revert a completed or deleted task back to pending"""
     if not _valid_task_id(task_id):
         return jsonify({'success': False, 'message': 'Invalid task ID'}), 400
-    args = ['task', task_id, 'modify', 'status:pending']
+    # completing dropped its start time: a task from Started comes back to the lane before
+    args = ['task', task_id, 'modify', 'status:pending'] + _kb_leaving_started(_export_one(task_id))
     result = run_task_command(args)
     signals = _hook_signals(result, args)
     if result['success']:
@@ -2093,11 +2094,26 @@ def set_kanban_order():
         raw = {}
     ko = dict(raw.get('kanban_order') or {})
     ko[col] = [str(u) for u in order]
+    # Keep pending tasks only, in every lane: a completed or deleted one never comes back to a
+    # lane's order (a reopened task goes after the placed ones, by urgency)
+    r = run_task_command(['task', 'rc.context=none', 'status:pending', '_uuids'], readonly=True)
+    if r['success']:
+        pending = set(r['stdout'].split())
+        ko = {k: [u for u in v if u in pending] for k, v in ko.items()}
     _save_settings({'kanban_order': ko})
     return jsonify({'success': True})
 
 # Two Kanban lanes mean more than a state, by name (tests/test_kanban.py)
 _KB_STARTED, _KB_DONE = 'started', 'done'
+
+def _kb_leaving_started(task):
+    """A task in Started that loses its start time (stop, an undone completion) goes to the lane
+    before Started: the modification that says so, or none. Started means started."""
+    if not task or task.get('state') != _KB_STARTED:
+        return []
+    cols = _load_settings()['kanban_columns']
+    i = cols.index(_KB_STARTED) if _KB_STARTED in cols else 0
+    return [f'state:{cols[i - 1]}' if i > 0 else 'state:']
 
 @app.route('/api/kanban/move', methods=['POST'])
 def kanban_move():

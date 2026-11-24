@@ -130,13 +130,34 @@ function kbNavFilter(tasks) {
 
 // A lane's tasks: Done is the completed ones; Unassigned is every pending task whose state is no
 // other lane's (a pending state:done task included: Done is completed tasks now)
-function kbLaneTasks(col) {
-    if (col === KB_DONE) return kbNavFilter(kbDoneTasks);
+function kbLaneTasks(col, { filtered = true } = {}) {
+    const f = filtered ? kbNavFilter : (x => x);
+    if (col === KB_DONE) return f(kbDoneTasks);
     if (col === '') {
         const lanes = new Set(kbColumns.filter(c => c !== KB_DONE));
-        return kbNavFilter(kbAllTasks.filter(t => !lanes.has(t.state || '')));
+        return f(kbAllTasks.filter(t => !lanes.has(t.state || '')));
     }
-    return kbNavFilter(kbAllTasks.filter(t => (t.state || '') === col));
+    return f(kbAllTasks.filter(t => (t.state || '') === col));
+}
+
+// A lane reordered by hand: `visible` is the new order of the cards on screen. The filter may hide
+// some of the lane, and tasks outside the context are in the saved order too: they keep their
+// places, and the visible cards fill the slots the visible cards had.
+function _kbReordered(col, visible) {
+    const old  = kbManualOrder[col] || [];
+    const seen = new Set(old);
+    const seq  = [...old, ...kbSort(kbLaneTasks(col, { filtered: false }), col, 'manual')
+                              .map(t => t.uuid).filter(u => !seen.has(u))];
+    const vis  = new Set(visible);
+    let i = 0;
+    const order = seq.map(u => vis.has(u) ? visible[i++] : u);
+    kbManualOrder[col] = order;
+    kbSetSort(col, 'manual');
+    _kbSaveOrder(col, order);
+    // reflect 'manual' in the sort popup without a full re-render
+    document.querySelector(`.kb-sort-popup[data-kb-popup="${col}"]`)
+        ?.querySelectorAll('input[type="radio"]')
+        .forEach(r => { r.checked = r.value === 'manual'; });
 }
 
 function _kbFetchDone(offset, limit) {
@@ -179,8 +200,7 @@ function kbSetSort(col, key) { localStorage.setItem(`tw-kb-sort-${col}`, key); }
 function kbGetView(col) { return localStorage.getItem(`tw-kb-view-${col}`) || 'card'; }
 function kbSetView(col, mode) { localStorage.setItem(`tw-kb-view-${col}`, mode); }
 
-function kbSort(tasks, col) {
-    const key = kbGetSort(col);
+function kbSort(tasks, col, key = kbGetSort(col)) {
     if (key === 'manual') {
         const ord = kbManualOrder[col] || [];
         return [...tasks].sort((a, b) => {
@@ -335,16 +355,8 @@ function _kbMakeCol(col, label, tasks, isUnassigned, colorIdx) {
                 _kbMove(evt.item.dataset.taskId, evt.to.dataset.col).then(() => kbReload(true));
             } else if (evt.oldIndex !== evt.newIndex) {
                 // within-column reorder — save manual order, no task mutation
-                const c     = evt.to.dataset.col;
-                const uuids = [...evt.to.querySelectorAll('[data-task-id]')]
-                    .map(el => el.dataset.taskId);
-                kbManualOrder[c] = uuids;
-                kbSetSort(c, 'manual');
-                _kbSaveOrder(c, uuids);
-                // reflect 'manual' in the sort popup without a full re-render
-                document.querySelector(`.kb-sort-popup[data-kb-popup="${c}"]`)
-                    ?.querySelectorAll('input[type="radio"]')
-                    .forEach(r => { r.checked = r.value === 'manual'; });
+                _kbReordered(evt.to.dataset.col,
+                    [...evt.to.querySelectorAll('[data-task-id]')].map(el => el.dataset.taskId));
             }
         },
     });

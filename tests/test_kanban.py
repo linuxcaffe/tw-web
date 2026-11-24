@@ -128,7 +128,50 @@ def test_done_lane_pages_by_end_newest_first(client):
 
 def test_saving_one_lane_order_keeps_the_others(client, app_module, tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, '_SETTINGS_PATH', tmp_path / 'settings.json')
-    client.put('/api/kanban/order', json={'col': 'todo', 'order': ['a', 'b']})
-    client.put('/api/kanban/order', json={'col': 'review', 'order': ['c']})
+    a, b, c = (_add(client, f'kb order {x}') for x in 'abc')
+    client.put('/api/kanban/order', json={'col': 'todo', 'order': [a, b]})
+    client.put('/api/kanban/order', json={'col': 'review', 'order': [c]})
     order = client.get('/api/kanban/order').get_json()['order']
-    assert order == {'todo': ['a', 'b'], 'review': ['c']}
+    assert order == {'todo': [a, b], 'review': [c]}
+
+
+def test_saving_an_order_trims_tasks_no_longer_pending(client, app_module, tmp_path, monkeypatch):
+    """The saved order only grew: every completed or deleted task stayed in it. Each save keeps
+    pending tasks only, in every lane (a task outside the context is still pending: kept)."""
+    monkeypatch.setattr(app_module, '_SETTINGS_PATH', tmp_path / 'settings.json')
+    a, b, c, d = (_add(client, f'kb trim {x}') for x in 'abcd')
+    client.put('/api/kanban/order', json={'col': 'review', 'order': [c, d]})
+    client.post(f'/api/task/{b}/done')
+    client.post(f'/api/task/{d}/done')
+    client.put('/api/kanban/order', json={'col': 'todo', 'order': [a, b, 'gone-0000']})
+    order = client.get('/api/kanban/order').get_json()['order']
+    assert order == {'todo': [a], 'review': [c]}
+
+
+# ── A task in Started that loses its start time goes to the lane before Started (todo) ──
+
+def test_stop_in_started_moves_to_the_lane_before(client):
+    u = _add(client, 'kb stop in started', state='todo')
+    _move(client, u, 'started')
+    r = client.post(f'/api/task/{u}/stop').get_json()
+    assert r['success'], r
+    t = _get(client, u)
+    assert 'start' not in t and t['state'] == 'todo'
+
+
+def test_stop_elsewhere_keeps_the_lane(client):
+    u = _add(client, 'kb stop in review', state='review')
+    client.post(f'/api/task/{u}/start')
+    client.post(f'/api/task/{u}/stop')
+    assert _get(client, u)['state'] == 'review'
+
+
+def test_undone_from_started_goes_to_the_lane_before(client):
+    """Completing drops the start time; reverting must not leave a stopped task in Started."""
+    u = _add(client, 'kb revert from started', state='todo')
+    _move(client, u, 'started')
+    client.post(f'/api/task/{u}/done')
+    r = client.post(f'/api/task/{u}/revert').get_json()
+    assert r['success'], r
+    t = _get(client, u)
+    assert t['status'] == 'pending' and t['state'] == 'todo' and 'start' not in t
