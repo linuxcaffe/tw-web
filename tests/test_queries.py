@@ -1,7 +1,7 @@
 """The three task-list reads build their filter one way (_task_filter_args).
 
 Known bugs 5, 6 and 13 (tw:docs/tw-web-known-bugs.md): /api/tasks/planned and /api/tasks/due
-dropped the raw filter; and reads that use a report (`count`, `projects`) silently applied the
+dropped the raw filter (both replaced by /api/tasks/dated, 2026-11-23: test_dated.py); and reads that use a report (`count`, `projects`) silently applied the
 CLI's active context, which tw-web never shows. In 2.6.2 `export` ignores the active context,
 but `count` and the `projects` report apply it, so every read says rc.context=none and takes
 its context only from the nav bar's `context=` parameter.
@@ -19,8 +19,6 @@ def work_context(app_module, monkeypatch):
 
 @pytest.mark.parametrize('url,tail', [
     ('/api/tasks',         ['export']),
-    ('/api/tasks/planned', ['scheduled.not:', 'export']),
-    ('/api/tasks/due',     ['due.any:', 'scheduled.none:', 'export']),
 ])
 def test_status_and_context(client, captured, work_context, url, tail):
     client.get(url + '?status=pending&context=work')
@@ -29,8 +27,6 @@ def test_status_and_context(client, captured, work_context, url, tail):
 
 @pytest.mark.parametrize('url,tail', [
     ('/api/tasks',         ['export']),
-    ('/api/tasks/planned', ['scheduled.not:', 'export']),
-    ('/api/tasks/due',     ['due.any:', 'scheduled.none:', 'export']),
 ])
 def test_raw_filter_is_one_parenthesised_term(client, captured, url, tail):
     # Wrapped, so `a or b` can't swallow the route's own terms ('and' binds tighter than 'or').
@@ -38,14 +34,14 @@ def test_raw_filter_is_one_parenthesised_term(client, captured, url, tail):
     assert captured[-1] == BASE + ['(', 'project:work', 'or', '+x', ')'] + tail
 
 
-@pytest.mark.parametrize('url', ['/api/tasks', '/api/tasks/planned', '/api/tasks/due'])
+@pytest.mark.parametrize('url', ['/api/tasks', '/api/tasks/dated'])
 def test_unparseable_raw_filter_is_refused(client, captured, url):
     r = client.get(url + '?rawfilter=%22unclosed')
     assert r.status_code == 400 and not captured
 
 
 @pytest.mark.parametrize('url', [
-    '/api/tasks', '/api/tasks/planned', '/api/tasks/due', '/api/tasks/dated', '/api/projects', '/api/projects?active=1',
+    '/api/tasks', '/api/tasks/dated', '/api/projects', '/api/projects?active=1',
     '/api/tags', '/api/tags?all=1', '/api/health', '/api/stats', '/api/vtags?match=DUE',
 ])
 def test_reads_never_use_the_cli_context(client, captured, url):

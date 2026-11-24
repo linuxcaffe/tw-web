@@ -2,7 +2,7 @@
  * tw-web shared data layer: one task cache and one way to write, for every page.
  * Load right after nav.js on every page (check-refs.py enforces it wherever TW is used).
  *
- *   TW.store.read(name, match, ttl?)  cached entry or null; name: 'tasks' | 'extras' | 'total' | 'vtags'
+ *   TW.store.read(name, match, ttl?)  cached entry or null; name: 'tasks' | 'dated' | 'total' | 'vtags'
  *   TW.store.save(name, value)        stamp and store an entry
  *   TW.store.invalidate()             forget every cached task list (after any write)
  *   TW.api.get(url)                   GET, parsed JSON

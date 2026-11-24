@@ -971,49 +971,6 @@ def get_dated_tasks():
     return jsonify({'success': False, 'error': _task_error('Failed to retrieve dated tasks', result),
                     'stderr': result['stderr']}), 500
 
-@app.route('/api/tasks/due')
-def get_due_tasks():
-    """Get tasks that have a due date but no scheduled date (for calendar due-event display)."""
-    try:
-        args = ['task'] + _task_filter_args(request.args) + ['due.any:', 'scheduled.none:', 'export']
-    except ValueError as e:
-        return jsonify({'success': False, 'error': f'Invalid filter: {e}'}), 400
-    result = run_task_command(args, readonly=True)
-    if result['success']:
-        try:
-            tasks = json.loads(result['stdout'])
-            return jsonify({'success': True, 'data': tasks})
-        except json.JSONDecodeError as e:
-            return jsonify({'success': False, 'error': f'JSON decode error: {str(e)}'}), 500
-    return jsonify({'success': False, 'error': _task_error('Failed to retrieve due tasks', result), 'stderr': result['stderr']}), 500
-
-@app.route('/api/tasks/planned')
-def get_planned_tasks():
-    """Get all planned tasks (with scheduled date) in JSON format"""
-    try:
-        args = ['task'] + _task_filter_args(request.args) + ['scheduled.not:', 'export']
-    except ValueError as e:
-        return jsonify({'success': False, 'error': f'Invalid filter: {e}'}), 400
-    result = run_task_command(args, readonly=True)
-
-    if result['success']:
-        try:
-            tasks = json.loads(result['stdout'])
-            return jsonify({'success': True, 'data': tasks})
-        except json.JSONDecodeError as e:
-            return jsonify({
-                'success': False,
-                'error': f'JSON decode error: {str(e)}',
-                'stdout': result['stdout'],
-                'stderr': result['stderr']
-            }), 500
-    else:
-        return jsonify({
-            'success': False,
-            'error': _task_error('Failed to retrieve planned tasks', result),
-            'stderr': result['stderr']
-        }), 500
-
 def _stderr_lines(result):
     """stderr's lines, less Taskwarrior's override notices (TASKRC, TASKDATA, rc.*): what a hook
     or task itself said."""
@@ -1029,7 +986,7 @@ def _task_error(message, result):
 
 
 def _task_filter_args(params, pending_with_waiting=False):
-    """Filter argv for a task-list read (/api/tasks, /planned, /due, /dated), before the route's own terms.
+    """Filter argv for a task-list read (/api/tasks, /api/tasks/dated), before the route's own terms.
 
     rawfilter= is a whole TW expression and replaces status and context. Otherwise status= (ids,
     OR'd) and context= (a context name, AND'd). Every read says rc.context=none: in 2.6.2 `export`

@@ -6,33 +6,35 @@ let taskEditor;
 let taskCardManager;
 let unplannedTasks   = [];
 let allTasks         = [];
-let dueTasks         = [];
+let datedTasks       = [];   // /api/tasks/dated: each becomes one event, at TW.edate
 let _calEventSource  = null;  // managed FC event source — remove before re-adding
 let _loadId          = 0;     // increment each loadTasks() call; cancelled calls are ignored
 let _calSettings     = {};    // loaded from /api/config before calendar init
 
 // ── Task cache ────────────────────────────────────────────────────────────────
 // Two TW.store entries, emptied by every write (TW.api.write):
-//   'tasks'  — shared with main.js: {params, tasks}
-//   'extras' — shared with agenda.js: {cacheKey, planned, due}
+//   'tasks' — shared with main.js: {params, tasks}
+//   'dated' — shared with agenda.js: {cacheKey, tasks}
 function _readCache(params, cacheKey) {
-    const s = TW.store.read('tasks',  s => s.params === params);
-    const x = TW.store.read('extras', x => x.cacheKey === cacheKey);
-    return s && x ? { allFetched: s.tasks, plannedTasks: x.planned, due: x.due } : null;
+    const s = TW.store.read('tasks', s => s.params === params);
+    const x = TW.store.read('dated', x => x.cacheKey === cacheKey);
+    return s && x ? { allFetched: s.tasks, dated: x.tasks } : null;
 }
 
-function _writeCache(params, cacheKey, allFetched, plannedTasks, due) {
-    TW.store.save('tasks',  { params, tasks: allFetched });
-    TW.store.save('extras', { cacheKey, planned: plannedTasks, due });
+function _writeCache(params, cacheKey, allFetched, dated) {
+    TW.store.save('tasks', { params, tasks: allFetched });
+    TW.store.save('dated', { cacheKey, tasks: dated });
 }
 
-function _applyLoaded(myId, allFetched, plannedTasks, due) {
+// Unscheduled: neither scheduled nor due, so a wait-only or until-only task is in the column and
+// on the grid (djp 2026-11-23: drag it to give it a time)
+function _applyLoaded(myId, allFetched, dated) {
     if (myId !== _loadId) return;
-    dueTasks       = due;
+    datedTasks     = dated;
     unplannedTasks = allFetched.filter(t => !t.scheduled && !t.due);
-    allTasks       = [...unplannedTasks, ...plannedTasks];
+    allTasks       = [...unplannedTasks, ...dated];
     applyFiltersAndDisplay();
-    processTasksForCalendar(plannedTasks);
+    processTasksForCalendar(dated);
 }
 
 // ── Priority helper ───────────────────────────────────────────────────────────
@@ -316,7 +318,6 @@ function renderEventContent(arg) {
 }
 
 // ── Optimistic event drop/resize ──────────────────────────────────────────────
-function _isDueEvent(fcEvent) { return fcEvent.extendedProps?.kind === 'due'; }
 
 // A move writes the new start only: an event without a duration is drawn at its kind's default
 // length, which is not the task's. A resize writes the start and the duration. An all-day event
@@ -328,7 +329,7 @@ async function writeEventTimes(info, withDuration, failText) {
     if (!task?.uuid) return;
     const kind    = EVENT_KINDS[ev.extendedProps.kind];
     const modData = { [kind.field]: toLocalISOString(ev.start) };
-    if (withDuration && ev.end) modData[kind.duration] = minsToISO(Math.round((ev.end - ev.start) / 60000));
+    if (withDuration && ev.end && kind.duration) modData[kind.duration] = minsToISO(Math.round((ev.end - ev.start) / 60000));
 
     const result = await modifyTaskInBackend(task.uuid, modData);
     if (!result.success) {
@@ -682,35 +683,33 @@ function loadTasks() {
     const navState    = window.twNav ? window.twNav.getState() : {};
     const context     = (navState.context || '').trim();
     const ctxParam    = context ? '&context=' + encodeURIComponent(context) : '';
-    // Drag-list: always pending, in the context, blind to the status bar
-    const params      = 'status=pending' + ctxParam;
-    // Calendar events: follow the status bar only (completed, deleted, waiting, recurring all
-    // visible), never the context or the nav filter
+    // Drag-list: always pending (waiting ones too), in the context, blind to the status bar
+    const params      = 'status=pending,waiting' + ctxParam;
+    // Calendar events: follow the status bar only (completed, deleted, recurring all visible;
+    // waiting ones under Pending: /dated), never the context or the nav filter
     const calParams   = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(','));
 
     // Serve from cache when clean and fresh — skips all three fetches
     const cached = _readCache(params, calParams);
     if (cached) {
-        _applyLoaded(myId, cached.allFetched, cached.plannedTasks, cached.due);
+        _applyLoaded(myId, cached.allFetched, cached.dated);
         return;
     }
 
     function _fetch(attempt) {
         Promise.all([
-            fetch('api/tasks?'         + params    ).then(r => r.json()),
-            fetch('api/tasks/planned?' + calParams ).then(r => r.json()),
-            fetch('api/tasks/due?'     + calParams ).then(r => r.json()),
+            fetch('api/tasks?'       + params   ).then(r => r.json()),
+            fetch('api/tasks/dated?' + calParams).then(r => r.json()),
         ])
-        .then(([data, plannedData, dueData]) => {
+        .then(([data, datedData]) => {
             if (myId !== _loadId) return;   // superseded by a newer loadTasks() call
             if (!data.success) throw new Error(data.error || 'Failed to load tasks');
 
-            const allFetched   = data.tasks || [];
-            const plannedTasks = plannedData.success ? (plannedData.data || []) : [];
-            const due          = dueData.success      ? (dueData.data  || []) : [];
+            const allFetched = data.tasks || [];
+            const dated      = datedData.success ? (datedData.data || []) : [];
 
-            _writeCache(params, calParams, allFetched, plannedTasks, due);
-            _applyLoaded(myId, allFetched, plannedTasks, due);
+            _writeCache(params, calParams, allFetched, dated);
+            _applyLoaded(myId, allFetched, dated);
         })
         .catch(err => {
             if (myId !== _loadId) return;   // stale — a newer call is handling things
@@ -727,7 +726,7 @@ function loadTasks() {
     _fetch(0);
 }
 
-function processTasksForCalendar(scheduledTasks) {
+function processTasksForCalendar(tasks) {
     // Remove the previous event source cleanly (removeAllEvents() leaves stale
     // sources that FC may re-evaluate; tracking one source avoids this).
     if (_calEventSource) {
@@ -735,9 +734,14 @@ function processTasksForCalendar(scheduledTasks) {
         _calEventSource = null;
     }
 
+    // One event per task, at its effective date: the earlier of scheduled and due, else wait,
+    // else until (TW.edate; tw:docs/tw-web-edate-plan.md)
     const events = [];
-    scheduledTasks.forEach(task => { const e = createCalendarEvent(task, 'scheduled'); if (e) events.push(e); });
-    dueTasks.forEach(task =>       { const e = createCalendarEvent(task, 'due');       if (e) events.push(e); });
+    tasks.forEach(task => {
+        const at = TW.edate(task);
+        const e  = at && createCalendarEvent(task, at.field);
+        if (e) events.push(e);
+    });
 
     _calEventSource = calendar.addEventSource(events);
 }
@@ -851,14 +855,20 @@ function paintMonthIcons() {
 }
 
 // ── Event object factory ───────────────────────────────────────────────────────
-// Two kinds of event: a scheduled task (blue), and a due task with no scheduled date (red ⚑).
-// defaultMins is the height an event is drawn at when the task has no duration; it is never
-// written to the task.
+// Four kinds of event, one per task, by the field its effective date came from (TW.edate):
+// scheduled (blue), due (red ⚑), wait (muted: the task is hidden on the List until then) and
+// until (⌛: Taskwarrior deletes it after then). defaultMins is the height an event is drawn at
+// when the task has no duration; it is never written to the task. Wait and until have no
+// duration UDA, so they can't be resized.
 const EVENT_KINDS = {
     scheduled: { field: 'scheduled', duration: 'sched_duration', defaultMins: 60, idSuffix: '',
                  prefix: '',   bg: '#4a90e2', border: '#357abd' },
     due:       { field: 'due',       duration: 'due_duration',   defaultMins: 30, idSuffix: '_due',
                  prefix: '⚑ ', bg: '#e74c3c', border: '#c0392b' },
+    wait:      { field: 'wait',      duration: null,             defaultMins: 30, idSuffix: '_wait',
+                 prefix: '',   bg: '#9fa8da', border: '#7986cb' },
+    until:     { field: 'until',     duration: null,             defaultMins: 30, idSuffix: '_until',
+                 prefix: '⌛ ', bg: '#8d6e63', border: '#6d4c41' },
 };
 const STATUS_COLOURS = {
     completed: { bg: '#78909c', border: '#546e7a' },
@@ -882,11 +892,11 @@ function createCalendarEvent(task, kindName) {
         borderColor:     kind.border,
         textColor:       '#fff',
         editable:        true,
-        durationEditable: !allDay,
+        durationEditable: !allDay && !!kind.duration,
         extendedProps:   { raw: task, kind: kindName },
     };
     if (!allDay) {
-        const mins = parseDuration(task[kind.duration]) || kind.defaultMins;
+        const mins = (kind.duration && parseDuration(task[kind.duration])) || kind.defaultMins;
         ev.end = new Date(start.getTime() + mins * 60000);
     }
     const done = STATUS_COLOURS[task.status];
@@ -922,8 +932,10 @@ function showEventModal(fcEvent) {
     }
     if (task.due)            rows.push(`<tr><th>Due</th><td>${escHtml(fmt(task.due))}</td></tr>`);
     if (task.scheduled)      rows.push(`<tr><th>Scheduled</th><td>${escHtml(fmt(task.scheduled))}</td></tr>`);
-    const durField = EVENT_KINDS[fcEvent.extendedProps?.kind]?.duration || 'sched_duration';
-    if (task[durField])      rows.push(`<tr><th>Duration</th><td>${escHtml(task[durField])}</td></tr>`);
+    if (task.wait)           rows.push(`<tr><th>Wait</th><td>${escHtml(fmt(task.wait))}</td></tr>`);
+    if (task.until)          rows.push(`<tr><th>Until</th><td>${escHtml(fmt(task.until))}</td></tr>`);
+    const durField = EVENT_KINDS[fcEvent.extendedProps?.kind]?.duration;
+    if (durField && task[durField])      rows.push(`<tr><th>Duration</th><td>${escHtml(task[durField])}</td></tr>`);
     if (task.tags?.length)
         rows.push(`<tr><th>Tags</th><td>${task.tags.map(t => `<span class="card-tag">${escHtml(t)}</span>`).join(' ')}</td></tr>`);
     if (task.urgency != null)
@@ -960,7 +972,7 @@ function showEventModal(fcEvent) {
     // Unschedule (calendar-specific — hide for non-editable/due events: a due event's task
     // has no scheduled date to clear; bug 10)
     const unschedBtn = document.getElementById('modal-unschedule-btn');
-    unschedBtn.style.display = (isEditable && !_isDueEvent(fcEvent)) ? '' : 'none';
+    unschedBtn.style.display = (isEditable && fcEvent.extendedProps?.kind === 'scheduled') ? '' : 'none';
     unschedBtn.onclick = async () => {
         const r = await modifyTaskInBackend(task.uuid, { scheduled: null });
         if (r.success) { close(); loadTasks(); }
@@ -1000,7 +1012,7 @@ function applyFiltersAndDisplay() {
     // Nav counter: dated tasks shown / the status-only total (both status-only)
     const navState      = window.twNav ? window.twNav.getState() : {};
     const calParams     = 'status=' + encodeURIComponent((navState.statuses || ['pending']).join(','));
-    const calendarTasks = [...allTasks.filter(t => t.scheduled), ...dueTasks];
+    const calendarTasks = datedTasks.filter(t => TW.edate(t));
     let gt = window.twNav?.getGrandTotal(calParams) ?? null;
     window.twNav?.setCount(calendarTasks.length, gt ?? calendarTasks.length);
     if (gt === null && window.twNav) {

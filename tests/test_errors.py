@@ -12,7 +12,7 @@ def task_fails(app_module, monkeypatch):
     monkeypatch.setattr(app_module, 'run_task_command', fake)
 
 
-@pytest.mark.parametrize('url', ['/api/tasks', '/api/tasks/due', '/api/tasks/planned', '/api/tasks/dated'])
+@pytest.mark.parametrize('url', ['/api/tasks', '/api/tasks/dated'])
 def test_list_errors_carry_the_reason(client, task_fails, url):
     r = client.get(url)
     body = r.get_json()
