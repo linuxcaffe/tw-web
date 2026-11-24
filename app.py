@@ -952,6 +952,25 @@ def static_files(filename):
         return jsonify({'success': False, 'error': 'Not found'}), 404
     return send_from_directory('.', filename)
 
+@app.route('/api/tasks/dated')
+def get_dated_tasks():
+    """Tasks with any of scheduled, due, wait or until, for the Agenda and Calendar, which place
+    each at its one effective date (TW.edate; tw:docs/tw-web-edate-plan.md). Under Pending, waiting
+    tasks too: there they're what's coming up, not hidden (djp 2026-11-23)."""
+    try:
+        args = (['task'] + _task_filter_args(request.args, pending_with_waiting=True) +
+                ['(', 'scheduled.any:', 'or', 'due.any:', 'or', 'wait.any:', 'or', 'until.any:', ')', 'export'])
+    except ValueError as e:
+        return jsonify({'success': False, 'error': f'Invalid filter: {e}'}), 400
+    result = run_task_command(args, readonly=True)
+    if result['success']:
+        try:
+            return jsonify({'success': True, 'data': json.loads(result['stdout'])})
+        except json.JSONDecodeError as e:
+            return jsonify({'success': False, 'error': f'JSON decode error: {str(e)}'}), 500
+    return jsonify({'success': False, 'error': _task_error('Failed to retrieve dated tasks', result),
+                    'stderr': result['stderr']}), 500
+
 @app.route('/api/tasks/due')
 def get_due_tasks():
     """Get tasks that have a due date but no scheduled date (for calendar due-event display)."""
@@ -1009,8 +1028,8 @@ def _task_error(message, result):
     return f'{message}: {lines[-1]}' if lines else message
 
 
-def _task_filter_args(params):
-    """Filter argv for a task-list read (/api/tasks, /planned, /due), before the route's own terms.
+def _task_filter_args(params, pending_with_waiting=False):
+    """Filter argv for a task-list read (/api/tasks, /planned, /due, /dated), before the route's own terms.
 
     rawfilter= is a whole TW expression and replaces status and context. Otherwise status= (ids,
     OR'd) and context= (a context name, AND'd). Every read says rc.context=none: in 2.6.2 `export`
@@ -1032,6 +1051,9 @@ def _task_filter_args(params):
             terms = [expr]
         args += ['('] + terms + [')']
     statuses = [s.strip() for s in params.get('status', 'pending').split(',') if s.strip()]
+    # pending_with_waiting: the Agenda and Calendar show waiting tasks under Pending (/dated)
+    if pending_with_waiting and 'pending' in statuses and 'waiting' not in statuses:
+        statuses.append('waiting')
     return args + _build_task_filter(statuses)
 
 
