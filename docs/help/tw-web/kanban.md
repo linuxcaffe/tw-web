@@ -94,6 +94,7 @@ Under a filter, a drag reorders the cards you see and leaves the hidden ones whe
 ## On a phone
 
 The board works the same way at phone width, with fewer columns in view.
+A quick sideways swipe goes to the next or previous column, as on the [Calendar](calendar.md).
 Hold a card for a moment to pick it up, then drag; a pill in the nav bar is the easy way across.
 (The short hold is there with a mouse too, so a click on a card doesn't start a drag.)
 

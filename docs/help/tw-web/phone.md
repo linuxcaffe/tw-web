@@ -37,7 +37,7 @@ The README has the steps by hand: [Android / Termux](https://github.com/linuxcaf
 Open `http://localhost:5000` in the phone's browser, then **Add to Home Screen** (Chrome) or **Install** (Firefox).
 tw-web gets its own icon and opens full screen, like any other app.
 
-The layout is made for a narrow screen: the sidebars move into the menu, the bars wrap, and on the [Calendar](calendar.md) you hold a task to move it, swipe to change week and pinch to zoom.
+The layout is made for a narrow screen: the sidebars move into the menu, the bars wrap, and on the [Calendar](calendar.md) you hold a task to move it, swipe to change week and pinch to zoom, and on the [Kanban](kanban.md) board you swipe to change column.
 
 ## When Android stops the server
 

@@ -71,6 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('tw-open-add', () => { if (taskEditor) taskEditor.show(null); });
 
+    _kbSetupSwipe();
     kbReload();
 });
 
@@ -394,6 +395,75 @@ function _kbApplyFocus() {
     const focusedCol = cols[kbFocusedColIdx]?.dataset.col;
     if (focusedCol !== undefined) sessionStorage.setItem(_KB_FOCUS_KEY, focusedCol);
     _kbUpdateNavPillState();
+}
+
+// ── Swipe between lanes (touch) ───────────────────────────────────────────────
+// A decided sideways swipe moves the focus one lane, sliding the board, as the Calendar's swipe
+// changes the week (calendar-planner.js setupTouch, the same rules): the board follows the finger,
+// and on release a swipe past KB_SWIPE_MIN px and a quarter of the width, mostly sideways, and quick
+// (or past half the width) goes; anything else springs back. A held card is Sortable's drag
+// (_kbIsDragging), and a vertical start scrolls the lane. Past either end the board resists.
+const KB_GRAB_SLOP = 10, KB_SWIPE_MIN = 60, KB_SWIPE_WIDTH = 0.25, KB_SWIPE_MS = 600;
+let _kbSliding = false;
+
+function _kbSetupSwipe() {
+    const board = document.getElementById('kb-board');
+    const still = matchMedia('(prefers-reduced-motion: reduce)');
+    let t = null;   // this touch: where and when it started, axis 'x' | 'y' once decided
+    const lanes = () => board.querySelectorAll('.kb-col').length;
+
+    function slide(to, ms, then) {
+        board.style.transition = still.matches || !ms ? 'none' : `transform ${ms}ms ease-out`;
+        board.style.transform  = to ? `translateX(${to}px)` : '';
+        if (then) setTimeout(then, still.matches ? 0 : ms);
+    }
+    function back() {
+        if (board.style.transform) slide(0, 150, () => { board.style.transition = ''; });
+    }
+    function go(dir) {   // 1 next lane, -1 previous
+        const next = kbFocusedColIdx + dir;
+        if (next < 0 || next >= lanes()) { back(); return; }
+        const w = board.clientWidth;
+        _kbSliding = true;
+        slide(-dir * w, 120, () => {
+            _kbSetFocus(next);
+            slide(dir * w, 0);
+            board.offsetWidth;   // start the slide in from there
+            slide(0, 160, () => { board.style.transition = ''; _kbSliding = false; });
+        });
+    }
+    // The moves go to the element the finger landed on, even after a reload redraws its lane and
+    // takes it out of the page (then they never bubble up): listen there, as the Calendar does.
+    function move(e) {
+        if (!t) return;
+        if (_kbIsDragging || e.touches.length !== 1) { t = null; back(); return; }
+        const p = e.touches[0], dx = p.clientX - t.x, dy = p.clientY - t.y;
+        if (!t.axis) {
+            if (Math.hypot(dx, dy) < KB_GRAB_SLOP) return;
+            t.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+        }
+        if (t.axis !== 'x') return;
+        if (e.cancelable) e.preventDefault();
+        const atEnd = (dx > 0 && kbFocusedColIdx === 0) || (dx < 0 && kbFocusedColIdx === lanes() - 1);
+        slide(atEnd ? dx / 3 : dx, 0);
+    }
+    function end(e) {
+        for (const [type, fn] of [['touchmove', move], ['touchend', end], ['touchcancel', end]])
+            e.target.removeEventListener(type, fn);
+        if (!t || t.axis !== 'x') { t = null; back(); return; }
+        const p = e.changedTouches[0], dx = p.clientX - t.x, dy = p.clientY - t.y, w = board.clientWidth;
+        const far = Math.abs(dx) >= Math.max(KB_SWIPE_MIN, w * KB_SWIPE_WIDTH) && Math.abs(dx) > 2 * Math.abs(dy);
+        const decided = e.type === 'touchend' && far && (e.timeStamp - t.at <= KB_SWIPE_MS || Math.abs(dx) >= w / 2);
+        t = null;
+        decided ? go(dx < 0 ? 1 : -1) : back();
+    }
+    board.addEventListener('touchstart', e => {
+        const p = e.touches[0];
+        t = e.touches.length === 1 && !_kbSliding ? { x: p.clientX, y: p.clientY, at: e.timeStamp, axis: null } : null;
+        e.target.addEventListener('touchmove', move, { passive: false });
+        e.target.addEventListener('touchend', end);
+        e.target.addEventListener('touchcancel', end);
+    }, { passive: true });
 }
 
 // ── Column visibility (ResizeObserver) ────────────────────────────────────────

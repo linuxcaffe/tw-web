@@ -1338,6 +1338,7 @@ body.kanban-page .app-container { flex: 1; min-height: 0; display: flex; flex-di
     display: flex; gap: 10px; flex: 1; align-items: stretch;
     overflow: hidden;
     padding: 10px 12px 14px;
+    touch-action: pan-y pinch-zoom;   /* a sideways swipe is kanban.js's: it changes the lane */
 }
 
 /* column */
