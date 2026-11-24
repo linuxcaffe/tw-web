@@ -263,6 +263,11 @@ class TaskEditor {
         });
         this.modal.querySelectorAll('input[name="te-rtype"]').forEach(r =>
             r.addEventListener('change', () => this._recurHints()));
+        // Date order: hints as the four dates change
+        ['#task-editor-due', '#task-editor-scheduled', '#task-editor-wait', '#task-editor-until'].forEach(sel => {
+            const el = this.modal.querySelector(sel);
+            if (el) ['input', 'change'].forEach(ev => el.addEventListener(ev, () => this._dateHints()));
+        });
 
         // Save button — pulse animation + feedback
         const saveBtn = this.modal.querySelector('#task-editor-save');
@@ -426,6 +431,7 @@ class TaskEditor {
             if (TW.recur.kind(task) === 'template') this._fillTemplateDates(task);
         }
         this._fillRecur(task);
+        this._dateHints();
 
         // Sync datetime-local empty-state styling after programmatic fill
         this.modal.querySelectorAll('input[type="datetime-local"], input[type="date"]').forEach(inp =>
@@ -528,6 +534,7 @@ class TaskEditor {
         const sel = this.modal.querySelector('#task-editor-state');
         if (sel) { sel.dataset.current = ''; this._loadStateOptions(); }
         this._fillRecur(null);
+        this._dateHints();
     }
     
     handleSave() {
@@ -803,6 +810,21 @@ class TaskEditor {
         note.className = 'te-recur-note te-recur-hint';
         note.textContent = hint;
         note.style.display = hint ? '' : 'none';
+    }
+
+    // Scheduled after due, or wait after until: 2.6.2 takes them, and the Agenda and Calendar then
+    // show the task at the earlier date (TW.edate). A hint, never a block (edate plan step 5)
+    _dateHints() {
+        const note = this.modal?.querySelector('#te-date-note');
+        if (!note) return;
+        const val = id => this.modal.querySelector('#task-editor-' + id)?.value || '';   // datetime-local: sorts as text
+        const hints = [];
+        if (val('scheduled') && val('due') && val('scheduled') > val('due'))
+            hints.push('Scheduled is after due: the Agenda and Calendar show it at the due date.');
+        if (val('wait') && val('until') && val('wait') > val('until'))
+            hints.push('Wait is after until: the task would be gone before it shows.');
+        note.textContent = hints.join(' ');
+        note.style.display = hints.length ? '' : 'none';
     }
 
     async _showTemplateNote(inst) {

@@ -31,6 +31,13 @@ The date fields are your browser's date-and-time pickers; each has a **×** to c
 A duration is written as Taskwarrior writes them: `30min`, `1h`, `1h30min`, `2d` (see [Durations](../taskwarrior/durations.md)).
 What the fields mean is on [Using Dates Effectively](../taskwarrior/using_dates.md).
 
+Taskwarrior takes dates in any order, but some orders don't make sense: scheduled after due, or wait after until.
+The dialog says so under the dates, as a hint, and still saves what you asked for:
+
+```
+Scheduled is after due: the Agenda and Calendar show it at the due date.
+```
+
 The deps field has one more trick for a new task: `-12` makes task 12 wait for the new one, so you can add a step in front of something you already have.
 
 ## Save, or Log

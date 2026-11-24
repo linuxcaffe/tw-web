@@ -12,19 +12,32 @@ Press `A` to get here.
 
 ## What it shows
 
-Every task with a **scheduled** date appears on that date, and every task with a **due** date and no scheduled date appears on its due date.
-So a task appears once, at the date you plan to work on it if you've said, otherwise at its deadline.
+Each task appears **once**, at the date that says when it's coming up, its *effective date*:
+
+| The task has | It appears on |
+|---|---|
+| a scheduled date, a due date, or both | the earlier of the two |
+| only a wait date | the wait date |
+| only an until date | the until date |
+| none of these | not on the Agenda |
+
+A wait or until date beside a scheduled or due one is ignored here.
 
 Suppose you add these:
 
 ```
 $ task add Renew passport due:2026-12-15 scheduled:2026-12-01
 $ task add Pay rent due:eom
+$ task add Pick up the bike wait:2026-12-04
 $ task add Call the dentist
 ```
 
-The passport task sits under December 1st, the rent under the last day of the month, and the dentist call isn't on the Agenda at all, because it has no date.
-The heading counts both kinds: "4 Due, 7 Sched".
+The passport task sits under December 1st, when you plan to start; the rent under the last day of the month; the bike under December 4th, when it comes back into view; and the dentist call isn't on the Agenda at all, because it has no date.
+
+A **waiting** task, hidden on the List until its wait date, shows here: the Agenda is for seeing what's coming, and a task coming back next week is part of that.
+A card placed by its wait or until date says so, `wait Dec 4` or `⌛ until Dec 10`, since neither date shows on a card otherwise.
+
+The heading counts them by kind, "4 Due, 7 Sched", adding Wait and Until when there are some.
 
 Within a day they're in time order, so a task with only a date comes first.
 Cards are the same as on the [List](list.md), with the same buttons and the same card/row switch.
@@ -32,7 +45,8 @@ Cards are the same as on the [List](list.md), with the same buttons and the same
 ## The date lines
 
 Each day gets a quiet line: "Friday - Nov 27".
-Today's reads "TODAY - …" and tomorrow's "TOMORROW - …", and a day that's already past, with tasks still on it, says **(overdue)** in red.
+Today's reads "TODAY - …" and tomorrow's "TOMORROW - …", and a day that's already past with a due date still on it says **(overdue)** in red.
+A past scheduled day is just a past day: you meant to start then, which isn't the same as being late.
 
 There's always a TODAY line, even when nothing is due or scheduled today: it says so, so you know where today is in the list.
 

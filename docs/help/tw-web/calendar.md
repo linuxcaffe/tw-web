@@ -20,9 +20,18 @@ In Month, click a day to open it in Day view.
 
 ## What's on the grid
 
-A task with a **scheduled** date is a blue block, starting at that time.
-A task with a **due** date and no scheduled date is a red block marked ⚑, at its deadline.
-So a task appears once, like on the Agenda: where you've planned it, otherwise where it's due.
+Each task appears once, at its *effective date*, the same rule as the [Agenda](agenda.md#what-it-shows): the earlier of its scheduled and due dates, otherwise its wait date, otherwise its until date.
+The block's colour says which date put it there:
+
+| Block | The date |
+|---|---|
+| blue | scheduled: when you plan to work on it |
+| red, ⚑ | due: its deadline |
+| lavender | wait: when it comes back into view (it's hidden on the List until then) |
+| brown, ⌛ | until: when Taskwarrior deletes it if it isn't done |
+
+Wait and until blocks are rare: most tasks have a scheduled or due date, and then those win.
+A waiting task shows on the Calendar like any other, since it's part of what's coming.
 
 How tall a block is comes from the task's duration, the `sched_duration` or `due_duration` [UDA](../taskwarrior/udas.md) (see [Settings](settings.md#tw-web-rc)):
 
@@ -43,20 +52,20 @@ Completed tasks show in grey and deleted ones in purple when you pick those stat
 
 ## Moving and stretching
 
-Drag a block to another time or day, and tw-web changes its date, as if you'd typed:
+Drag a block to another time or day, and tw-web changes the date it's shown by, as if you'd typed:
 
 ```
 $ task 12 modify scheduled:2026-11-26T14:00
 ```
 
-A due block changes `due` the same way.
-Drag the bottom edge of a block to change how long it is, and that writes its duration too.
+A due block changes `due`, a wait block `wait` and an until block `until`, the same way.
+Drag the bottom edge of a scheduled or due block to change how long it is, and that writes its duration too; wait and until blocks have no duration, so they only move.
 Moves snap to 15 minutes.
 Your hooks run on every change, and if one refuses, the block goes back where it was, with the hook's message.
 
 ## Clicking
 
-Click a task to see its details, with buttons to **start** or **stop** it, **edit** it, **unschedule** it (📅: clears the scheduled date, so it goes back to the Unscheduled column), mark it **done**, or **delete** it.
+Click a task to see its details, with buttons to **start** or **stop** it, **edit** it, **unschedule** it (📅, on a scheduled block: clears the scheduled date, so it goes back to the Unscheduled column), mark it **done**, or **delete** it.
 
 Click an empty time to add a task scheduled there.
 Better still, drag down over a stretch of time: the Add dialog opens with the start and the duration already filled in.
@@ -64,8 +73,11 @@ Drag over the all-day strip for a date with no time.
 
 ## The Unscheduled column
 
-On a wide window, the column at the right lists your pending tasks that have no scheduled date.
+On a wide window, the column at the right lists your pending tasks, waiting ones included, that have neither a scheduled nor a due date.
 Drag one onto the grid to schedule it.
+
+A task with only a wait or until date is in both places: on the grid at that date, and in the column, since it isn't really planned yet.
+Dragging it from the column gives it a scheduled time, and from then on that's where it shows.
 It has its own sort (⇅, the same choices as the [List](list.md)) and card/row switch.
 
 The nav bar's filter and context narrow this column, so typing `home` in the project input leaves the Home tasks waiting to be planned.
