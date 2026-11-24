@@ -244,3 +244,35 @@ TW.recur = (() => {
 
     return { kind, anchorName, offsetDate, offsetExpr };
 })();
+
+// ── TW.edate ──────────────────────────────────────────────────────────────────
+// The effective date: the one date a task shows at in the Agenda and the Calendar, which answer
+// "what's coming up?" (tw:docs/tw-web-edate-plan.md, djp 2026-11-23). The earlier of scheduled and
+// due (a tie is the due date, the deadline); without either, the earlier of wait and until. Waiting
+// isn't hidden there. Pure: {field, at} (a Date) or null. The agenda-edate hook's own `edate` UDA
+// (sched first) is never read.
+TW.edate = (() => {
+    // TW's compact UTC (20261205T140000Z) or an ISO date; null for anything else
+    const COMPACT = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/;
+    function parse(v) {
+        if (!v || typeof v !== 'string') return null;
+        const m = COMPACT.exec(v);
+        if (m) return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
+        if (!/^\d{4}-\d{2}-\d{2}/.test(v)) return null;
+        const d = new Date(v);
+        return isNaN(d) ? null : d;
+    }
+    // The earliest of fields that hold a date; on a tie the later-listed field wins
+    function earliest(task, fields) {
+        let best = null;
+        for (const field of fields) {
+            const at = parse(task[field]);
+            if (at && (!best || at <= best.at)) best = { field, at };
+        }
+        return best;
+    }
+    return function edate(task) {
+        if (!task) return null;
+        return earliest(task, ['scheduled', 'due']) || earliest(task, ['wait', 'until']);
+    };
+})();

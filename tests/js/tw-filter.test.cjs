@@ -8,7 +8,7 @@ const vm = require('vm');
 const ctx = { TW: {}, window: {} };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', '..', 'tw-filter.js'), 'utf8'), ctx);
-const { filter: F, sort: S, recur: R } = ctx.TW;
+const { filter: F, sort: S, recur: R, edate: E } = ctx.TW;
 
 // Arrays made inside the vm context have another Array prototype: compare as JSON
 const eq = (a, b) => assert.strictEqual(JSON.stringify(a), JSON.stringify(b));
@@ -152,5 +152,30 @@ t('offset expr: seconds from the anchor, signed', () => {
     eq(R.offsetExpr('sched', new Date(2030, 0, 31, 9), new Date(2030, 0, 31, 11)), 'sched+7200s');
 });
 t('anchor name: ranchor sched, else due', () => { eq(R.anchorName({ ranchor: 'sched' }), 'sched'); eq(R.anchorName({ ranchor: 'due' }), 'due'); eq(R.anchorName({}), 'due'); });
+
+// TW.edate: the one date a task shows at in the Agenda and Calendar (tw:docs/tw-web-edate-plan.md)
+const ed = task => { const e = E(task); return e && [e.field, e.at.toISOString()]; };
+const D1 = '20261201T140000Z', D5 = '20261205T140000Z', D9 = '20261209T140000Z';
+t('edate: nothing dated is null', () => { eq(E({}), null); eq(E(null), null); eq(E({ entry: D1, end: D5 }), null); });
+t('edate: scheduled alone', () => eq(ed({ scheduled: D5 }), ['scheduled', '2026-12-05T14:00:00.000Z']));
+t('edate: due alone', () => eq(ed({ due: D5 }), ['due', '2026-12-05T14:00:00.000Z']));
+t('edate: scheduled before due takes scheduled', () => eq(ed({ scheduled: D1, due: D5 })[0], 'scheduled'));
+t('edate: due before scheduled (illogical) takes due', () => eq(ed({ scheduled: D9, due: D5 })[0], 'due'));
+t('edate: same moment takes due (the deadline)', () => eq(ed({ scheduled: D5, due: D5 })[0], 'due'));
+t('edate: wait ignored beside scheduled or due', () => {
+    eq(ed({ wait: D1, due: D9 }), ['due', '2026-12-09T14:00:00.000Z']);
+    eq(ed({ wait: D1, scheduled: D9 })[0], 'scheduled');
+});
+t('edate: until ignored beside scheduled or due', () => eq(ed({ until: D1, scheduled: D5, due: D9 })[0], 'scheduled'));
+t('edate: wait alone', () => eq(ed({ wait: D5 }), ['wait', '2026-12-05T14:00:00.000Z']));
+t('edate: until alone', () => eq(ed({ until: D5 }), ['until', '2026-12-05T14:00:00.000Z']));
+t('edate: wait and until take the earlier', () => {
+    eq(ed({ wait: D1, until: D9 })[0], 'wait');
+    eq(ed({ wait: D9, until: D5 })[0], 'until');      // wait after until (illogical): until
+});
+t('edate: ISO forms read too; junk ignored', () => {
+    eq(ed({ due: '2026-12-05T14:00:00Z' }), ['due', '2026-12-05T14:00:00.000Z']);
+    eq(ed({ due: 'tomorrow', wait: D5 })[0], 'wait');
+});
 
 console.log(`tw-filter: ${n} passed`);
