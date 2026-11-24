@@ -58,6 +58,8 @@ nav.js:initProjectsSidebar
 nav.js:initTagsSidebar
 nav.js:--tw-nav-h
 nav.js:const BP
+nav.js:function spinnerHTML
+nav.js:data-tw-spinner
 nav.js:offerTerminal
 
 # ── Classes and methods the four views share ─────────────────────────────────

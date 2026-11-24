@@ -209,7 +209,9 @@
 
     async function showPage(tab, name, anchor) {
         const seq = (showPage.seq = (showPage.seq || 0) + 1);
-        el.page.replaceChildren(make('p', 'help-loading', 'Loading…'));
+        const wait = make('div', 'loading');
+        wait.appendChild(window.twNav.spinner('Loading the page'));
+        el.page.replaceChildren(wait);
         let data;
         try {
             const r = await fetch('api/help/page/' + encodeURIComponent(tab) + '/' + encodeURIComponent(name));

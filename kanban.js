@@ -79,6 +79,14 @@ document.addEventListener('DOMContentLoaded', () => {
 async function kbReload(preserveView = false) {
     const savedOffset = kbColOffset;
     const savedFocus  = kbFocusedColIdx;
+    // The first load: an empty board until the lanes come (a reload keeps the board it shows)
+    const board = document.getElementById('kb-board');
+    if (board && !board.children.length) {
+        const fill = document.createElement('div');
+        fill.className = 'tw-loading-fill';
+        fill.appendChild(window.twNav.spinner('Loading the board'));
+        board.appendChild(fill);
+    }
     try {
         const navState   = window.twNav ? window.twNav.getState() : {};
         const context    = (navState.context || '').trim();
@@ -118,6 +126,7 @@ async function kbReload(preserveView = false) {
         _kbSetCount();
     } catch (e) {
         console.error('Kanban load failed:', e);
+        board?.querySelector(':scope > .tw-loading-fill')?.remove();
         document.dispatchEvent(new CustomEvent('tw-show-notification',
             { detail: { message: 'Failed to load kanban', type: 'error' } }));
     }
@@ -172,16 +181,21 @@ function _kbFetchDone(offset, limit) {
 async function _kbLoadMoreDone() {
     if (_kbDoneLoading || kbDoneTasks.length >= kbDoneTotal || !kbColumns.includes(KB_DONE)) return;
     _kbDoneLoading = true;
+    const more = document.querySelector(`.kb-col-body[data-col="${KB_DONE}"] .kb-more`);
+    if (more) {
+        more.disabled = true;
+        more.replaceChildren(window.twNav.spinner('Loading more', { small: true }), 'Loading…');
+    }
     try {
         const d = await _kbFetchDone(kbDoneTasks.length, KB_DONE_PAGE);
         if (d.success) {
             const seen = new Set(kbDoneTasks.map(t => t.uuid));
             kbDoneTasks = kbDoneTasks.concat(d.tasks.filter(t => !seen.has(t.uuid)));
             kbDoneTotal = d.total;
-            _kbRerenderCol(KB_DONE);
         }
     } finally {
         _kbDoneLoading = false;
+        _kbRerenderCol(KB_DONE);   // the new cards, or the button back as it was
     }
 }
 

@@ -30,6 +30,7 @@ function _writeCache(params, cacheKey, allFetched, dated) {
 // on the grid (djp 2026-11-23: drag it to give it a time)
 function _applyLoaded(myId, allFetched, dated) {
     if (myId !== _loadId) return;
+    document.getElementById('cal-loading')?.remove();
     datedTasks     = dated;
     unplannedTasks = allFetched.filter(t => !t.scheduled && !t.due);
     allTasks       = [...unplannedTasks, ...dated];
@@ -695,6 +696,14 @@ function loadTasks() {
         _applyLoaded(myId, cached.allFetched, cached.dated);
         return;
     }
+    // The first load: the grid is empty until the tasks come (a reload keeps what it shows)
+    if (!_calEventSource && !document.getElementById('cal-loading')) {
+        const over = document.createElement('div');
+        over.id = 'cal-loading';
+        over.className = 'tw-loading-over';
+        over.appendChild(window.twNav.spinner('Loading the calendar'));
+        document.getElementById('calendar')?.before(over);
+    }
 
     function _fetch(attempt) {
         Promise.all([
@@ -718,6 +727,9 @@ function loadTasks() {
                 const delay = attempt === 0 ? 1200 : 2500;
                 setTimeout(() => { if (myId === _loadId) _fetch(attempt + 1); }, delay);
             } else {
+                document.getElementById('cal-loading')?.remove();
+                const box = document.getElementById('unplanned-tasks');
+                if (box?.querySelector('.tw-spinner')) box.replaceChildren();
                 showCalNotification('Failed to load tasks: ' + err.message, 'error');
             }
         });

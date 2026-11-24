@@ -295,8 +295,27 @@
         });
     }
 
+    // ── Spinner: the helmet, for a wait on the server ─────────────────────────
+    // Drawn inline in the text colour, so it shows on light pages, dark ones and the dark menus
+    // (an <img> can't take currentColor: the old one was white on the light theme's white page).
+    // It fades in after a moment (styles.css), so an answer that comes quickly never flashes one.
+    // A static placeholder gets one with data-tw-spinner="<label>" (filled by init).
+    const _HELMET = 'M21.75,27.1V43.5c-3.37-.87-8.12-4.58-11-7.63,1.91-4.75,2.72-8.76,1.83-15.54-5.79-21.11,' +
+                    '28.77-21.11,23,0-.88,6.77-.08,10.79,1.77,15.54-2.86,3.05-7.64,6.76-11,7.63l0-16.4,6.82-5,' +
+                    '.18-2.74L24,21.13l-9.18-1.79L15,22.08Z';
+    function spinnerHTML(label = 'Loading', { small = false } = {}) {
+        return `<span class="tw-spinner${small ? ' tw-spinner-sm' : ''}" role="status" aria-label="${esc(label).replace(/"/g, '&quot;')}">` +
+               `<svg viewBox="0 0 48 48" aria-hidden="true"><path d="${_HELMET}"/></svg></span>`;
+    }
+    function spinner(label, opts) {
+        const t = document.createElement('template');
+        t.innerHTML = spinnerHTML(label, opts);
+        return t.content.firstChild;
+    }
+
     window.twNav = { getState, setState, stateToParams, setCount, setGrandTotal, getGrandTotal,
                      openSyncDialog, initProjectsSidebar, initTagsSidebar, showNotification, showOutput,
+                     spinner, spinnerHTML,
                      setRawFilter, clearRawFilter, openPty, nbWebHere, goNbWeb, nbWebCandidates,
                      // BP.bars, where the bars stack and the brand reads "Task"; BP.phone, the phone layout
                      narrow: window.matchMedia(`(max-width: ${BP.bars}px)`),
@@ -1288,6 +1307,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         const style = document.createElement('style');
         style.textContent = CSS;
         document.head.appendChild(style);
+        document.querySelectorAll('[data-tw-spinner]').forEach(el => el.prepend(spinner(el.dataset.twSpinner)));
 
         const state    = getState();
         const active   = activePage();
@@ -1484,7 +1504,8 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     function openPanel(title) {
         document.getElementById('tw-menu-list').style.display  = 'none';
         document.getElementById('tw-panel-title').textContent  = title;
-        document.getElementById('tw-panel-body').innerHTML     = '<div class="tw-panel-loading">Loading…</div>';
+        document.getElementById('tw-panel-body').innerHTML     =
+            `<div class="tw-panel-loading">${spinnerHTML('Loading', { small: true })}Loading…</div>`;
         document.getElementById('tw-menu-panel').classList.add('open');
     }
     function closePanel() {
@@ -2317,7 +2338,10 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
     // The advisory (step 7, item 4): what's coming in, by station; what's here and not pushed;
     // when each station last synced; how automatic sync is doing. d null: still checking.
     function _renderSyncStatus(el, d) {
-        if (!d) { el.innerHTML = '<span class="sync-checking">Checking the other stations…</span>'; return; }
+        if (!d) {
+            el.innerHTML = `<span class="sync-checking">${spinnerHTML('Checking', { small: true })}Checking the other stations…</span>`;
+            return;
+        }
         if (!d.git) { el.textContent = ''; return; }
         const STATUS_LABEL = { M: 'modified', A: 'added', D: 'deleted', '?': 'untracked' };
         const plural = (n, w) => `${n} ${w}${n !== 1 ? 's' : ''}`;
@@ -2404,7 +2428,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         btn.onclick = () => {
             const msg = comment.value.trim();
             btn.disabled    = true;
-            btn.textContent = 'Syncing…';
+            btn.innerHTML   = spinnerHTML('Syncing', { small: true }) + 'Syncing…';
             output.style.display = 'none';
             TW.api.write('POST', 'api/sync', { message: msg }).then(data => {
                 const came = _pulledText(data.pulled);
@@ -2441,7 +2465,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         undoBtn.onclick = () => {
             if (!confirm('Undo the last task modification?')) return;
             undoBtn.disabled    = true;
-            undoBtn.textContent = 'Undoing…';
+            undoBtn.innerHTML   = spinnerHTML('Undoing', { small: true }) + 'Undoing…';
             TW.api.write('POST', 'api/sync/undo').then(d => {
                 output.textContent   = d.output || (d.success ? 'Undone.' : 'Undo failed.');
                 output.style.display = 'block';
@@ -2689,7 +2713,7 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         if (!confirm(`Update tw-web (${v.behind} new)?\n\n` + v.subjects.slice(0, 12).map(s => '• ' + s).join('\n'))) return;
         const pill = document.getElementById('tw-update-pill');
         pill.disabled = true;
-        pill.textContent = 'Updating…';
+        pill.innerHTML = spinnerHTML('Updating', { small: true }) + 'Updating…';
         let d;
         try {
             d = await (await fetch('api/update', { method: 'POST' })).json();
