@@ -556,6 +556,7 @@ h2 {
 .card-due  { font-size: 0.78em; color: var(--text-muted); }
 .card-due.overdue  { color: #b71c1c; font-weight: 600; }
 .card-due.due-soon { color: #e65100; }
+.card-edate { font-size: 0.78em; color: var(--text-muted); font-style: italic; }   /* Agenda: placed by wait or until (TW.edate) */
 .card-sched { font-size: 0.78em; color: #4a90e2; }
 .card-dur  { font-size: 0.78em; color: var(--text-muted); }
 .card-tag  { font-size: 0.75em; color: var(--tw-text-label); background: var(--bg3); padding: 1px 5px; border-radius: 8px; }

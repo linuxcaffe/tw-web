@@ -51,14 +51,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('tw-filter-change', loadAgenda);
 });
 
-// ── Task cache (TW.store 'extras', shared with calendar-planner.js) ──────────
-function _readExtras(cacheKey) {
-    const x = TW.store.read('extras', x => x.cacheKey === cacheKey);
-    return x && { planned: x.planned, due: x.due };
+// ── Task cache (TW.store 'dated': /api/tasks/dated for these params) ──────────
+function _readDated(cacheKey) {
+    const x = TW.store.read('dated', x => x.cacheKey === cacheKey);
+    return x && x.tasks;
 }
 
-function _writeExtras(cacheKey, planned, due) {
-    TW.store.save('extras', { cacheKey, planned, due });
+function _writeDated(cacheKey, tasks) {
+    TW.store.save('dated', { cacheKey, tasks });
 }
 
 // ── Data loading ──────────────────────────────────────────────────────────────
@@ -70,23 +70,21 @@ function loadAgenda() {
     document.getElementById('error-message').style.display = 'none';
     document.getElementById('tasks-container').innerHTML = '';
 
-    const cached = _readExtras(params);
+    const cached = _readDated(params);
     if (cached) {
         document.getElementById('loading').style.display = 'none';
-        renderAgenda(cached.planned, cached.due);
+        renderAgenda(cached);
         return;
     }
 
-    Promise.all([
-        fetch('api/tasks/planned?' + params).then(r => r.json()),
-        fetch('api/tasks/due?'     + params).then(r => r.json()),
-    ])
-    .then(([plannedData, dueData]) => {
+    // Every task with scheduled, due, wait or until (waiting ones too, under Pending); each is
+    // placed once, at its effective date (TW.edate; tw:docs/tw-web-edate-plan.md)
+    fetch('api/tasks/dated?' + params).then(r => r.json())
+    .then(data => {
         document.getElementById('loading').style.display = 'none';
-        const scheduled = plannedData.success ? (plannedData.data || []) : [];
-        const due       = dueData.success      ? (dueData.data  || []) : [];
-        _writeExtras(params, scheduled, due);
-        renderAgenda(scheduled, due);
+        if (!data.success) throw new Error(data.error || 'failed');
+        _writeDated(params, data.data || []);
+        renderAgenda(data.data || []);
     })
     .catch(err => {
         document.getElementById('loading').style.display = 'none';
@@ -98,27 +96,34 @@ function loadAgenda() {
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
-function renderAgenda(scheduled, due) {
+const KIND_LABEL = { scheduled: 'Sched', due: 'Due', wait: 'Wait', until: 'Until' };
+
+function renderAgenda(tasks) {
     const container = document.getElementById('tasks-container');
     const navState  = window.twNav ? window.twNav.getState() : {};
-
-    // Update heading with raw counts before filtering
-    const heading = document.getElementById('tasks-heading');
-    if (heading) heading.textContent = `${due.length} Due, ${scheduled.length} Sched`;
 
     // Completed/deleted: reverse-chrono by end date so most recent appears first
     const statuses  = navState.statuses || ['pending'];
     const isHistory = statuses.some(s => s === 'completed' || s === 'deleted');
 
-    const items = [
-        ...scheduled.map(t => ({ ...t, _date: t.scheduled, _type: 'scheduled',
-                                  _sort: isHistory ? (t.end || t.modified || t.scheduled) : t.scheduled })),
-        ...due.map(      t => ({ ...t, _date: t.due,       _type: 'due',
-                                  _sort: isHistory ? (t.end || t.modified || t.due)       : t.due       })),
-    ].sort((a, b) => {
-        const cmp = (a._sort || '').localeCompare(b._sort || '');
+    // Each task once, at its effective date: the earlier of scheduled and due, else wait, else until
+    const items = tasks.map(t => {
+        const e = TW.edate(t);
+        return e && { ...t, _at: e.at, _type: e.field,
+                      _sort: isHistory ? (t.end || t.modified || '') : e.at.toISOString() };
+    }).filter(Boolean).sort((a, b) => {
+        const cmp = String(a._sort).localeCompare(String(b._sort));
         return isHistory ? -cmp : cmp;
     });
+
+    // Heading: raw counts by kind, before filtering ("3 Due, 5 Sched, 1 Wait"); the rare kinds only when there
+    const heading = document.getElementById('tasks-heading');
+    if (heading) {
+        const n = k => items.filter(t => t._type === k).length;
+        heading.textContent = ['due', 'scheduled', 'wait', 'until']
+            .filter(k => k === 'due' || k === 'scheduled' || n(k))
+            .map(k => `${n(k)} ${KIND_LABEL[k]}`).join(', ');
+    }
 
     const total = items.length;
     const p     = window.twNav?.stateToParams() ?? '';
@@ -145,7 +150,7 @@ function renderAgenda(scheduled, due) {
     // Group by local calendar day (task's dates are UTC: 20:00 EDT is already tomorrow there)
     const groups = new Map();
     filtered.forEach(task => {
-        const key = localDayKey(task._date);
+        const key = dayKey(task._at);
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(task);
     });
@@ -215,8 +220,11 @@ function drawAgenda(container, groups, layers, todayKey, isHistory, shown, total
             return;
         }
         if (key === todayKey) todayDone = true;
-        container.appendChild(dateHeader(key, isHistory, layers.byDay.get(key)));
-        tasks.forEach(task => taskCardManager.appendWithDeps(container, task, allLookup));
+        container.appendChild(dateHeader(key, isHistory, layers.byDay.get(key), tasks));
+        tasks.forEach(task => {
+            taskCardManager.appendWithDeps(container, task, allLookup);
+            if (task._type === 'wait' || task._type === 'until') markKind(container, task);
+        });
     });
     if (!todayDone) addToday();
 
@@ -227,21 +235,37 @@ function drawAgenda(container, groups, layers, todayKey, isHistory, shown, total
     }
 }
 
-// YYYYMMDD of a local date; of a task's UTC timestamp (20261018T000000Z), its local day
+// YYYYMMDD of a local date (a task's dates are UTC: 20:00 EDT is already tomorrow there)
 function dayKey(d) {
     return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 }
-function localDayKey(ts) {
-    const m = (ts || '').match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
-    if (!m) return (ts || '').slice(0, 8) || 'none';
-    return dayKey(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])));
+
+// A task placed by its wait or until date says so on its card: neither shows there otherwise
+function markKind(container, task) {
+    const card = container.querySelector(`.task-card[data-task-id="${CSS.escape(task.uuid)}"]:not(.task-card-dep)`);
+    if (!card) return;
+    let meta = card.querySelector('.card-meta');
+    if (!meta) {
+        meta = document.createElement('div');
+        meta.className = 'card-meta';
+        card.querySelector('.card-desc')?.after(meta);
+    }
+    const chip = document.createElement('span');
+    chip.className = `card-edate card-edate-${task._type}`;
+    const day = task._at.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    chip.textContent = task._type === 'wait' ? `wait ${day}` : `⌛ until ${day}`;
+    chip.title = task._type === 'wait' ? 'Hidden from the List until then' : 'Deleted by Taskwarrior after then';
+    meta.prepend(chip);
 }
 
 // A date line: centred and quiet; only "(overdue)" is red; a holiday's name follows the date, and
 // so do the moon's phases and the seasons, with their icon and time.
 // A click opens that day in the Calendar.
-function dateHeader(key, isHistory, layerItems) {
-    const { label, overdue, today } = formatDateKey(key, isHistory);
+// "(overdue)" only for a past day that holds a past due date (a past scheduled, wait or until day
+// is just a past day; djp 2026-11-23)
+function dateHeader(key, isHistory, layerItems, tasks = []) {
+    const { label, overdue: past, today } = formatDateKey(key, isHistory);
+    const overdue = past && tasks.some(t => t._type === 'due');
     const header = document.createElement('div');
     header.className = 'agenda-date-header';
     header.textContent = label;
