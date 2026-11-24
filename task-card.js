@@ -146,6 +146,7 @@ class TaskCardManager {
         card.className = 'task-card';
         if (dep)    card.classList.add('task-card-dep');
         if (active) card.classList.add('task-started');
+        if (task.status === 'completed' || task.status === 'deleted') card.classList.add('task-' + task.status);
         card.dataset.taskId   = task.uuid;
         card.dataset.taskData = JSON.stringify(task);
         if (pri) card.dataset.pri = pri;

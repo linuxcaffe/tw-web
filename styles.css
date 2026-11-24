@@ -14,6 +14,7 @@
     --tw-mine-bg:        #e3f4ec;   /* your own events (TW.layers mine): quiet green, never task blue */
     --tw-mine-border:    #5bb38c;
     --tw-mine-text:      #2e6b50;
+    --tw-done-text:      #1e8449;   /* a completed task's description, everywhere */
     --bg:             #f5f5f5;   /* page / outer background */
     --bg2:            #ffffff;   /* card / panel surface */
     --bg3:            #f0f0f0;   /* chip / button-hover / elevated surface */
@@ -50,6 +51,7 @@
     --tw-mine-bg:        rgba(91,179,140,0.14);
     --tw-mine-border:    #3f8a69;
     --tw-mine-text:      #8fd6b4;
+    --tw-done-text:      #6fcf97;
     --bg:             #1a1e24;
     --bg2:            #22272e;
     --bg3:            #2b3038;
@@ -521,6 +523,10 @@ h2 {
     gap: 5px;
 }
 .card-desc-text { flex: 1; min-width: 0; word-break: break-word; }
+/* A task's status shows in its description on every page: completed green, deleted struck through */
+.task-card.task-completed .card-desc-text { color: var(--tw-done-text); }
+.task-card.task-deleted   .card-desc-text { text-decoration: line-through; }
+.fc-event.tw-ev-deleted .fc-ev-title { text-decoration: line-through; }
 
 /* Priority dot — leads the description, same pattern as calendar events */
 .card-pri-dot {

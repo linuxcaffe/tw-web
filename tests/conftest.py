@@ -23,6 +23,7 @@ _tmp = Path(tempfile.mkdtemp(prefix='tw-web-test-'))
     'hooks=off\n'
     'confirmation=no\n'
     'verbose=nothing\n'
+    'uda.state.type=string\n'   # the Kanban lanes (tests/test_kanban.py)
     # Holidays as tw-events writes them (tests/test_holidays.py reads them back)
     'holiday.hd20261012a.name=Thanksgiving Day\n'
     'holiday.hd20261012a.date=20261012\n'

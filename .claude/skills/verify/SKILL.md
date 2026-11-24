@@ -142,7 +142,7 @@ for Epiphany-only bugs the user tries a scratch server's URL in Epiphany itself.
 - **Known flaky tests** (each failing once then passing on rerun, on `main` too):
   e2e `editor-recur` (the recurrence hook's template sometimes isn't there yet), pytest
   `test_update.py::test_check_fetches_now_and_says_what_is_new` (both 2026-11-12) and e2e
-  `bug18-notification-echo` ("one notification became 2 events", once in a full run, 2026-11-23). Rerun before suspecting your change; if one
+  `bug18-notification-echo` ("one notification became 2 events", once in a full run, 2026-11-23), and `calendar-sky` (null `getBoundingClientRect`) and `embed-edit` ("the edit is saved"), each once in a full run and green alone, 2026-11-23). Rerun before suspecting your change; if one
   fails twice in a row, it's real.
 - **A test that passes in a worktree can still miss files git won't commit.** `.gitignore` has `_*`, and the
   help import's `_get.md` passed every test in the worktree but never reached `main`

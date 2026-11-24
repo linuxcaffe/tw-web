@@ -8,7 +8,13 @@ const KB_SORT_OPTIONS = [
     { key: 'priority', label: 'Priority' },
     { key: 'project',  label: 'Project' },
     { key: 'desc',     label: 'Description' },
+    { key: 'end',      label: 'Completed' },
 ];
+// Lanes that mean more than a state, by name (app.py /api/kanban/move): into `started` starts the
+// task, out of it stops it; `done` shows completed tasks, newest first, a page at a time
+const KB_STARTED   = 'started';
+const KB_DONE      = 'done';
+const KB_DONE_PAGE = 50;
 // Saturated-enough to read but dark enough for white text
 const KB_COL_COLORS = [
     '#1a4a6e','#1a5a2e','#6a4a14','#3a1a6e','#6e1a1a','#1a5a5a','#5a5a1a','#2e1a5a',
@@ -18,8 +24,11 @@ const KB_COL_GAP   = 10;
 
 // ── Globals ───────────────────────────────────────────────────────────────────
 let kbColumns       = [];
-let kbAllTasks      = [];   // swimlane tasks — context-filtered, always pending
-let kbUnassignedSrc = [];   // same tasks as kbAllTasks: Unassigned follows the context too
+let kbAllTasks      = [];   // pending tasks in the context: every lane but Done
+let kbDoneTasks     = [];   // completed tasks in the context, newest first, the pages loaded so far
+let kbDoneTotal     = 0;    // how many completed tasks the context has
+let _kbDoneLoading  = false;
+let kbGrandTotal    = null; // every pending task: the count's denominator, as on the List
 let kbManualOrder   = {};   // { col: [uuid, ...] } loaded from server
 let kbColOffset     = 0;
 let kbFocusedColIdx = 0;
@@ -56,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // clientOnly = text/project/tags/priority → only unassigned needs re-render
     // !clientOnly = context changed → full server re-fetch, preserve scroll/focus
     document.addEventListener('tw-filter-change', e => {
-        if (e.detail && e.detail.clientOnly) kbRerenderUnassigned();
+        if (e.detail && e.detail.clientOnly) kbRerenderLanes();
         else kbReload(true);
     });
 
@@ -72,28 +81,39 @@ async function kbReload(preserveView = false) {
     try {
         const navState   = window.twNav ? window.twNav.getState() : {};
         const context    = (navState.context || '').trim();
-        // Kanban is always pending-only; status filter is suppressed on this page
+        // Kanban's lanes are pending tasks, Done's completed ones; the status filter is suppressed here
         const swimParams = 'status=pending' + (context ? '&context=' + encodeURIComponent(context) : '');
-        const [colsData, swimData, orderData] = await Promise.all([
+        const [colsData, swimData, orderData, totalData, doneData] = await Promise.all([
             fetch('api/kanban/columns').then(r => r.json()),
             fetch('api/tasks?' + swimParams).then(r => r.json()),
             fetch('api/kanban/order').then(r => r.json()),
+            fetch('api/tasks?status=pending').then(r => r.json()),
+            // a reload keeps as many Done cards as were loaded, so its scroll survives
+            _kbFetchDone(0, Math.max(KB_DONE_PAGE, kbDoneTasks.length)),
         ]);
         kbColumns       = colsData.columns    || [];
         kbAllTasks      = swimData.tasks      || [];
-        kbUnassignedSrc = kbAllTasks;
         kbManualOrder   = orderData.order     || {};
-        // On fresh load: restore persisted focus column; default to first swimlane
+        kbGrandTotal    = totalData.success ? totalData.tasks.length : null;
+        kbDoneTasks     = doneData.success ? doneData.tasks : [];
+        kbDoneTotal     = doneData.success ? doneData.total : 0;
+        // On fresh load: the lane this tab last focused, else todo, else the first lane
         if (!preserveView) {
-            const savedCol  = sessionStorage.getItem(_KB_FOCUS_KEY);
-            const swimIdx   = savedCol !== null ? kbColumns.indexOf(savedCol) : -1;
-            kbFocusedColIdx = swimIdx >= 0 ? swimIdx + 1 : (kbColumns.length > 0 ? 1 : 0);
+            const savedCol = sessionStorage.getItem(_KB_FOCUS_KEY);
+            let idx = savedCol === '' ? 0
+                    : savedCol !== null && kbColumns.includes(savedCol) ? kbColumns.indexOf(savedCol) + 1
+                    : -1;
+            if (idx < 0) idx = kbColumns.includes('todo') ? kbColumns.indexOf('todo') + 1
+                             : (kbColumns.length > 0 ? 1 : 0);
+            kbFocusedColIdx = idx;
             kbColOffset     = kbColumns.length > 0 ? 1 : 0;
         } else {
             kbFocusedColIdx = savedFocus;
             kbColOffset     = savedOffset;
         }
         kbRenderBoard();
+        // One column on a phone: the offset alone used to show backlog whatever had focus
+        if (!preserveView) _kbBringIntoView(kbFocusedColIdx);
         _kbSetCount();
     } catch (e) {
         console.error('Kanban load failed:', e);
@@ -102,15 +122,59 @@ async function kbReload(preserveView = false) {
     }
 }
 
-// ── Unassigned-only filter ────────────────────────────────────────────────────
-// The nav filter (TW.filter, the List's rules) applies to the Unassigned column only.
-// State columns show all tasks for that state within the active context.
+// ── Lanes ─────────────────────────────────────────────────────────────────────
+// The nav filter (TW.filter, the List's rules) applies to every lane, Done too.
 function kbNavFilter(tasks) {
     return TW.filter.navTasks(tasks);
 }
 
+// A lane's tasks: Done is the completed ones; Unassigned is every pending task whose state is no
+// other lane's (a pending state:done task included: Done is completed tasks now)
+function kbLaneTasks(col) {
+    if (col === KB_DONE) return kbNavFilter(kbDoneTasks);
+    if (col === '') {
+        const lanes = new Set(kbColumns.filter(c => c !== KB_DONE));
+        return kbNavFilter(kbAllTasks.filter(t => !lanes.has(t.state || '')));
+    }
+    return kbNavFilter(kbAllTasks.filter(t => (t.state || '') === col));
+}
+
+function _kbFetchDone(offset, limit) {
+    const ctx = ((window.twNav ? window.twNav.getState() : {}).context || '').trim();
+    const q = `status=completed&sort=end&limit=${limit}&offset=${offset}` +
+              (ctx ? '&context=' + encodeURIComponent(ctx) : '');
+    return fetch('api/tasks?' + q).then(r => r.json()).catch(() => ({ success: false }));
+}
+
+// The next page of Done, when its lane scrolls near the bottom (or its button is pressed)
+async function _kbLoadMoreDone() {
+    if (_kbDoneLoading || kbDoneTasks.length >= kbDoneTotal || !kbColumns.includes(KB_DONE)) return;
+    _kbDoneLoading = true;
+    try {
+        const d = await _kbFetchDone(kbDoneTasks.length, KB_DONE_PAGE);
+        if (d.success) {
+            const seen = new Set(kbDoneTasks.map(t => t.uuid));
+            kbDoneTasks = kbDoneTasks.concat(d.tasks.filter(t => !seen.has(t.uuid)));
+            kbDoneTotal = d.total;
+            _kbRerenderCol(KB_DONE);
+        }
+    } finally {
+        _kbDoneLoading = false;
+    }
+}
+
 // ── Sort / view persistence ───────────────────────────────────────────────────
-function kbGetSort(col) { return localStorage.getItem(`tw-kb-sort-${col}`) || 'urgency'; }
+// Manual became the default (2026-11-23): forget each browser's older choices once
+try {
+    if (!localStorage.getItem('tw-kb-sortreset-1')) {
+        Object.keys(localStorage).filter(k => k.startsWith('tw-kb-sort-'))
+            .forEach(k => localStorage.removeItem(k));
+        localStorage.setItem('tw-kb-sortreset-1', '1');
+    }
+} catch {}
+function kbGetSort(col) {
+    return localStorage.getItem(`tw-kb-sort-${col}`) || (col === KB_DONE ? 'end' : 'manual');
+}
 function kbSetSort(col, key) { localStorage.setItem(`tw-kb-sort-${col}`, key); }
 function kbGetView(col) { return localStorage.getItem(`tw-kb-view-${col}`) || 'card'; }
 function kbSetView(col, mode) { localStorage.setItem(`tw-kb-view-${col}`, mode); }
@@ -121,7 +185,7 @@ function kbSort(tasks, col) {
         const ord = kbManualOrder[col] || [];
         return [...tasks].sort((a, b) => {
             const ai = ord.indexOf(a.uuid), bi = ord.indexOf(b.uuid);
-            if (ai === -1 && bi === -1) return 0;
+            if (ai === -1 && bi === -1) return (b.urgency || 0) - (a.urgency || 0);  // never placed
             if (ai === -1) return 1;
             if (bi === -1) return -1;
             return ai - bi;
@@ -134,6 +198,7 @@ function kbSort(tasks, col) {
             case 'priority': return TW.sort.priRank(b.priority) - TW.sort.priRank(a.priority);
             case 'project':  return (a.project || '').localeCompare(b.project || '');
             case 'desc':     return (a.description || '').localeCompare(b.description || '');
+            case 'end':      return (b.end || '').localeCompare(a.end || '');
             default:         return 0;
         }
     });
@@ -151,34 +216,40 @@ function kbRenderBoard() {
     const board = document.getElementById('kb-board');
     board.innerHTML = '';
 
-    const assigned = new Set(kbColumns);
-    board.appendChild(_kbMakeCol('', 'Unassigned',
-        kbNavFilter(kbUnassignedSrc.filter(t => !assigned.has(t.state || ''))), true, -1));
+    board.appendChild(_kbMakeCol('', 'Unassigned', kbLaneTasks(''), true, -1));
     kbColumns.forEach((col, i) =>
-        board.appendChild(_kbMakeCol(col, col,
-            kbAllTasks.filter(t => (t.state || '') === col), false, i)));
+        board.appendChild(_kbMakeCol(col, col, kbLaneTasks(col), false, i)));
 
     _kbInitResize();
     _kbUpdateNavPills();
     _kbApplyFocus();
 }
 
-function kbRerenderUnassigned() {
+// The nav filter changed (no refetch): redraw every lane, keeping each one's scroll
+function kbRerenderLanes() {
+    ['', ...kbColumns].forEach(col => _kbRerenderCol(col));
+}
+
+function _kbRerenderCol(col) {
     const board    = document.getElementById('kb-board');
-    const assigned = new Set(kbColumns);
-    const filtered = kbNavFilter(kbUnassignedSrc.filter(t => !assigned.has(t.state || '')));
-    const existing = board.querySelector('.kb-col[data-col=""]');
-    const fresh    = _kbMakeCol('', 'Unassigned', filtered, true, -1);
-    if (existing) board.replaceChild(fresh, existing); else board.prepend(fresh);
+    const existing = [...board.querySelectorAll('.kb-col')].find(c => c.dataset.col === col);
+    if (!existing) return;
+    const scroll = existing.querySelector('.kb-col-body')?.scrollTop || 0;
+    const fresh  = col === '' ? _kbMakeCol('', 'Unassigned', kbLaneTasks(''), true, -1)
+                              : _kbMakeCol(col, col, kbLaneTasks(col), false, kbColumns.indexOf(col));
+    board.replaceChild(fresh, existing);
+    fresh.querySelector('.kb-col-body').scrollTop = scroll;
     _kbApplyVisibility();
     _kbApplyFocus();
     _kbSetCount();
 }
 
-// Counter: cards on the board / pending tasks in the context (one population, bug 5)
+// Counter: cards in the workflow lanes (not Unassigned, not Done) / every pending task, as the List
 function _kbSetCount() {
-    const shown = document.querySelectorAll('#kb-board .kb-col-body > .task-card:not(.task-card-dep)').length;
-    window.twNav?.setCount(shown, kbAllTasks.length);
+    const shown = [...document.querySelectorAll('#kb-board .kb-col')]
+        .filter(c => c.dataset.col !== '' && c.dataset.col !== KB_DONE)
+        .reduce((n, c) => n + c.querySelectorAll('.kb-col-body > .task-card:not(.task-card-dep)').length, 0);
+    window.twNav?.setCount(shown, kbGrandTotal ?? kbAllTasks.length);
 }
 
 function _kbColKey(col) { return col === '' ? '__unassigned__' : col; }
@@ -198,7 +269,8 @@ function _kbMakeCol(col, label, tasks, isUnassigned, colorIdx) {
     hdr.className = 'kb-col-hdr' + (isUnassigned ? ' kb-col-hdr--unassigned' : '');
     if (color) hdr.style.background = color;
     hdr.innerHTML =
-        `<span class="kb-col-count">${tasks.length}</span>` +
+        `<span class="kb-col-count">${col === KB_DONE && kbDoneTotal !== tasks.length
+            ? `${tasks.length}/${kbDoneTotal}` : tasks.length}</span>` +
         `<span class="kb-col-name">${label}</span>` +
         `<div class="kb-col-ctrl">` +
             `<button class="kb-btn kb-btn-sort" data-col="${col}" title="Sort">↕</button>` +
@@ -227,10 +299,26 @@ function _kbMakeCol(col, label, tasks, isUnassigned, colorIdx) {
     } else {
         body.innerHTML = `<div class="kb-empty">${isUnassigned ? 'No unassigned tasks' : 'Empty'}</div>`;
     }
+    if (col === KB_DONE) {
+        if (kbDoneTasks.length < kbDoneTotal) {
+            const more = document.createElement('button');
+            more.className = 'kb-btn kb-more';
+            more.textContent = `More (${kbDoneTasks.length} of ${kbDoneTotal} loaded)`;
+            more.addEventListener('click', () => _kbLoadMoreDone());
+            body.appendChild(more);
+        }
+        // a page ahead: load the next one before the reader reaches the end
+        body.addEventListener('scroll', () => {
+            if (body.scrollHeight - body.scrollTop - body.clientHeight < body.clientHeight) _kbLoadMoreDone();
+        }, { passive: true });
+    }
     div.appendChild(body);
 
     new Sortable(body, {
         group:         'kanban',
+        sort:          col !== KB_DONE,   // Done is in completion order
+        filter:        '.kb-more, .kb-empty',
+        preventOnFilter: false,
         animation:     150,
         forceFallback: true,   // use pointer tracking so pointermove fires during drag
         ghostClass:    'sortable-ghost',
@@ -244,7 +332,7 @@ function _kbMakeCol(col, label, tasks, isUnassigned, colorIdx) {
             if (evt.to.id === 'kb-nav-cols') return;
             if (evt.from !== evt.to) {
                 // dropped in a different column — write state then reload to sync local arrays
-                _kbSetState(evt.item.dataset.taskId, evt.to.dataset.col).then(() => kbReload(true));
+                _kbMove(evt.item.dataset.taskId, evt.to.dataset.col).then(() => kbReload(true));
             } else if (evt.oldIndex !== evt.newIndex) {
                 // within-column reorder — save manual order, no task mutation
                 const c     = evt.to.dataset.col;
@@ -471,7 +559,7 @@ function _kbUpdateNavPills() {
             evt.item.remove();
             _kbNavDropTarget = null;
             if (uuid && targetState !== null) {
-                _kbSetState(uuid, targetState).then(() => kbReload(true));
+                _kbMove(uuid, targetState).then(() => kbReload(true));
             }
         },
     });
@@ -529,14 +617,7 @@ document.addEventListener('change', e => {
 
     const colDiv = document.querySelector(`.kb-col[data-col="${col}"]`);
     if (!colDiv) return;
-    const body     = colDiv.querySelector('.kb-col-body');
-    const assigned = new Set(kbColumns);
-    const src      = col === ''
-        ? kbNavFilter(kbUnassignedSrc.filter(t => !assigned.has(t.state || '')))
-        : kbAllTasks.filter(t => (t.state || '') === col);
-    body.innerHTML = '';
-    const allLookup = new Map(kbAllTasks.map(t => [t.uuid, t]));
-    kbSort(src, col).forEach(t => kbCardManager.appendWithDeps(body, t, allLookup));
+    _kbRerenderCol(col);
 });
 
 // Arrow keys: left/right = change focused column, up/down = scroll within it
@@ -553,8 +634,8 @@ document.addEventListener('keydown', e => {
 });
 
 // ── API ───────────────────────────────────────────────────────────────────────
-// Drag/drop (column body and nav pill) only modifies state — nothing else.
-// All other task mutations go through kbCardManager CRUD actions.
+// Drag/drop (column body and nav pill) moves a card to a lane: the server decides what that
+// means (state, start, done, reopen: /api/kanban/move). Everything else goes through kbCardManager.
 
 async function _kbSaveOrder(col, uuids) {
     try {
@@ -569,8 +650,9 @@ async function _kbSaveOrder(col, uuids) {
     }
 }
 
-async function _kbSetState(uuid, newState) {
-    const d = await TW.api.write('PUT', `api/task/${uuid}/modify`, { state: newState });
+async function _kbMove(uuid, to) {
+    const d = await TW.api.write('POST', 'api/kanban/move', { uuid, to });
+    if (TW.api.handleWriteResult(d)) return;
     if (!d.success) document.dispatchEvent(new CustomEvent('tw-show-notification',
         { detail: { message: `Error: ${d.error || d.message}`, type: 'error' } }));
 }

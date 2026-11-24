@@ -72,7 +72,7 @@ tw-web's context is its own: choosing one here doesn't change `task context` in 
 
 ## One filter, every view
 
-The filter means the same thing on the [List](list.md), the [Agenda](agenda.md) and the [Kanban](kanban.md) board's Unassigned column.
+The filter means the same thing on the [List](list.md), the [Agenda](agenda.md) and the [Kanban](kanban.md) board.
 The [Calendar](calendar.md) is the exception: its grid follows only the status buttons, so a planned task never vanishes from it, while its Unscheduled column follows the filter and context.
 
 ## A filter starts your next task

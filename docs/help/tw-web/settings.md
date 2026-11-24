@@ -36,16 +36,17 @@ Set it to 0 and they stay until you dismiss them, which is handy while you're le
 **Kanban columns** are the columns of the Kanban board, left to right, as a comma-separated list:
 
 ```
-backlog, todo, doing, review, done
+backlog, todo, started, review, done
 ```
 
-Each column is a value of the `state` UDA (see [tw-web.rc](#tw-web-rc) below), so moving a card to "doing" runs, in effect:
+Each column is a value of the `state` UDA (see [tw-web.rc](#tw-web-rc) below), so moving a card to "review" runs, in effect:
 
 ```
-$ task 12 modify state:doing
+$ task 12 modify state:review
 ```
 
 Rename them, reorder them, add a column or drop one; the board follows.
+Two names do more: **started** starts a task and **done** completes it ([Kanban](kanban.md#the-started-and-done-columns)).
 
 **Sync automatically** works with [gittw](https://github.com/linuxcaffe/gittw), which keeps your task data in git and shares it between stations.
 With it on, tw-web syncs soon after the server starts, a minute after your last change, and every 15 minutes (every 5 after a failed try, as when you're offline).

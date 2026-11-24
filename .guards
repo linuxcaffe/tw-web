@@ -133,3 +133,8 @@ app.py:def _stderr_lines
 app.py:_git_net_lock =
 nav.js:function _applyUpdate
 app.py:def _log_sync
+
+# ── Kanban lanes (2026-11-23): started starts, done completes (tests/test_kanban.py) ──
+app.py:def kanban_move
+app.py:_KB_STARTED
+kanban.js:KB_DONE

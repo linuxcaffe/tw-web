@@ -134,7 +134,7 @@ def _valid_bool(v):
 _SETTINGS_SCHEMA = {
     'notification_timeout': {'type': int,  'default': 3000,
                               'validate': lambda v: v >= 0},
-    'kanban_columns':       {'type': None, 'default': ['backlog','todo','doing','review','done'],
+    'kanban_columns':       {'type': None, 'default': ['backlog','todo','started','review','done'],
                               'coerce': lambda v: [c.strip() for c in
                                   (v if isinstance(v, list) else str(v).split(',')) if c.strip()]},
     'cal_day_start':        {'type': None, 'default': '06:00:00', 'coerce': _valid_hour},
@@ -1073,9 +1073,20 @@ def get_tasks():
     if result['success']:
         try:
             tasks = json.loads(result['stdout'])
-            tasks.sort(key=lambda x: x.get('urgency', 0), reverse=True)
             warnings = [l for l in result['stderr'].splitlines() if l.strip()]
-            return jsonify({'success': True, 'tasks': tasks, 'warnings': warnings})
+            if request.args.get('sort') == 'end':   # the Kanban Done lane: newest first
+                tasks.sort(key=lambda x: x.get('end', ''), reverse=True)
+            else:
+                tasks.sort(key=lambda x: x.get('urgency', 0), reverse=True)
+            out = {'success': True, 'tasks': tasks, 'warnings': warnings}
+            if request.args.get('limit'):            # a page of them, and how many there are
+                try:
+                    limit  = max(1, int(request.args['limit']))
+                    offset = max(0, int(request.args.get('offset', 0)))
+                except ValueError:
+                    return jsonify({'success': False, 'error': 'limit and offset are numbers'}), 400
+                out.update(tasks=tasks[offset:offset + limit], total=len(tasks))
+            return jsonify(out)
         except json.JSONDecodeError as e:
             return jsonify({
                 'success': False,
@@ -2074,11 +2085,63 @@ def set_kanban_order():
     order = data.get('order', [])
     if col is None:
         return jsonify({'success': False, 'error': 'col required'}), 400
-    s  = _load_settings()
-    ko = dict(s.get('kanban_order', {}))
+    # Read the raw file: _load_settings() returns only schema keys, so every other lane's
+    # order was lost on each save
+    try:
+        raw = json.loads(_SETTINGS_PATH.read_text()) if _SETTINGS_PATH.exists() else {}
+    except Exception:
+        raw = {}
+    ko = dict(raw.get('kanban_order') or {})
     ko[col] = [str(u) for u in order]
     _save_settings({'kanban_order': ko})
     return jsonify({'success': True})
+
+# Two Kanban lanes mean more than a state, by name (tests/test_kanban.py)
+_KB_STARTED, _KB_DONE = 'started', 'done'
+
+@app.route('/api/kanban/move', methods=['POST'])
+def kanban_move():
+    """Move a card to a lane: one `task` call.
+    Into `started` sets a start time (a started task keeps its own); out of it clears it.
+    Into `done` completes the task; a completed task moved out is reopened into that lane."""
+    data = request.get_json(silent=True) or {}
+    uuid, to = str(data.get('uuid', '')), data.get('to')
+    if not _valid_task_id(uuid):
+        return jsonify({'success': False, 'error': 'Invalid task ID'}), 400
+    if not isinstance(to, str) or (to and to not in _load_settings()['kanban_columns']):
+        return jsonify({'success': False, 'error': f'Not a Kanban lane: {to!r}'}), 400
+    task = _export_one(uuid)
+    if not task:
+        return jsonify({'success': False, 'error': 'Task not found'}), 404
+    status = task.get('status')
+    if status not in ('pending', 'completed'):
+        return jsonify({'success': False, 'error': f'A {status} task has no Kanban lane'}), 400
+
+    if to == _KB_DONE:
+        if status == 'completed':
+            return jsonify({'success': True, 'task': task})
+        args = [uuid, 'done']
+        result = run_task_command(args, extra_env={'TW_PREFLIGHT_CMD': _console_cmd(args)})
+    else:
+        mods = [f'state:{to}' if to else 'state:']
+        if status == 'completed':
+            mods += ['status:pending', 'end:']
+        if to == _KB_STARTED:
+            if status == 'completed' or not task.get('start'):
+                mods.append('start:now')
+        elif task.get('state') == _KB_STARTED and task.get('start') and status == 'pending':
+            mods.append('start:')
+        args = ['task', uuid, 'modify'] + mods
+        result = run_task_command(args)
+    signals = _hook_signals(result, args)
+    if signals.get('needs_pty'):
+        return jsonify({'success': False, **signals})
+    resp = {'success': result['success'], 'warnings': _warnings(result), **signals}
+    if result['success']:
+        resp['task'] = _export_one(uuid)
+    else:
+        resp['error'] = _write_error(result, 'Failed to move the task')
+    return jsonify(resp)
 
 @app.route('/api/task/add', methods=['POST'])
 def add_task():

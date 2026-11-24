@@ -870,9 +870,11 @@ const EVENT_KINDS = {
     until:     { field: 'until',     duration: null,             defaultMins: 30, idSuffix: '_until',
                  prefix: '⌛ ', bg: '#8d6e63', border: '#6d4c41' },
 };
+// A completed task's title is green, as on every page (darker grey to carry it); a deleted one's is
+// struck through (styles.css .tw-ev-deleted)
 const STATUS_COLOURS = {
-    completed: { bg: '#78909c', border: '#546e7a' },
-    deleted:   { bg: '#ab47bc', border: '#8e24aa' },
+    completed: { bg: '#4f626c', border: '#3d4d55', text: '#b6f2c8' },
+    deleted:   { bg: '#ab47bc', border: '#8e24aa', text: '#fff', cls: 'tw-ev-deleted' },
 };
 
 // A task at local midnight has a date and no time, so it is an all-day event: in the all-day
@@ -900,7 +902,11 @@ function createCalendarEvent(task, kindName) {
         ev.end = new Date(start.getTime() + mins * 60000);
     }
     const done = STATUS_COLOURS[task.status];
-    if (done) { ev.backgroundColor = done.bg; ev.borderColor = done.border; ev.editable = false; }
+    if (done) {
+        ev.backgroundColor = done.bg; ev.borderColor = done.border; ev.textColor = done.text;
+        ev.editable = false;
+        if (done.cls) ev.classNames = [done.cls];
+    }
     return ev;
 }
 

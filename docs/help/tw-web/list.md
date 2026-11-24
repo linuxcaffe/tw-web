@@ -69,6 +69,7 @@ Your hooks run for every one of these, just as they do in a terminal.
 If a hook needs to ask you something, the console opens so it can (see [The terminal console](console.md)).
 
 A completed or deleted card has only the edit button, and shows its short UUID and end date first, since it has no ID any more.
+A completed task's description is green and a deleted one's is struck through, here and on every other page.
 To undo the last change, open **Sync** from the menu and use **Undo** (`task undo`).
 
 ## Sorting
