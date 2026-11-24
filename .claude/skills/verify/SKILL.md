@@ -25,14 +25,14 @@ python3 .tools/check-guards.py && python3 .tools/check-refs.py   # the hook runs
 eval "$(.tools/scratch-server.sh env)" # TASKRC/TASKDATA/TW_WEB_PORT/TW_WEB_SETTINGS for seeding
 task add 'seed task' project:demo      # goes to the throwaway db (check the "TASKRC override" line)
 curl -s localhost:$TW_WEB_PORT/api/tasks
-.tools/scratch-server.sh probe         # taskutil web probe: 11/11 expected (no Tailscale bind here)
+.tools/scratch-server.sh probe         # taskutil web probe: "OK: n/n checks ok" (6/6 on 2026-11-23)
 .tools/scratch-server.sh down          # stops exactly that server, deletes the data
 unset TASKRC TASKDATA TW_WEB_PORT TW_WEB_SETTINGS   # or later `task` commands hit the deleted db
 
 # 4. Merge and clean up
 git -C ~/dev/tw-web merge --ff-only <topic>    # live server reloads now
 git -C ~/dev/tw-web worktree remove ../tw-web-<topic> && git -C ~/dev/tw-web branch -d <topic>
-taskutil web probe --port 5000                 # 21/21 on the live server (with Tailscale)
+taskutil web probe --port 5000                 # "OK: n/n checks ok" on the live server too
 git -C ~/dev/tw-web push && git -C ~/dev/tw-web fetch -q github
 ```
 
