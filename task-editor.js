@@ -588,9 +588,10 @@ class TaskEditor {
             if (parents.length === 1) {
                 const pid = parseInt(parents[0].slice(1), 10);
                 if (!pid || pid < 1) { this.onSaveError('Invalid parent ID: ' + parents[0]); return; }
-                // Only meaningful when adding — silently ignore on edits
-                if (!this.currentTask) taskData.parent_id = pid;
+                // This task blocks pid: on an add or an edit (the server links it after the write)
+                taskData.parent_id = pid;
             }
+            // The whole list: the server clears and sets it, so a removed ID goes
             taskData.depends = normal.join(',');
         }
         if (waitField)     taskData.wait           = waitField.value;

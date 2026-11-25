@@ -21,7 +21,7 @@ Everything in the dialog is something you could type on a `task add` line:
 | tags | comma-separated | `+outside +weekend` |
 | pri | priority: H, M, L, or 1–6 if you use them | `priority:H` |
 | state | the Kanban column | `state:todo` |
-| deps | the IDs it waits for | `depends:42,55` |
+| deps | the IDs it waits for; `-12`: task 12 waits for this one | `depends:42,55` |
 | Due, Scheduled | dates and times | `due:friday scheduled:thursday+9h` |
 | Due dur, Sched dur | how long, for the Calendar | `sched_duration:90min` |
 | Wait, Until | hide until, expire at | `wait:due-7d until:due+2d` |
@@ -38,7 +38,14 @@ The dialog says so under the dates, as a hint, and still saves what you asked fo
 Scheduled is after due: the Agenda and Calendar show it at the due date.
 ```
 
-The deps field has one more trick for a new task: `-12` makes task 12 wait for the new one, so you can add a step in front of something you already have.
+The deps field lists the tasks this one waits for, by ID: `42, 55`.
+When you edit a task, it shows its whole list (a task with no ID, completed or not in view, shows as a short UUID), and the list you save is the whole list: take an ID out, and that dependency goes.
+Empty the field to clear them all.
+
+It has one more trick: `-12` makes task 12 wait for this one, so you can put a step in front of something you already have.
+It works when you add a task and when you edit one, and can go with the IDs it waits for (`42, -12`); one `-ID` per save.
+The link lives on task 12, so when you open this task again, `-12` isn't in its field: open task 12 to see it, or to take it away.
+Task 12 has to be pending or waiting, and it can't be this task.
 
 ## Save, or Log
 

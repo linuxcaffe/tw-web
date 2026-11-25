@@ -1933,6 +1933,40 @@ def delete_task(task_id):
 RECUR_KEYS = ('r', 'type', 'rend', 'rwait', 'runtil', 'rscheduled')
 
 
+def _export_one(ref):
+    """One task's export by ID or UUID, or None."""
+    r = run_task_command(['task', str(ref), 'export'], readonly=True)
+    try:
+        found = json.loads(r['stdout']) if r['success'] and r['stdout'].strip() else []
+    except json.JSONDecodeError:
+        return None
+    return found[0] if found else None
+
+def _parent_task(parent_id):
+    """The deps field's `-ID` (this task blocks ID): (task ID's export, None), or (None, why not).
+    ID must be a pending or waiting task."""
+    try:
+        parent_id = int(parent_id)
+    except (TypeError, ValueError):
+        return None, f'Invalid parent ID: {parent_id}'
+    if parent_id < 1:
+        return None, f'Invalid parent ID: {parent_id}'
+    parent = _export_one(parent_id)
+    if not parent:
+        return None, f'Parent task {parent_id} not found'
+    status = parent.get('status', '')
+    if status not in ('pending', 'waiting'):
+        return None, f'Parent task {parent_id} is {status} — cannot add deps to it'
+    return {**parent, 'id': parent_id}, None
+
+def _link_parent(parent, uuid):
+    """Make parent depend on uuid (2.6.2's depends: adds to the list). [] or a warning."""
+    r = run_task_command(['task', parent['uuid'], 'modify', f'depends:{uuid}'])
+    if r['success']:
+        return []
+    why = ' '.join(_stderr_lines(r)) or 'task refused'
+    return [f"Saved, but task {parent['id']} could not be made to wait for this one: {why}"]
+
 @app.route('/api/task/<task_id>/modify', methods=['PUT'])
 def modify_task(task_id):
     """Modify a task"""
@@ -1941,6 +1975,19 @@ def modify_task(task_id):
 
     data = request.get_json()
     modifications = []
+
+    # The deps field's -ID: this task blocks ID. Checked before anything is written.
+    parent = own = None
+    if data.get('parent_id'):
+        parent, err = _parent_task(data['parent_id'])
+        if not err:
+            own = _export_one(task_id)
+            if not own:
+                err = 'Task not found'
+            elif own['uuid'] == parent['uuid']:
+                err = f"−{parent['id']} is this task: a task can't wait for itself"
+        if err:
+            return jsonify({'success': False, 'error': err, 'message': err}), 400
 
     if 'description' in data and data['description']:
         modifications.append(f'description:{data["description"]}')
@@ -1980,8 +2027,12 @@ def modify_task(task_id):
     if 'state' in data:
         modifications.append(f'state:{data["state"]}' if data['state'] else 'state:')
 
+    # 2.6.2's depends:X adds to the list: clear it first, in the same modify, so the field's list
+    # is the whole list (removing one in the dialog did nothing)
     if 'depends' in data:
-        modifications.append(f'depends:{data["depends"]}' if data['depends'] else 'depends:')
+        modifications.append('depends:')
+        if data['depends']:
+            modifications.append(f'depends:{data["depends"]}')
 
     if 'wait' in data:
         modifications.append(f'wait:{data["wait"]}' if data['wait'] else 'wait:')
@@ -2000,18 +2051,20 @@ def modify_task(task_id):
         result = run_task_command(args)
         signals = _hook_signals(result, args)
         if result['success']:
+            linked = _link_parent(parent, own['uuid']) if parent else []
             export_result = run_task_command(['task', task_id, 'export'], readonly=True)
             if export_result['success'] and export_result['stdout'].strip():
                 try:
                     task = json.loads(export_result['stdout'])
                     if task:
                         return jsonify({'success': True, 'message': result['stdout'], 'task': task[0],
-                                        'warnings': (_warnings(result) or []) + _recurrence_warning(data.get('r')),
+                                        'warnings': (_warnings(result) or []) + _recurrence_warning(data.get('r'))
+                                                    + linked,
                                         **signals})
                 except (json.JSONDecodeError, IndexError) as e:
                     print(f"Error parsing task data: {e}")
                     return jsonify({'success': True, 'message': result['stdout'], 'task': None,
-                                    'warnings': _warnings(result), **signals})
+                                    'warnings': (_warnings(result) or []) + linked, **signals})
 
         return jsonify({
             'success': False,
@@ -2020,6 +2073,10 @@ def modify_task(task_id):
             'warnings': _warnings(result),
             **signals,
         })
+    elif parent:
+        linked = _link_parent(parent, own['uuid'])
+        return jsonify({'success': not linked, 'message': f"Task {parent['id']} now waits for this one",
+                        'error': linked[0] if linked else None, 'task': own, 'warnings': linked})
     else:
         return jsonify({'success': True, 'message': 'No changes to apply', 'task': None, 'warnings': []})
 
@@ -2196,25 +2253,12 @@ def add_task():
     parent_id = data.get('parent_id')
     parent_existing_deps = []
     if parent_id:
-        try:
-            parent_id = int(parent_id)
-        except (TypeError, ValueError):
-            return jsonify({'success': False, 'error': f'Invalid parent ID: {parent_id}'}), 400
-        pr = run_task_command(['task', str(parent_id), 'export'], readonly=True)
-        if not pr['success'] or not pr['stdout'].strip():
-            return jsonify({'success': False, 'error': f'Parent task {parent_id} not found'}), 400
-        try:
-            ptasks = json.loads(pr['stdout'])
-            if not ptasks:
-                return jsonify({'success': False, 'error': f'Parent task {parent_id} not found'}), 400
-            pstatus = ptasks[0].get('status', '')
-            if pstatus not in ('pending', 'waiting'):
-                return jsonify({'success': False,
-                    'error': f'Parent task {parent_id} is {pstatus} — cannot add deps to it'}), 400
-            raw = ptasks[0].get('depends', [])
-            parent_existing_deps = raw if isinstance(raw, list) else [u.strip() for u in raw.split(',') if u.strip()]
-        except (json.JSONDecodeError, IndexError):
-            return jsonify({'success': False, 'error': f'Could not verify parent task {parent_id}'}), 400
+        parent, err = _parent_task(parent_id)
+        if err:
+            return jsonify({'success': False, 'error': err}), 400
+        parent_id = parent['id']
+        raw = parent.get('depends', [])
+        parent_existing_deps = raw if isinstance(raw, list) else [u.strip() for u in raw.split(',') if u.strip()]
 
     args = ['task', 'add']
 
