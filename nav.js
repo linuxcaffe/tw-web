@@ -609,7 +609,7 @@
     border-radius: 10px; padding: 2px 10px; margin-top: -2px; cursor: pointer;
 }
 #tw-update-pill:hover { background: #f7c948; }
-#tw-update-pill:disabled { opacity: 0.6; cursor: default; }
+#tw-update-pill:disabled, #tw-update-pill.tw-cant-update { opacity: 0.6; cursor: default; }
 .tw-menu-items { flex: 1; padding: 8px 0; overflow-y: auto; }
 #tw-menu-footer {
     display: flex; align-items: center; gap: 12px; padding: 10px 20px;
@@ -2704,12 +2704,15 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         if (!show) return;
         pill.textContent = `Update (${v.behind} new)`;
         pill.title = v.subjects.join('\n') + (v.can_update ? '' : `\n\nCan't update here: ${v.reason}`);
-        pill.disabled = !v.can_update;
+        // Not disabled when it can't update: a tap says why (a phone has no tooltip)
+        pill.disabled = false;
+        pill.classList.toggle('tw-cant-update', !v.can_update);
     }
 
     async function _applyUpdate() {
         const v = _versionInfo;
-        if (!v || !v.can_update) return;
+        if (!v) return;
+        if (!v.can_update) { showNotification(`Can't update here: ${v.reason}`, 'error'); return; }
         if (!confirm(`Update tw-web (${v.behind} new)?\n\n` + v.subjects.slice(0, 12).map(s => '• ' + s).join('\n'))) return;
         const pill = document.getElementById('tw-update-pill');
         pill.disabled = true;

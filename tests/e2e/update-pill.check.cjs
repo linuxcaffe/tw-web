@@ -34,11 +34,17 @@ check(async pg => {
     expect(updates === 1, `update posted ${updates} times`);
     expect(reloaded, 'the page did not reload after the update');
 
-    // Local edits (or another branch): the pill says so and can't be tapped
+    // Local edits (or another branch): the pill can't update, and tapping it says why (a phone
+    // has no tooltip: a disabled pill did nothing at all, s5 2026-11-25)
     info = { ...info, can_update: false, reason: 'there are local changes' };
     await pg.waitForSelector('.card-desc-text');
     await pg.click('#tw-logo-btn');
     await sleep(400);
-    expect(await pill.isDisabled(), 'pill can be tapped over local changes');
     expect((await pill.getAttribute('title')).includes('local changes'), 'tooltip does not say why');
+    expect(await pill.evaluate(el => el.classList.contains('tw-cant-update')), 'pill does not look unavailable');
+    await pill.click();
+    await sleep(400);
+    expect(updates === 1, `update posted over local changes (${updates})`);
+    const note = await pg.locator('#tw-notification').textContent().catch(() => '');
+    expect(/local changes/.test(note), `tapping did not say why (${JSON.stringify(note)})`);
 });
