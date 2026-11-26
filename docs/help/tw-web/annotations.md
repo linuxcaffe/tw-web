@@ -23,7 +23,7 @@ That's the easy way to keep a task's reference material with it: the bug report,
 
 ## Launchers
 
-An annotation that starts with a **label**, a colon and a value is a launcher, when tw-web knows that label:
+An annotation that starts with a **label**, a colon and a value can be a launcher, when tw-web knows that label:
 
 ```
 file: ~/Documents/lease.pdf

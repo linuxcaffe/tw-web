@@ -62,7 +62,7 @@ The counter in the nav bar counts the cards in the columns between Unassigned an
 
 ## Statuses
 
-The status buttons don't apply here: every column is pending tasks, except **done**, which is completed ones.
+The status buttons don't apply, and aren't shown here: every column is pending tasks, except **done**, which is completed ones.
 A task you complete from a card moves to **done**, whatever column it was in. Deleted tasks are never on the board.
 
 ## Moving around the board

@@ -6,7 +6,7 @@ summary: "Your tasks as cards or rows: sorting, the status buttons, sidebars, ca
 # List
 
 The List is where tw-web starts, and it's the closest thing to running a report on the command line.
-It shows the tasks that match the nav bar's status, context and filter, most urgent first, the same order `task next` would give you.
+It shows the tasks that match the nav bar's status, context and filter, sorted most urgent first (by default), the same order `task next` would give you.
 
 [image: the List with its Projects sidebar on the left, Tags on the right, and a few cards between]
 
