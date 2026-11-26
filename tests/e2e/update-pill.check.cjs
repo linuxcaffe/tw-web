@@ -5,8 +5,9 @@ const { check, expect, B, sleep } = require('./lib.cjs');
 check(async pg => {
     await pg.setViewportSize({ width: 1280, height: 800 });
     let info = { version: 'v2.0.0-27', behind: 0, subjects: [], can_update: true, reason: '', checked: null };
-    let updates = 0;
+    let updates = 0, sends = 0;
     await pg.route('**/api/version', r => r.fulfill({ json: info }));
+    await pg.route('**/api/update/send-edits', r => { sends++; r.fulfill({ json: { success: true, version: 'v2.0.0-31' } }); });
     await pg.route('**/api/update', r => { updates++; r.fulfill({ json: { success: true, version: 'v2.0.0-29' } }); });
     await pg.goto(B + '/');
     await pg.waitForSelector('.card-desc-text');
@@ -47,4 +48,23 @@ check(async pg => {
     expect(updates === 1, `update posted over local changes (${updates})`);
     const note = await pg.locator('#tw-notification').textContent().catch(() => '');
     expect(/local changes/.test(note), `tapping did not say why (${JSON.stringify(note)})`);
+    expect(sends === 0, 'sent code edits');
+
+    // Help edits only (djp edits help on the phone): a tap offers to send them home, then update
+    info = { ...info, can_update: false, can_send: true, edits: ['docs/help/tw-web/list.md'],
+             reason: 'there are local changes' };
+    await pg.click('.tw-menu-header img');
+    await sleep(400);
+    await pg.click('#tw-logo-btn');
+    await sleep(400);
+    expect(await pill.evaluate(el => !el.classList.contains('tw-cant-update')), 'help edits look like a dead end');
+    expect((await pill.getAttribute('title')).includes('list.md'), 'tooltip does not name the help edits');
+    let asked = '';
+    pg.once('dialog', d => { asked = d.message(); });   // the harness accepts it
+    reloaded = false;
+    await pill.click();
+    await sleep(6000);
+    expect(/send/i.test(asked) && asked.includes('list.md'), `the question: ${JSON.stringify(asked)}`);
+    expect(sends === 1 && updates === 1, `sends ${sends}, updates ${updates}`);
+    expect(reloaded, 'the page did not reload after sending');
 });

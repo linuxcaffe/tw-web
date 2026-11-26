@@ -129,6 +129,8 @@ nav.js:'synced'
 # ── Updates: the menu's pill (tw-web's own checkout) ──
 app.py:def _version_info
 app.py:'/api/update'
+app.py:'/api/update/send-edits'
+app.py:_SENDABLE
 app.py:def _update_check_loop
 app.py:RECUR_KEYS =
 app.py:def _stderr_lines

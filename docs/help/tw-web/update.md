@@ -26,10 +26,22 @@ The server looks for updates every hour, and also when you sync (see [Syncing](s
 
 ## When it can't
 
-The pill is greyed out, and its tooltip says why, when an update would get in the way of your own work:
+The pill is greyed out when an update would get in the way of your own work; its tooltip says why, and so does a tap (a phone has no tooltips):
 
-- **there are local changes**: you've edited tw-web's files yourself
+- **there are local changes outside docs/help/**: you've edited tw-web's own code
 - **on branch …, not main**: you're running a version of your own
+
+## Help edits made on a station
+
+If the only files you've changed are help pages (under `docs/help/`), the pill stays yellow, and a tap offers to send them home first:
+
+```
+Send your help edits on this station to tw-web, then update (2 new)?
+```
+
+Say yes and the server commits your edits ("Help: edits from s5"), puts them on top of the new version, pushes them, and updates, all in one go.
+If anything goes wrong (you're offline, the station can't push, or the new version changes the same lines), nothing is sent and your edits stay as they were.
+The station needs push access to tw-web's repository: its git remote's push address (`remote.origin.pushurl`) and a key that's allowed there.
 
 An update only ever moves forward along the published version (a git fast-forward), so it never overwrites anything.
 

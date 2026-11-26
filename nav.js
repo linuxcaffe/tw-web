@@ -2703,23 +2703,29 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         pill.style.display = show ? '' : 'none';
         if (!show) return;
         pill.textContent = `Update (${v.behind} new)`;
-        pill.title = v.subjects.join('\n') + (v.can_update ? '' : `\n\nCan't update here: ${v.reason}`);
+        pill.title = v.subjects.join('\n') + (v.can_update ? '' : v.can_send
+            ? `\n\nYour help edits here go home first:\n${v.edits.join('\n')}`
+            : `\n\nCan't update here: ${v.reason}`);
         // Not disabled when it can't update: a tap says why (a phone has no tooltip)
         pill.disabled = false;
-        pill.classList.toggle('tw-cant-update', !v.can_update);
+        pill.classList.toggle('tw-cant-update', !v.can_update && !v.can_send);
     }
 
     async function _applyUpdate() {
         const v = _versionInfo;
         if (!v) return;
-        if (!v.can_update) { showNotification(`Can't update here: ${v.reason}`, 'error'); return; }
-        if (!confirm(`Update tw-web (${v.behind} new)?\n\n` + v.subjects.slice(0, 12).map(s => '• ' + s).join('\n'))) return;
+        const send = !v.can_update && v.can_send;   // help edits made here: commit, push, then update
+        if (!v.can_update && !send) { showNotification(`Can't update here: ${v.reason}`, 'error'); return; }
+        const list = xs => xs.slice(0, 12).map(s => '• ' + s).join('\n');
+        if (!confirm(send
+            ? `Send your help edits on this station to tw-web, then update (${v.behind} new)?\n\n${list(v.edits)}`
+            : `Update tw-web (${v.behind} new)?\n\n` + list(v.subjects))) return;
         const pill = document.getElementById('tw-update-pill');
         pill.disabled = true;
         pill.innerHTML = spinnerHTML('Updating', { small: true }) + 'Updating…';
         let d;
         try {
-            d = await (await fetch('api/update', { method: 'POST' })).json();
+            d = await (await fetch(send ? 'api/update/send-edits' : 'api/update', { method: 'POST' })).json();
         } catch (e) { showNotification(TW.api.networkError(e), 'error'); pill.disabled = false; return; }
         if (!d.success) { showNotification(d.error || 'Update failed', 'error'); _checkVersion(); return; }
         // The server restarts by itself when Python files changed; then the service worker fetches

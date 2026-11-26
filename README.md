@@ -164,6 +164,9 @@ the commits since; the app cache's number is its tooltip). The server checks for
 once an hour (by the clock: a phone that slept checks within a minute of waking); when there are some, a pill appears there, **Update (3 new)**, listing them on hover.
 Tapping it pulls them (fast-forward only, and only on `main` with no local edits) and reloads the
 page onto the new version. Updating by hand still works: `git pull` in the tw-web folder.
+When the only local edits are help pages (`docs/help/`, edited on a phone, say), a tap offers to
+send them home first (`POST /api/update/send-edits`: commit, rebase onto the update, push, or put
+everything back as it was); the station needs a working `remote.origin.pushurl`.
 
 On Termux tw-web sets `LD_PRELOAD` to Termux's termux-exec when it's missing (as when Termux:Widget
 starts it), so hooks starting `#!/usr/bin/env python3` work however the server was started.

@@ -134,3 +134,101 @@ def test_a_sync_also_checks(client, app_module, repos, monkeypatch):
     monkeypatch.setattr(app_module, '_check_soon', lambda: calls.append(1))
     assert client.post('/api/sync', headers=TRUSTED, json={}).status_code == 200
     assert calls == [1]
+
+
+# ── Sending help edits home (djp 2026-11-25) ─────────────────────────────────
+# djp edits help pages on the phone, in its deployed checkout; those edits blocked every update
+# there. Edits only under docs/help/ can be sent: commit, rebase onto the update, push. Any
+# failure undoes the commit and leaves the edits as they were. Code edits are never sent.
+
+@pytest.fixture
+def helped(repos):
+    web, publish = repos
+    git(web, 'config', 'user.name', 't')
+    git(web, 'config', 'user.email', 't@x.invalid')
+    remote = web.parent / 'remote.git'
+    dev = web.parent / 'dev'
+    (dev / 'docs' / 'help').mkdir(parents=True)
+    (dev / 'docs' / 'help' / 'list.md').write_text('most urgent first\n')
+    git(dev, 'add', '-A')
+    git(dev, 'commit', '-qm', 'help page')
+    git(dev, 'push', '-q', 'origin', 'main')
+    git(web, 'pull', '-q', '--ff-only')
+    return web, publish, remote
+
+
+def test_version_says_help_edits_can_be_sent(client, app_module, helped):
+    web, publish, remote = helped
+    (web / 'docs/help/list.md').write_text('sorted most urgent first\n')
+    d = client.get('/api/version', headers=LOCAL).get_json()
+    assert d['can_update'] is False and d['can_send'] is True and d['edits'] == ['docs/help/list.md']
+
+
+def test_code_edits_cannot_be_sent(client, app_module, helped):
+    web, publish, remote = helped
+    (web / 'docs/help/list.md').write_text('sorted\n')
+    (web / 'app.py').write_text('my edit\n')
+    d = client.get('/api/version', headers=LOCAL).get_json()
+    assert d['can_send'] is False and 'outside docs/help' in d['reason']
+    r = client.post('/api/update/send-edits', headers=TRUSTED)
+    assert r.status_code == 409 and (web / 'app.py').read_text() == 'my edit\n'
+    assert git(web, 'rev-list', '--count', '@{u}..HEAD').strip() == '0', 'committed anyway'
+
+
+def test_send_edits_pushes_them_and_updates(client, app_module, helped):
+    web, publish, remote = helped
+    publish('Calendar: a fix')
+    (web / 'docs/help/list.md').write_text('sorted most urgent first\n')
+    r = client.post('/api/update/send-edits', headers=TRUSTED)
+    d = r.get_json()
+    assert r.status_code == 200 and d['success'] is True, d
+    assert 'Calendar: a fix' in (web / 'app.py').read_text(), 'not updated'
+    assert git(remote, 'show', 'main:docs/help/list.md') == 'sorted most urgent first\n', 'not pushed'
+    assert git(remote, 'log', '-1', '--format=%s', 'main').startswith('Help: edits from')
+    v = client.get('/api/version', headers=LOCAL).get_json()
+    assert v['behind'] == 0 and v['edits'] == [] and v['can_update'] is True
+
+
+def test_a_failed_push_leaves_the_edits_as_they_were(client, app_module, helped, monkeypatch):
+    web, publish, remote = helped
+    (web / 'docs/help/list.md').write_text('sorted most urgent first\n')
+    git(web, 'remote', 'set-url', '--push', 'origin', str(web.parent / 'nowhere.git'))
+    head = git(web, 'rev-parse', 'HEAD')
+    r = client.post('/api/update/send-edits', headers=TRUSTED)
+    assert r.status_code == 502 and 'push' in r.get_json()['error']
+    assert git(web, 'rev-parse', 'HEAD') == head, 'the commit stayed'
+    assert (web / 'docs/help/list.md').read_text() == 'sorted most urgent first\n'
+    assert git(web, 'diff', '--name-only', 'HEAD').split() == ['docs/help/list.md']
+
+
+def test_a_conflict_leaves_the_edits_as_they_were(client, app_module, helped):
+    web, publish, remote = helped
+    dev = web.parent / 'dev'
+    (dev / 'docs/help/list.md').write_text('upstream wording\n')
+    git(dev, 'commit', '-qam', 'Help: upstream wording')
+    git(dev, 'push', '-q', 'origin', 'main')
+    (web / 'docs/help/list.md').write_text('phone wording\n')
+    head = git(web, 'rev-parse', 'HEAD')
+    r = client.post('/api/update/send-edits', headers=TRUSTED)
+    assert r.status_code == 409 and 'conflict' in r.get_json()['error']
+    assert git(web, 'rev-parse', 'HEAD') == head
+    assert (web / 'docs/help/list.md').read_text() == 'phone wording\n'
+    assert git(remote, 'show', 'main:docs/help/list.md') == 'upstream wording\n'
+
+
+def test_send_edits_is_a_post_and_origin_checked(client, helped):
+    web, publish, remote = helped
+    (web / 'docs/help/list.md').write_text('x\n')
+    assert client.get('/api/update/send-edits', headers=LOCAL).status_code in (404, 405)
+    r = client.post('/api/update/send-edits', headers={**LOCAL, 'Origin': 'http://evil.example'})
+    assert r.status_code == 403 and git(web, 'diff', '--name-only', 'HEAD').split() == ['docs/help/list.md']
+
+
+def test_no_send_over_unpushed_commits(client, helped):
+    """A push would carry them along: those are someone's work in progress, not help edits."""
+    web, publish, remote = helped
+    (web / 'app.py').write_text('local commit\n')
+    git(web, 'commit', '-qam', 'work in progress')
+    (web / 'docs/help/list.md').write_text('sorted\n')
+    assert client.get('/api/version', headers=LOCAL).get_json()['can_send'] is False
+    assert client.post('/api/update/send-edits', headers=TRUSTED).status_code == 409

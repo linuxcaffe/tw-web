@@ -1479,11 +1479,25 @@ def _version_info():
     branch = _web_git('rev-parse', '--abbrev-ref', 'HEAD') or ''
     behind = int(_web_git('rev-list', '--count', 'HEAD..@{u}') or 0)
     subjects = (_web_git('log', '--format=%s', '-20', 'HEAD..@{u}') or '').splitlines() if behind else []
-    edits = _web_git('status', '--porcelain', '--untracked-files=no')
-    reason = ('' if branch == 'main' and edits == '' else
+    edits = _local_edits()
+    ahead = int(_web_git('rev-list', '--count', '@{u}..HEAD') or 0)
+    reason = ('' if branch == 'main' and edits == [] else
               f'on branch {branch}, not main' if branch != 'main' else 'there are local changes')
+    help_only = bool(edits) and all(f.startswith(_SENDABLE) for f in edits)
+    if reason and branch == 'main' and edits and not help_only:
+        reason = 'there are local changes outside docs/help/'
     return {'version': version, 'behind': behind, 'subjects': subjects, 'can_update': not reason,
-            'reason': reason, 'checked': _update_state['checked']}
+            'reason': reason, 'checked': _update_state['checked'], 'edits': edits,
+            'can_send': branch == 'main' and help_only and ahead == 0}
+
+# Help edits made on a station (djp edits help pages on the phone) can be sent home: anything
+# else there is work in progress and blocks the update, as before.
+_SENDABLE = 'docs/help/'
+
+def _local_edits():
+    """Tracked files changed in tw-web's checkout (untracked files don't block a pull)."""
+    out = _web_git('diff', '--name-only', '--no-renames', 'HEAD')
+    return out.splitlines() if out else []
 
 def _update_check_due(checked, now):
     """By the clock: time.sleep runs on the monotonic clock, which stops while a phone sleeps, so a
@@ -1530,6 +1544,39 @@ def web_update():
     if _web_git('pull', '--ff-only', '-q', timeout=SYNC_TIMEOUT) is None:
         return jsonify({'success': False, 'error': 'git pull failed (offline, or not a fast-forward)'}), 502
     return jsonify({'success': True, 'version': _version_info()['version']})
+
+@app.route('/api/update/send-edits', methods=['POST'])
+def web_send_edits():
+    """Send this station's help edits home, then update (djp 2026-11-25): commit them, rebase
+    onto the upstream, push. Any failure puts the edits back as they were, uncommitted."""
+    info = _version_info()
+    if not info['can_send']:
+        return jsonify({'success': False, 'error': f"Can't send: {info['reason'] or 'no help edits'}"}), 409
+    if not _fetch_web():
+        return jsonify({'success': False, 'error': 'git fetch failed (offline?)'}), 502
+    start = _web_git('rev-parse', 'HEAD')
+    files = info['edits']
+    msg = f"Help: edits from {_station_name() or 'a station'}\n\n" + '\n'.join(files)
+    if _web_git('commit', '-q', '-m', msg, '--', *files) is None:
+        return jsonify({'success': False, 'error': 'git commit failed (is user.name set?)'}), 500
+    mine = _web_git('rev-parse', 'HEAD')
+
+    def put_back():
+        # The edits commit on the old base, then HEAD back to where it was: the edits are left
+        # in the tree, uncommitted. --hard is safe: only these help files differed from HEAD.
+        _web_git('reset', '-q', '--hard', mine)
+        _web_git('reset', '-q', start)
+
+    if _web_git('rebase', '-q', '@{u}', timeout=SYNC_TIMEOUT) is None:
+        _web_git('rebase', '--abort')
+        put_back()
+        return jsonify({'success': False, 'error': 'An update changes the same lines (a conflict): '
+                        'your edits are still here; send them from a desktop'}), 409
+    if _web_git('push', '-q', 'origin', 'HEAD:main', timeout=SYNC_TIMEOUT) is None:
+        put_back()
+        return jsonify({'success': False, 'error': 'git push failed (offline, or no push access): '
+                        'your edits are still here'}), 502
+    return jsonify({'success': True, 'version': _version_info()['version'], 'sent': files})
 
 @app.route('/api/server/stop', methods=['POST'])
 def server_stop():
