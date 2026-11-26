@@ -52,6 +52,8 @@ It works best alongside some of them, and needs none of them:
 - [nb-web](https://github.com/linuxcaffe/nb-web) keeps notes that link to tasks and back
 - [tw-mobilize](https://github.com/linuxcaffe/tw-mobilize) sets the whole thing up on an Android phone
 
+More, and how your own hooks behave in tw-web: [Working with tw](tw.md).
+
 ## Where to next
 
 - [Installing](install.md), if you haven't yet
