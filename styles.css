@@ -550,8 +550,9 @@ h2 {
     gap: 5px;
     align-items: center;
 }
-/* Card view: meta sits on its own line, right-aligned — description always owns full width */
-:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card:not(.collapsed) .card-meta {
+/* A card (card mode, or a line opened by a click in line mode): meta sits on its own line,
+   right-aligned; the description owns the full width */
+:is(:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded, :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card:not(.collapsed)) .card-meta {
     justify-content: flex-end;
     margin-top: 2px;
 }
@@ -572,9 +573,6 @@ h2 {
     word-break: break-word;
     clear: both;
 }
-/* Hide extras in collapsed and list-view (non-expanded) states */
-:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-extras,
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded) .card-extras { display: none; }
 
 /* Tree-style dep cards in list view */
 .task-card.task-card-dep {
@@ -639,90 +637,46 @@ a.ann-link:hover { text-decoration: underline; }
     color: var(--text-muted);
 }
 
-/* ── List view ───────────────────────────────────────────────── */
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card {
+/* ── One line ─────────────────────────────────────────────────
+   A task as one line looks the same however it got there: the List's line mode, or a card
+   collapsed by a click in card mode. One set of rules for both (they had drifted apart, so a
+   card toggled back to a line didn't match its neighbours, user 2026-11-27). A line opened by a
+   click in line mode is a plain card: no rules of its own. */
+:is(:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded), :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed) {
     margin-bottom: 2px;
     border-radius: 3px;
-    padding: 0;
     cursor: pointer;
 }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-main {
+:is(:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded), :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed) .card-main {
     display: flex;
-    flex-wrap: wrap;          /* meta wraps below desc when there's no room */
+    flex-wrap: wrap;          /* meta wraps below desc when the two don't fit on one line */
     align-items: baseline;
     gap: 0 8px;
     padding: 3px 8px;
 }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-desc {
-    flex: 1 1 0;
-    min-width: min(160px, 100%);
+:is(:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded), :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed) .card-desc {
+    flex: 1 1 auto;           /* as wide as its text: with the pills if both fit, else alone on */
+    min-width: 0;             /* the first line (pills below), truncated only past the full width */
     margin-bottom: 0;
     font-size: 0.88rem;
     align-items: center;
 }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-desc-text {
+:is(:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded), :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed) .card-desc-text {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-meta {
+:is(:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded), :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed) .card-meta {
     flex: 0 0 auto;           /* meta never squeezes desc; wraps to next line if needed */
     white-space: nowrap;
     gap: 4px;
 }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-meta .card-pri,
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-meta .card-dur { display: none; }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .card-actions { display: none; }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded) .card-annotations { display: none; }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:hover { box-shadow: none; background: var(--tw-surface-hov); }
-
-/* ── Collapsed card within card view ────────────────────────── */
-:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed {
-    margin-bottom: 2px;
-    border-radius: 3px;
-    cursor: pointer;
-}
-:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-main {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 4px 10px;
-}
-:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-desc {
-    margin-bottom: 0;
-    flex: 1;
-    align-items: center;
-}
-:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-desc-text {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-meta .card-pri,
-:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-meta .card-dur { display: none; }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-actions { display: none; }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed .card-annotations { display: none; }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed:hover { box-shadow: none; background: var(--tw-surface-hov); }
-
-/* ── Expanded card within list view ─────────────────────────── */
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded {
-    margin-bottom: 7px;
-    border-radius: 6px;
-    cursor: default;
-}
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-main {
-    display: block;
-    padding: 8px 12px;
-}
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-desc {
-    margin-bottom: 4px;
-    white-space: normal;
-}
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-meta .card-pri,
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-meta .card-due,
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-meta .card-dur { display: inline; }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded .card-actions { display: flex; }
-:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card.expanded:hover { box-shadow: 0 3px 8px rgba(0,0,0,0.1); background: var(--bg2); }
+:is(:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded), :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed) .card-meta .card-pri,
+:is(:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded), :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed) .card-meta .card-dur,
+:is(:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded), :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed) .card-actions,
+:is(:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded), :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed) .card-annotations,
+:is(:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded), :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed) .card-extras { display: none; }
+:is(:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded), :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed):hover { box-shadow: none; background: var(--tw-surface-hov); }
 
 /* Modal */
 .modal {
