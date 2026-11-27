@@ -166,7 +166,10 @@ body {
     padding: 10px 12px 4px;
     font-size: 0.68rem; font-weight: 700; letter-spacing: 0.07em;
     text-transform: uppercase; color: var(--text-dim);
+    display: flex; align-items: baseline;
 }
+/* the sidebar's count sits at the header's right, not among the toggle buttons */
+.tw-sb-label .tw-proj-total { margin-left: auto; font-weight: 400; letter-spacing: 0; }
 /* sidebar pick item styles */
 .list-sidebar .tw-toggle-bar  { background: transparent; border-bottom: 1px solid var(--border); padding: 4px 8px; }
 .list-sidebar .tw-toggle-btn  { background: var(--bg3); border-color: var(--border); color: var(--text-muted); font-size: 11px; }

@@ -1846,11 +1846,10 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
         function render() {
             const state = getState();
             let html =
-                `<div class="tw-sb-label">Projects</div>` +
+                `<div class="tw-sb-label">Projects<span class="tw-proj-total">${allProjects.length}</span></div>` +
                 `<div class="tw-toggle-bar">` +
                     `<button class="tw-toggle-btn${mode==='active'?' active':''}" data-mode="active">active</button>` +
                     `<button class="tw-toggle-btn${mode==='all'?' active':''}" data-mode="all">all</button>` +
-                    `<span class="tw-proj-total">${allProjects.length}</span>` +
                 `</div>` +
                 `<button class="tw-pick-item${!state.project?' active':''}" data-pick=""><span class="tw-proj-label">All projects</span></button>` +
                 `<button class="tw-pick-item${state.project==='.none:'?' active':''}" data-pick=".none:"><span class="tw-proj-label">No project</span></button>`;
@@ -1896,8 +1895,10 @@ select.tw-settings-input option { background: #1a2a3a; color: #ecf0f1; }
                 m => load(m),
                 pick => setState({ tags: pick }, { clientOnly: true })
             );
-            // Prepend sidebar section label (panel version doesn't need it)
+            // Prepend sidebar section label (panel version doesn't need it); the count moves up into it
             container.insertAdjacentHTML('afterbegin', `<div class="tw-sb-label">Tags</div>`);
+            const total = container.querySelector('.tw-toggle-bar .tw-proj-total');
+            if (total) container.firstElementChild.appendChild(total);
         }
 
         async function load(m) {
