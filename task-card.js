@@ -194,15 +194,32 @@ class TaskCardManager {
     }
 
     _extras(task) {
-        // Fields rendered elsewhere — never appear in extras
-        const CORE = new Set([
+        // Fields rendered elsewhere, or bookkeeping: never in extras.
+        // edate is the agenda hook's copy of due/scheduled (shown above); r* are recurrence-overhaul's
+        // own fields (the editor's Recur line shows them as the user wrote them).
+        const HIDDEN = new Set([
             'uuid','description','status','priority','project','tags',
             'due','scheduled','sched_duration',
             'entry','modified','start','end',
             'annotations','mask','imask','parent',
             'id','urgency','depends','wait','recur',
+            'edate','r','type','rend','rindex','rtemplate',
+            'rtype','ranchor','rlast','rwait','rscheduled','runtil',
         ]);
-        const pairs = [];  // {key, text} — sorted alpha after id
+        const date = (s, yr) => {
+            const m = String(s).match(/^(\d{4})(\d{2})(\d{2})/);
+            return m ? new Date(+m[1], +m[2]-1, +m[3])
+                           .toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(yr ? { year: 'numeric' } : {}) })
+                     : String(s);
+        };
+
+        // Always first: id (or, once done, uuid and end)
+        const parts = [];
+        const nonPending = task.status === 'completed' || task.status === 'deleted';
+        if (nonPending) {
+            if (task.uuid) parts.push(`uuid:${task.uuid.slice(0, 8)}`);
+            if (task.end)  parts.push(`end:${date(task.end, true)}`);
+        } else if (task.id) parts.push(`id:${task.id}`);
 
         if (task.depends) {
             const deps = Array.isArray(task.depends) ? task.depends
@@ -210,46 +227,30 @@ class TaskCardManager {
             const lookup = new Map((window._twAllTasks || []).map(t => [t.uuid, t]));
             const labels = deps.map(u => {
                 const t = lookup.get(u);
-                return t ? (t.id ? String(t.id) : u.slice(0, 8)) : u.slice(0, 8);
+                return t && t.id ? String(t.id) : u.slice(0, 8);
             });
-            pairs.push({ key: 'dep', text: 'dep:' + labels.join(',') });
+            parts.push('dep:' + labels.join(','));
         }
+        if (task.wait) parts.push(`wait:${date(task.wait)}`);
 
-        if (task.recur) pairs.push({ key: 'recur', text: `recur:${task.recur}` });
+        // Recurrence: the rule, chain (period is the default), its end, an instance's number
+        if (task.r)                parts.push(`r:${task.r}`);
+        else if (task.recur)       parts.push(`recur:${task.recur}`);
+        if (task.type === 'chain') parts.push('type:chain');
+        if (task.rend)             parts.push(`rend:${this._fmtVal(task.rend)}`);
+        if (task.rindex)           parts.push(`rindex:${task.rindex}`);
 
-        if (task.urgency != null)
-            pairs.push({ key: 'urgency', text: `urgency:${Math.round(task.urgency * 10) / 10}` });
-
-        if (task.wait) {
-            const m = task.wait.match(/^(\d{4})(\d{2})(\d{2})/);
-            const lbl = m ? new Date(+m[1], +m[2]-1, +m[3])
-                                .toLocaleDateString(undefined, {month:'short', day:'numeric'})
-                          : task.wait;
-            pairs.push({ key: 'wait', text: `wait:${lbl}` });
-        }
-
-        // Unknown UDAs
-        for (const [k, v] of Object.entries(task)) {
-            if (CORE.has(k)) continue;
-            if (v === null || v === undefined || v === '') continue;
+        // Other UDAs, A–Z. A key starting with _ is a page's own working field (agenda.js adds
+        // _at, _type, _sort), never Taskwarrior's
+        Object.keys(task).filter(k => !HIDDEN.has(k) && !k.startsWith('_')).sort().forEach(k => {
+            const v = task[k];
+            if (v === null || v === undefined || v === '') return;
             const fmt = Array.isArray(v) ? v.map(x => this._fmtVal(x)).join(',') : this._fmtVal(v);
-            pairs.push({ key: k, text: `${k}:${fmt}` });
-        }
+            parts.push(`${k}:${fmt}`);
+        });
 
-        pairs.sort((a, b) => a.key.localeCompare(b.key));
-
-        const parts = [];
-        const nonPending = task.status === 'completed' || task.status === 'deleted';
-        if (nonPending && task.uuid) parts.push(`uuid:${task.uuid.slice(0, 8)}`);
-        if (nonPending && task.end) {
-            const m = task.end.match(/^(\d{4})(\d{2})(\d{2})/);
-            const lbl = m ? new Date(+m[1], +m[2]-1, +m[3])
-                                .toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                          : task.end.slice(0, 8);
-            parts.push(`end:${lbl}`);
-        }
-        if (!nonPending && task.id) parts.push(`id:${task.id}`);
-        pairs.forEach(p => parts.push(p.text));
+        // Always last
+        if (task.urgency != null) parts.push(`urgency:${Math.round(task.urgency * 10) / 10}`);
 
         return parts.join(', ');
     }
