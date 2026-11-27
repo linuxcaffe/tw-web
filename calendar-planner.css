@@ -572,7 +572,8 @@ body.cal-page .app-container {
 [data-theme="dark"] .fc .fc-timegrid-slot-label           { color: #768390; }
 
 /* Unscheduled sidebar task cards */
-[data-theme="dark"] .tasks-column .task-card             { background: #2b3038; border-color: rgba(255,255,255,0.08); }
+/* :where() keeps this at .task-card's weight, so the coloured edges ([data-annotated]) still win */
+:where([data-theme="dark"] .tasks-column) .task-card    { background: #2b3038; border-color: rgba(255,255,255,0.08); }
 [data-theme="dark"] .tasks-column .task-card:hover        { border-color: var(--primary-color); }
 [data-theme="dark"] .tasks-column .task-card.selected     { background-color: rgba(91,155,213,0.12); }
 [data-theme="dark"] .task-description                     { color: var(--dark-text); }
