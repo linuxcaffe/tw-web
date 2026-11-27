@@ -47,7 +47,7 @@ A card shows:
 
 - a **priority dot**, red for H (and 1, 2), amber for M (3, 4), green for L (5, 6); a ring around it means a recurring task, see [Recurrence](recurrence.md)
 - the **description**, then the project, due and scheduled dates, duration and tags; the due date turns amber when it's less than three days off, red once it's past
-- an **extras** line for anything else, such as `dep:12` when it depends on task 12, or a UDA's value
+- an **extras** line for the rest, from its `id:` to its `urgency:`: what it depends on (`dep:12`), its wait date, its recurrence rule and any UDA's value
 - its **annotations**, with links you can click (see [Annotations and links](annotations.md))
 
 A task that depends on others shows them right under it, indented, so you can see what's in the way.

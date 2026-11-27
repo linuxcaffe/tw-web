@@ -48,6 +48,9 @@ A task whose time is midnight has a date but no time, so it goes in the **all-da
 $ task add Mum's birthday scheduled:2026-12-03
 ```
 
+Tap **all-day ▾** to fold the strip away and give the hours the room; each device remembers.
+A day's header then counts what's hidden, "2 all-day", and a tap brings the strip back.
+
 Completed tasks show in grey and deleted ones in purple when you pick those statuses; they can't be moved.
 
 ## Moving and stretching
