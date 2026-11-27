@@ -90,6 +90,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     _step('setupCalTooltip', () => setupCalTooltip());
     _step('setupOffscreenMarkers', () => setupOffscreenMarkers());
     _step('setupMoreLinkTitles',   () => setupMoreLinkTitles());
+    _step('setupAllDayFold',       () => setupAllDayFold());
 
     document.addEventListener('tw-open-add',      () => { if (taskEditor) taskEditor.show(null); });
     document.addEventListener('tw-filter-change', () => loadTasks());
@@ -1157,14 +1158,13 @@ function initSidebarControls() {
 // ── Off-screen markers ────────────────────────────────────────────────────────
 // Week and Day draw 24 hours but open at a zoom step's start hour, so events can be scrolled out of view.
 // "↑ N earlier" / "↓ N later" sit at the top and bottom edge of the visible grid; a click scrolls
-// to the nearest hidden event. Where the page scrolls (phone), the all-day row scrolls away too:
-// "↑ N all-day" then sits beside "earlier", and a click brings the row back. Each marker's tooltip
-// names what it hides (user 2026-11-27). The grid scrolls inside FullCalendar's scroller, or with the
+// to the nearest hidden event. Each marker's tooltip names what it hides (user 2026-11-27). All-day
+// events out of sight get a count in their day's header instead (paintAllDayCounts). The grid scrolls inside FullCalendar's scroller, or with the
 // page when the height is auto (narrow screens), so the visible band is the scroller cut to the window.
 let _markerFrame = 0;
 
 function setupOffscreenMarkers() {
-    for (const dir of ['allday', 'up', 'down']) {
+    for (const dir of ['up', 'down']) {
         const btn = document.createElement('button');
         btn.id        = `cal-marker-${dir}`;
         btn.className = `cal-marker cal-marker-${dir}`;
@@ -1234,8 +1234,7 @@ function _hiddenTitle(descs) {
     return list.slice(0, 12).map(d => `• ${d}`).concat(more).join('\n');
 }
 
-// The visible band of the time grid; the timed events above and below it, and the all-day events
-// scrolled away above it ({r: rect, desc})
+// The visible band of the time grid, and the timed events above and below it ({r: rect, desc})
 function _offscreenEvents() {
     const body = document.querySelector('#calendar .fc-timegrid-body');
     if (!body || !calendar?.view.type.startsWith('timeGrid')) return null;
@@ -1246,72 +1245,117 @@ function _offscreenEvents() {
         .map(sel => document.querySelector(sel)?.getBoundingClientRect().bottom || 0);
     const top      = Math.max(sr.top, 0, ...edges);
     const bottom   = Math.min(sr.bottom, window.innerHeight);
-    const above = [], below = [], allday = [];
+    const above = [], below = [];
     body.querySelectorAll('.fc-timegrid-event').forEach(el => {
         const r = el.getBoundingClientRect();
         if (r.height === 0) return;
         if (r.bottom <= top) above.push({ r, desc: _evDesc(el) });
         else if (r.top >= bottom) below.push({ r, desc: _evDesc(el) });
     });
-    // the all-day row sits above the time grid: with the page scroll it can pass under the sticky
-    // headers, so its events are hidden once they're above the headers' bottom edge
-    const headTop = Math.max(0, ...edges);
-    const dayRow  = document.querySelector('#calendar .fc-daygrid-body');
-    const dr      = dayRow?.getBoundingClientRect();
-    dayRow?.querySelectorAll('.fc-daygrid-event').forEach(el => {
-        const r = el.getBoundingClientRect();
-        if (r.height && r.bottom <= headTop + 2) allday.push({ r, desc: _evDesc(el) });
-    });
-    return { scroller, sr, top, bottom, above, below, allday, dayRow: dr, headTop };
+    return { scroller, sr, top, bottom, above, below, headTop: Math.max(0, ...edges) };
 }
 
 function updateOffscreenMarkers() {
     const up   = document.getElementById('cal-marker-up');
     const down = document.getElementById('cal-marker-down');
-    const all  = document.getElementById('cal-marker-allday');
-    if (!up || !down || !all) return;
+    if (!up || !down) return;
     const o = _offscreenEvents();
-    const show = (btn, list, text) => {
-        if (!o || list.length === 0) { btn.style.display = 'none'; return false; }
+    const place = (btn, list, text, y) => {
+        if (!o || list.length === 0) { btn.style.display = 'none'; return; }
         btn.textContent   = text(list.length);
         btn.title         = _hiddenTitle(list.map(e => e.desc));
         btn.style.display = '';
-        return true;
+        btn.style.left    = `${o.sr.left + o.sr.width / 2}px`;
+        btn.style.top     = `${y}px`;
     };
-    const hasAll  = show(all,  o?.allday || [], n => `↑ ${n} all-day`);
-    const hasUp   = show(up,   o?.above  || [], n => `↑ ${n} earlier`);
-    show(down, o?.below || [], n => `↓ ${n} later`);
-    if (!o) return;
-    // the top markers side by side, centred on the grid (left is each one's centre: translateX(-50%))
-    const cx  = o.sr.left + o.sr.width / 2, gap = 6;
-    const wa  = hasAll ? all.offsetWidth : 0, wu = hasUp ? up.offsetWidth : 0;
-    const x0  = cx - (wa + wu + (hasAll && hasUp ? gap : 0)) / 2;
-    const y   = `${o.top + 6}px`;
-    if (hasAll) { all.style.left = `${x0 + wa / 2}px`; all.style.top = y; }
-    if (hasUp)  { up.style.left  = `${x0 + (hasAll ? wa + gap : 0) + wu / 2}px`; up.style.top = y; }
-    down.style.left = `${cx}px`;
-    down.style.top  = `${o.bottom - 6 - (down.offsetHeight || 24)}px`;
+    place(up,   o?.above || [], n => `↑ ${n} earlier`, o ? o.top + 6 : 0);
+    place(down, o?.below || [], n => `↓ ${n} later`,   o ? o.bottom - 6 - (down.offsetHeight || 24) : 0);
+    paintAllDayCounts(o);
 }
 
-// Bring the nearest hidden event above (or below), or the all-day row, to the top of the visible band
+// Bring the nearest hidden event above (or below) to the top of the visible band
 function scrollToHidden(dir) {
     const o = _offscreenEvents();
     if (!o) return;
-    let delta;
-    if (dir === 'allday') {
-        if (!o.allday.length) return;
-        delta = o.dayRow.top - (o.headTop + 2);
-    } else {
-        const list = (dir === 'up' ? o.above : o.below).map(e => e.r);
-        if (!list.length) return;
-        const target = dir === 'up'
-            ? list.reduce((a, b) => (b.bottom > a.bottom ? b : a))
-            : list.reduce((a, b) => (b.top < a.top ? b : a));
-        delta = target.top - (o.top + 8);
-    }
-    if (dir !== 'allday' && o.scroller.scrollHeight > o.scroller.clientHeight) o.scroller.scrollTop += delta;
+    const list = (dir === 'up' ? o.above : o.below).map(e => e.r);
+    if (!list.length) return;
+    const target = dir === 'up'
+        ? list.reduce((a, b) => (b.bottom > a.bottom ? b : a))
+        : list.reduce((a, b) => (b.top < a.top ? b : a));
+    const delta = target.top - (o.top + 8);
+    if (o.scroller.scrollHeight > o.scroller.clientHeight) o.scroller.scrollTop += delta;
     else window.scrollBy(0, delta);
     scheduleMarkers();
+}
+
+// ── All-day row: folded, and counts in the day headers ─────────────────────────
+// Week and Day keep all-day events in a row above the hours. Tapping its "all-day" label folds it
+// away (remembered on this device) to give the hours the room. A day whose all-day events are out of
+// sight, folded or scrolled away under the sticky day names (phone), says "N all-day" in its header:
+// the tooltip names them, a click unfolds the row and brings it into view (user 2026-11-27).
+const ALLDAY_KEY = 'tw-cal-allday-folded';
+function _allDayFolded() {
+    try { return localStorage.getItem(ALLDAY_KEY) === '1'; } catch { return false; }
+}
+function setAllDayFolded(folded) {
+    try { localStorage.setItem(ALLDAY_KEY, folded ? '1' : '0'); } catch { /* this visit only */ }
+    document.getElementById('calendar').classList.toggle('cal-allday-folded', folded);
+    calendar.updateSize();
+    scheduleMarkers();
+}
+
+// The all-day events (tasks and layers, not background marks) on a local day "YYYY-MM-DD"
+function _allDayOn(dateStr) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const day0 = new Date(y, m - 1, d), day1 = new Date(y, m - 1, d + 1);
+    return calendar.getEvents().filter(e => e.allDay && e.display !== 'background' && e.display !== 'none'
+        && e.start < day1 && (e.end || new Date(e.start.getTime() + 864e5)) > day0);
+}
+
+function paintAllDayCounts(o) {
+    const heads = document.querySelectorAll('#calendar .fc-timegrid .fc-col-header-cell[data-date]');
+    const row   = document.querySelector('#calendar .fc-timegrid .fc-daygrid-body');
+    const out   = _allDayFolded() || (o && row && row.getBoundingClientRect().bottom <= o.headTop + 2);
+    heads.forEach(th => {
+        const inner = th.querySelector('.fc-scrollgrid-sync-inner');
+        if (!inner) return;
+        let badge = inner.querySelector(':scope > .cal-allday-count');
+        const evs = out ? _allDayOn(th.dataset.date) : [];
+        if (!evs.length) { badge?.remove(); return; }
+        if (!badge) {
+            badge = document.createElement('button');
+            badge.type = 'button';
+            badge.className = 'cal-allday-count';
+            badge.addEventListener('click', e => { e.stopPropagation(); showAllDay(); });
+            inner.prepend(badge);
+        }
+        badge.textContent = `${evs.length} all-day`;
+        badge.title = _hiddenTitle(evs.map(e => e.title));
+    });
+}
+
+// Unfold the all-day row and bring it into view under the sticky headers
+function showAllDay() {
+    if (_allDayFolded()) setAllDayFolded(false);
+    requestAnimationFrame(() => {
+        const row = document.querySelector('#calendar .fc-timegrid .fc-daygrid-body');
+        const o   = _offscreenEvents();
+        if (!row || !o) return;
+        const delta = row.getBoundingClientRect().top - (o.headTop + 2);
+        if (delta < 0) window.scrollBy(0, delta);
+        scheduleMarkers();
+    });
+}
+
+function setupAllDayFold() {
+    const cal = document.getElementById('calendar');
+    cal.classList.toggle('cal-allday-folded', _allDayFolded());
+    cal.addEventListener('click', e => {
+        const axis = e.target.closest('.fc-timegrid .fc-daygrid-body .fc-timegrid-axis');
+        if (!axis) return;
+        e.stopPropagation();
+        setAllDayFolded(!_allDayFolded());
+    });
 }
 
 // Month's "+N more" (and the all-day row's): its tooltip names the events it hides, which are the

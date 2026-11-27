@@ -392,6 +392,32 @@ body.cal-page .app-container {
 }
 .cal-marker:hover { opacity: 1; }
 
+/* The all-day row in Week and Day: no spare line under its events (FullCalendar leaves 1em and a
+   2em minimum); an empty row stays tall enough to select in. Its "all-day" label folds it away
+   (calendar-planner.js setupAllDayFold); a day with all-day events out of sight counts them in
+   its header (.cal-allday-count). */
+.fc .fc-timegrid .fc-daygrid-body .fc-daygrid-day-events { margin-bottom: 2px; min-height: 1.4em; }
+.fc .fc-timegrid .fc-daygrid-body .fc-timegrid-axis { cursor: pointer; }
+.fc .fc-timegrid .fc-daygrid-body .fc-timegrid-axis-cushion { white-space: nowrap; }
+.fc .fc-timegrid .fc-daygrid-body .fc-timegrid-axis-cushion::after { content: ' ▾'; }
+#calendar.cal-allday-folded .fc-timegrid .fc-daygrid-body .fc-timegrid-axis-cushion::after { content: ' ▸'; }
+#calendar.cal-allday-folded .fc-timegrid .fc-daygrid-body .fc-daygrid-day-events { display: none; }
+#calendar.cal-allday-folded .fc-timegrid .fc-daygrid-body .fc-daygrid-day-frame { min-height: 0; height: 1.4em; }
+.cal-allday-count {
+    margin-right: 6px;
+    padding: 0 6px;
+    border: none;
+    border-radius: 8px;
+    background: var(--primary-color);
+    color: #fff;
+    font-size: 0.7rem;
+    line-height: 1.5;
+    vertical-align: middle;
+    cursor: pointer;
+    opacity: 0.85;
+}
+.cal-allday-count:hover { opacity: 1; }
+
 .cal-tooltip {
     position: fixed;
     background: #333;
