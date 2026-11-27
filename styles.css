@@ -43,6 +43,7 @@
 }
 
 [data-theme="dark"] {
+    color-scheme: dark;   /* the browser's own parts follow: every scrollbar, not just the styled ones */
     --tw-holiday-bg:     rgba(224,184,74,0.14);
     --tw-holiday-border: #9c7a2c;
     --tw-holiday-text:   #e3c77d;

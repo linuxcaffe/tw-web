@@ -89,6 +89,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     _step('loadTasks', () => loadTasks());
     _step('setupCalTooltip', () => setupCalTooltip());
     _step('setupOffscreenMarkers', () => setupOffscreenMarkers());
+    _step('setupMoreLinkTitles',   () => setupMoreLinkTitles());
 
     document.addEventListener('tw-open-add',      () => { if (taskEditor) taskEditor.show(null); });
     document.addEventListener('tw-filter-change', () => loadTasks());
@@ -1156,12 +1157,14 @@ function initSidebarControls() {
 // ── Off-screen markers ────────────────────────────────────────────────────────
 // Week and Day draw 24 hours but open at a zoom step's start hour, so events can be scrolled out of view.
 // "↑ N earlier" / "↓ N later" sit at the top and bottom edge of the visible grid; a click scrolls
-// to the nearest hidden event. The grid scrolls inside FullCalendar's scroller, or with the page
-// when the height is auto (narrow screens), so the visible band is the scroller cut to the window.
+// to the nearest hidden event. Where the page scrolls (phone), the all-day row scrolls away too:
+// "↑ N all-day" then sits beside "earlier", and a click brings the row back. Each marker's tooltip
+// names what it hides (user 2026-11-27). The grid scrolls inside FullCalendar's scroller, or with the
+// page when the height is auto (narrow screens), so the visible band is the scroller cut to the window.
 let _markerFrame = 0;
 
 function setupOffscreenMarkers() {
-    for (const dir of ['up', 'down']) {
+    for (const dir of ['allday', 'up', 'down']) {
         const btn = document.createElement('button');
         btn.id        = `cal-marker-${dir}`;
         btn.className = `cal-marker cal-marker-${dir}`;
@@ -1219,7 +1222,20 @@ function scheduleMarkers() {
     _markerFrame = requestAnimationFrame(updateOffscreenMarkers);
 }
 
-// The visible band of the time grid, and the timed events above and below it
+// An event element's description (renderEventContent's data-desc), for a marker's tooltip
+function _evDesc(el) {
+    return el.querySelector('[data-desc]')?.dataset.desc || el.textContent.trim();
+}
+
+// A tooltip naming hidden events: one per line, at most 12
+function _hiddenTitle(descs) {
+    const list = [...new Set(descs.filter(Boolean))];
+    const more = list.length > 12 ? [`… and ${list.length - 12} more`] : [];
+    return list.slice(0, 12).map(d => `• ${d}`).concat(more).join('\n');
+}
+
+// The visible band of the time grid; the timed events above and below it, and the all-day events
+// scrolled away above it ({r: rect, desc})
 function _offscreenEvents() {
     const body = document.querySelector('#calendar .fc-timegrid-body');
     if (!body || !calendar?.view.type.startsWith('timeGrid')) return null;
@@ -1230,45 +1246,87 @@ function _offscreenEvents() {
         .map(sel => document.querySelector(sel)?.getBoundingClientRect().bottom || 0);
     const top      = Math.max(sr.top, 0, ...edges);
     const bottom   = Math.min(sr.bottom, window.innerHeight);
-    const above = [], below = [];
+    const above = [], below = [], allday = [];
     body.querySelectorAll('.fc-timegrid-event').forEach(el => {
         const r = el.getBoundingClientRect();
         if (r.height === 0) return;
-        if (r.bottom <= top) above.push(r);
-        else if (r.top >= bottom) below.push(r);
+        if (r.bottom <= top) above.push({ r, desc: _evDesc(el) });
+        else if (r.top >= bottom) below.push({ r, desc: _evDesc(el) });
     });
-    return { scroller, sr, top, bottom, above, below };
+    // the all-day row sits above the time grid: with the page scroll it can pass under the sticky
+    // headers, so its events are hidden once they're above the headers' bottom edge
+    const headTop = Math.max(0, ...edges);
+    const dayRow  = document.querySelector('#calendar .fc-daygrid-body');
+    const dr      = dayRow?.getBoundingClientRect();
+    dayRow?.querySelectorAll('.fc-daygrid-event').forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.height && r.bottom <= headTop + 2) allday.push({ r, desc: _evDesc(el) });
+    });
+    return { scroller, sr, top, bottom, above, below, allday, dayRow: dr, headTop };
 }
 
 function updateOffscreenMarkers() {
     const up   = document.getElementById('cal-marker-up');
     const down = document.getElementById('cal-marker-down');
-    if (!up || !down) return;
+    const all  = document.getElementById('cal-marker-allday');
+    if (!up || !down || !all) return;
     const o = _offscreenEvents();
-    const place = (btn, list, word, y) => {
-        if (!o || list.length === 0) { btn.style.display = 'none'; return; }
-        btn.textContent   = `${btn === up ? '↑' : '↓'} ${list.length} ${word}`;
+    const show = (btn, list, text) => {
+        if (!o || list.length === 0) { btn.style.display = 'none'; return false; }
+        btn.textContent   = text(list.length);
+        btn.title         = _hiddenTitle(list.map(e => e.desc));
         btn.style.display = '';
-        btn.style.left    = `${o.sr.left + o.sr.width / 2}px`;
-        btn.style.top     = `${y}px`;
+        return true;
     };
-    place(up,   o?.above || [], 'earlier', o ? o.top + 6 : 0);
-    place(down, o?.below || [], 'later',   o ? o.bottom - 6 - (down.offsetHeight || 24) : 0);
+    const hasAll  = show(all,  o?.allday || [], n => `↑ ${n} all-day`);
+    const hasUp   = show(up,   o?.above  || [], n => `↑ ${n} earlier`);
+    show(down, o?.below || [], n => `↓ ${n} later`);
+    if (!o) return;
+    // the top markers side by side, centred on the grid (left is each one's centre: translateX(-50%))
+    const cx  = o.sr.left + o.sr.width / 2, gap = 6;
+    const wa  = hasAll ? all.offsetWidth : 0, wu = hasUp ? up.offsetWidth : 0;
+    const x0  = cx - (wa + wu + (hasAll && hasUp ? gap : 0)) / 2;
+    const y   = `${o.top + 6}px`;
+    if (hasAll) { all.style.left = `${x0 + wa / 2}px`; all.style.top = y; }
+    if (hasUp)  { up.style.left  = `${x0 + (hasAll ? wa + gap : 0) + wu / 2}px`; up.style.top = y; }
+    down.style.left = `${cx}px`;
+    down.style.top  = `${o.bottom - 6 - (down.offsetHeight || 24)}px`;
 }
 
-// Bring the nearest hidden event above (or below) to the top of the visible band
+// Bring the nearest hidden event above (or below), or the all-day row, to the top of the visible band
 function scrollToHidden(dir) {
     const o = _offscreenEvents();
     if (!o) return;
-    const list = dir === 'up' ? o.above : o.below;
-    if (!list.length) return;
-    const target = dir === 'up'
-        ? list.reduce((a, b) => (b.bottom > a.bottom ? b : a))
-        : list.reduce((a, b) => (b.top < a.top ? b : a));
-    const delta = target.top - (o.top + 8);
-    if (o.scroller.scrollHeight > o.scroller.clientHeight) o.scroller.scrollTop += delta;
+    let delta;
+    if (dir === 'allday') {
+        if (!o.allday.length) return;
+        delta = o.dayRow.top - (o.headTop + 2);
+    } else {
+        const list = (dir === 'up' ? o.above : o.below).map(e => e.r);
+        if (!list.length) return;
+        const target = dir === 'up'
+            ? list.reduce((a, b) => (b.bottom > a.bottom ? b : a))
+            : list.reduce((a, b) => (b.top < a.top ? b : a));
+        delta = target.top - (o.top + 8);
+    }
+    if (dir !== 'allday' && o.scroller.scrollHeight > o.scroller.clientHeight) o.scroller.scrollTop += delta;
     else window.scrollBy(0, delta);
     scheduleMarkers();
+}
+
+// Month's "+N more" (and the all-day row's): its tooltip names the events it hides, which are the
+// day cell's hidden harnesses (FullCalendar 5 keeps them, visibility hidden). FullCalendar's own
+// "Show N more events" is replaced as the pointer arrives, so a re-render can't put it back first.
+function setupMoreLinkTitles() {
+    document.getElementById('calendar').addEventListener('mouseover', e => {
+        const link = e.target.closest('.fc-daygrid-more-link');
+        const cell = link?.closest('.fc-daygrid-day');
+        if (!cell) return;
+        const descs = [...cell.querySelectorAll('.fc-daygrid-event-harness')]
+            .filter(h => h.style.visibility === 'hidden')
+            .map(h => _evDesc(h));
+        if (descs.length) link.title = _hiddenTitle(descs);
+    });
 }
 
 // ── Hover tooltip (shows full description when event block is small) ───────────
