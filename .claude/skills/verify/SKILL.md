@@ -155,6 +155,9 @@ for Epiphany-only bugs the user tries a scratch server's URL in Epiphany itself.
   show on `reload()`: the page's task cache only hears of outside changes later (2026-11-27).
 - **A check's `console.log` shows only when it fails** (`run.py` prints output for FAIL/ERROR). To measure
   something, throw at the end of a throwaway check, then delete it.
+- **Don't `tail` a full e2e run.** `run.py | tail -3` shows "93 pass, 1 ERROR" without the check's name, and the
+  pipeline's exit code is `tail`'s (0). Use `run.py 2>&1 | grep -v '^pass'` and read it before merging (2026-11-27:
+  merged past an unnamed ERROR; the rerun was 94/94, a flake).
 - **An interrupted `run.py` leaves its scratch server up**, and the next run refuses ("already up"). Run
   `.tools/scratch-server.sh down` in that worktree.
 - **e2e on `help.html`:** each tab's list stays in the DOM, hidden, after you switch tabs. Scope selectors to

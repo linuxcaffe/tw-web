@@ -144,6 +144,9 @@ laptop window, and `d225a36` (a pointer-type split) was reverted for it (`b08801
 - **Only `#tw-nav-bar` sticks**; the button bar scrolls away. Anything that sticks below the nav bar uses
   `--tw-nav-h`, which `nav.js` measures on every page (fallback `50px`); the Calendar adds `--cal-bar-h`. Never
   guess a bar's height.
+- **`calendar-planner.css` loads after `styles.css` and restyles `.task-card`** (`padding: 1rem`, a 2px border,
+  a dark `border-color` scoped with `:where()`). A shared card rule that should hold on the Calendar's Unscheduled
+  list must cancel or out-rank those: two regressions in one day (2026-11-27) came from it.
 - **Layout shots** (`tests/e2e/layout-shots-100`/`-133`): six views at four widths and two zooms, top and after the
   wheel. A change that should leave the layout alone compares 96/96 before and after (`.tools/compare-shots.sh`;
   verify skill). An Epiphany-only glitch: rule out its state first (`tw-web-launch.sh --clean`, the PWA's zoom).
