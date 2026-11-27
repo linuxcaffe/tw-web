@@ -148,6 +148,15 @@ for Epiphany-only bugs the user tries a scratch server's URL in Epiphany itself.
   help import's `_get.md` passed every test in the worktree but never reached `main`
   (`test_help_docs.py::test_no_page_is_gitignored` now guards `docs/help/`). After merging new files, check
   `git ls-files` has them all.
+- **The List renders twice on load** (again when the virtual tags land), so a class a check sets by a
+  click right after `waitForSelector('.task-card')` can vanish. Wait ~1.5 s first. `waitForLoadState('networkidle')`
+  never returns: the SSE stream keeps the network busy (2026-11-27).
+- **Add a check's tasks before the first `goto`.** Tasks added with `task()` after the page has loaded don't
+  show on `reload()`: the page's task cache only hears of outside changes later (2026-11-27).
+- **A check's `console.log` shows only when it fails** (`run.py` prints output for FAIL/ERROR). To measure
+  something, throw at the end of a throwaway check, then delete it.
+- **An interrupted `run.py` leaves its scratch server up**, and the next run refuses ("already up"). Run
+  `.tools/scratch-server.sh down` in that worktree.
 - **e2e on `help.html`:** each tab's list stays in the DOM, hidden, after you switch tabs. Scope selectors to
   `.help-list:not([hidden])` (`help.check.cjs` keeps it in `V`).
 
