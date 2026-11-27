@@ -645,6 +645,7 @@ a.ann-link:hover { text-decoration: underline; }
 :is(:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded), :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed) {
     margin-bottom: 2px;
     border-radius: 3px;
+    padding: 0;               /* calendar-planner.css pads every .task-card 1rem */
     cursor: pointer;
 }
 :is(:is(#tasks-container, #unplanned-tasks, .kb-col-body).list-view .task-card:not(.expanded), :is(#tasks-container, #unplanned-tasks, .kb-col-body):not(.list-view) .task-card.collapsed) .card-main {
